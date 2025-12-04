@@ -4,7 +4,9 @@
  * POST - Registra impressões e cliques de anúncios
  */
 
+// CORS MUST be first
 require_once __DIR__ . '/../cors.php';
+
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../database.php';
