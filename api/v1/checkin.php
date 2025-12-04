@@ -1,6 +1,7 @@
 <?php
 error_reporting(0);
 
+require_once __DIR__ . "/../../db_config.php";
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
