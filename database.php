@@ -4,11 +4,11 @@
 function getDbConnection() {
     try {
         // Buscar variáveis de ambiente diretamente
-        $db_host = $_ENV['DB_HOST'] ?? getenv('DB_HOST');
-        $db_user = $_ENV['DB_USER'] ?? getenv('DB_USER');
-        $db_pass = $_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD');
-        $db_name = $_ENV['DB_NAME'] ?? getenv('DB_NAME');
-        $db_port = $_ENV['DB_PORT'] ?? getenv('DB_PORT');
+        $db_host = $_ENV['MYSQLHOST'] ?? getenv('MYSQLHOST') ?: 'localhost';
+        $db_user = $_ENV['MYSQLUSER'] ?? getenv('MYSQLUSER') ?: 'root';
+        $db_pass = $_ENV['MYSQLPASSWORD'] ?? getenv('MYSQLPASSWORD') ?: '';
+        $db_name = $_ENV['MYSQLDATABASE'] ?? getenv('MYSQLDATABASE') ?: 'railway';
+        $db_port = $_ENV['MYSQLPORT'] ?? getenv('MYSQLPORT') ?: 3306;
         
         // Debug: Log das configurações (sem senha)
         error_log("DB_HOST: " . $db_host);
@@ -24,12 +24,8 @@ function getDbConnection() {
             throw new Exception("mysqli_init failed");
         }
         
-        // Configurar SSL (Aiven requer SSL)
-        $conn->ssl_set(NULL, NULL, NULL, NULL, NULL);
-        $conn->options(MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, false);
-        
-        // Conectar ao banco
-        $success = $conn->real_connect($db_host, $db_user, $db_pass, $db_name, $db_port, NULL, MYSQLI_CLIENT_SSL);
+        // Conectar ao banco (Railway MySQL não requer SSL na rede interna)
+        $success = $conn->real_connect($db_host, $db_user, $db_pass, $db_name, $db_port);
         
         if (!$success) {
             error_log("Connection failed: " . $conn->connect_error);
