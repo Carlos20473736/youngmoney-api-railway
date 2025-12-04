@@ -14,9 +14,50 @@ try {
     $user = getAuthenticatedUser($conn);
     if (!$user) { sendUnauthorizedError(); }
     
-    // Por enquanto, retornar array vazio (implementar tabela notifications depois)
-    sendSuccess(['notifications' => [], 'total' => 0]);
+    $userId = $user['id'];
     
+    // Buscar notificações do usuário
+    $stmt = $conn->prepare("
+        SELECT 
+            id,
+            title,
+            message,
+            type,
+            is_read as `read`,
+            UNIX_TIMESTAMP(created_at) as timestamp,
+            created_at
+        FROM notifications 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT 50
+    ");
+    
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $notifications = [];
+    while ($row = $result->fetch_assoc()) {
+        $notifications[] = [
+            'id' => (int)$row['id'],
+            'title' => $row['title'],
+            'message' => $row['message'],
+            'type' => $row['type'] ?? 'info',
+            'read' => (bool)$row['read'],
+            'timestamp' => (int)$row['timestamp'],
+            'created_at' => $row['created_at']
+        ];
+    }
+    
+    sendSuccess([
+        'notifications' => $notifications,
+        'total' => count($notifications),
+        'unread' => array_reduce($notifications, function($carry, $item) {
+            return $carry + ($item['read'] ? 0 : 1);
+        }, 0)
+    ]);
+    
+    $stmt->close();
     $conn->close();
     
 } catch (Exception $e) {
