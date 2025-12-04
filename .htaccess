@@ -1,0 +1,30 @@
+# MIDDLEWARE DE SEGURANÇA GLOBAL - VALIDA 30 HEADERS
+php_value auto_prepend_file "/home/ubuntu/youngmoney-api/global_security_middleware.php"
+
+# Configuração CORS
+<IfModule mod_headers.c>
+    # Permitir requisições do painel administrativo
+    Header set Access-Control-Allow-Origin "https://satisfied-connection-production-deb1.up.railway.app"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header set Access-Control-Allow-Credentials "true"
+    
+    # Responder a requisições OPTIONS (preflight)
+    RewriteEngine On
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>
+
+# Permitir acesso direto a arquivos PHP
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Permitir acesso direto a arquivos na pasta /api/
+    RewriteCond %{REQUEST_URI} ^/api/
+    RewriteRule ^ - [L]
+    
+    # Redirecionar outras requisições para index.php (se necessário)
+    # RewriteCond %{REQUEST_FILENAME} !-f
+    # RewriteCond %{REQUEST_FILENAME} !-d
+    # RewriteRule ^ index.php [L]
+</IfModule>

@@ -1,0 +1,23 @@
+{
+    auto_https off
+    admin off
+}
+
+:80 {
+    root * /app
+    php_server
+    
+    # Configuração CORS
+    header {
+        Access-Control-Allow-Origin "https://satisfied-connection-production-deb1.up.railway.app"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        Access-Control-Allow-Credentials "true"
+    }
+    
+    # Responder a requisições OPTIONS
+    @options {
+        method OPTIONS
+    }
+    respond @options 200
+}
