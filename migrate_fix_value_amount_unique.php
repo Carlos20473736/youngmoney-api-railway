@@ -28,13 +28,19 @@ if ($tableCheck->num_rows == 0) {
 
 echo "✅ Tabela 'withdrawal_quick_values' existe!<br><br>";
 
-// Drop old column 'value' if it exists
-echo "🔧 Removendo coluna 'value' antiga...<br>";
-$dropValueColumn = "ALTER TABLE withdrawal_quick_values DROP COLUMN IF EXISTS value";
-if ($conn->query($dropValueColumn) === TRUE) {
-    echo "✅ Coluna 'value' removida com sucesso!<br>";
+// Check if 'value' column exists and drop it
+echo "🔧 Verificando coluna 'value' antiga...<br>";
+$checkValueColumn = $conn->query("SHOW COLUMNS FROM withdrawal_quick_values LIKE 'value'");
+if ($checkValueColumn->num_rows > 0) {
+    echo "🔧 Removendo coluna 'value' antiga...<br>";
+    $dropValueColumn = "ALTER TABLE withdrawal_quick_values DROP COLUMN value";
+    if ($conn->query($dropValueColumn) === TRUE) {
+        echo "✅ Coluna 'value' removida com sucesso!<br>";
+    } else {
+        echo "❌ Erro ao remover coluna 'value': " . $conn->error . "<br>";
+    }
 } else {
-    echo "ℹ️ Coluna 'value' não existe ou já foi removida: " . $conn->error . "<br>";
+    echo "ℹ️ Coluna 'value' não existe ou já foi removida!<br>";
 }
 
 // Add UNIQUE constraint to value_amount if not exists
@@ -51,21 +57,33 @@ if ($conn->query($addUniqueConstraint) === TRUE) {
 }
 
 // Add display_order column if not exists
-echo "<br>🔧 Adicionando coluna 'display_order'...<br>";
-$addDisplayOrder = "ALTER TABLE withdrawal_quick_values ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0";
-if ($conn->query($addDisplayOrder) === TRUE) {
-    echo "✅ Coluna 'display_order' adicionada com sucesso!<br>";
+echo "<br>🔧 Verificando coluna 'display_order'...<br>";
+$checkDisplayOrder = $conn->query("SHOW COLUMNS FROM withdrawal_quick_values LIKE 'display_order'");
+if ($checkDisplayOrder->num_rows == 0) {
+    echo "🔧 Adicionando coluna 'display_order'...<br>";
+    $addDisplayOrder = "ALTER TABLE withdrawal_quick_values ADD COLUMN display_order INT DEFAULT 0";
+    if ($conn->query($addDisplayOrder) === TRUE) {
+        echo "✅ Coluna 'display_order' adicionada com sucesso!<br>";
+    } else {
+        echo "❌ Erro ao adicionar coluna 'display_order': " . $conn->error . "<br>";
+    }
 } else {
-    echo "ℹ️ Coluna 'display_order' já existe ou erro: " . $conn->error . "<br>";
+    echo "ℹ️ Coluna 'display_order' já existe!<br>";
 }
 
 // Add updated_at column if not exists
-echo "<br>🔧 Adicionando coluna 'updated_at'...<br>";
-$addUpdatedAt = "ALTER TABLE withdrawal_quick_values ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP";
-if ($conn->query($addUpdatedAt) === TRUE) {
-    echo "✅ Coluna 'updated_at' adicionada com sucesso!<br>";
+echo "<br>🔧 Verificando coluna 'updated_at'...<br>";
+$checkUpdatedAt = $conn->query("SHOW COLUMNS FROM withdrawal_quick_values LIKE 'updated_at'");
+if ($checkUpdatedAt->num_rows == 0) {
+    echo "🔧 Adicionando coluna 'updated_at'...<br>";
+    $addUpdatedAt = "ALTER TABLE withdrawal_quick_values ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP";
+    if ($conn->query($addUpdatedAt) === TRUE) {
+        echo "✅ Coluna 'updated_at' adicionada com sucesso!<br>";
+    } else {
+        echo "❌ Erro ao adicionar coluna 'updated_at': " . $conn->error . "<br>";
+    }
 } else {
-    echo "ℹ️ Coluna 'updated_at' já existe ou erro: " . $conn->error . "<br>";
+    echo "ℹ️ Coluna 'updated_at' já existe!<br>";
 }
 
 // Show final table structure
