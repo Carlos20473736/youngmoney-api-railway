@@ -1,7 +1,7 @@
 <?php
 /**
  * Endpoint de Configurações do Sistema
- * Permite buscar e atualizar configurações, incluindo horário de reset diário
+ * Permite buscar e atualizar configurações, incluindo horário de reset diário e roleta
  */
 
 require_once __DIR__ . '/cors.php';
@@ -21,7 +21,7 @@ try {
         $stmt = $conn->prepare("
             SELECT setting_key, setting_value 
             FROM system_settings 
-            WHERE setting_key IN ('reset_time', 'min_withdrawal', 'max_withdrawal')
+            WHERE setting_key IN ('reset_time', 'min_withdrawal', 'max_withdrawal', 'max_daily_spins')
         ");
         $stmt->execute();
         $result = $stmt->get_result();
@@ -68,6 +68,7 @@ try {
             'success' => true,
             'data' => [
                 'reset_time' => $settings['reset_time'] ?? '21:00',
+                'max_daily_spins' => (int)($settings['max_daily_spins'] ?? 10),
                 'withdrawal_limits' => [
                     'min' => (int)($settings['min_withdrawal'] ?? 10),
                     'max' => (int)($settings['max_withdrawal'] ?? 1000)
@@ -98,13 +99,6 @@ try {
                     throw new Exception('Formato de hora inválido. Use HH:MM (ex: 21:00)');
                 }
                 
-                // Buscar valor antigo para log
-                $oldValueStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'reset_time'");
-                $oldValueStmt->execute();
-                $oldValueResult = $oldValueStmt->get_result();
-                $oldValue = $oldValueResult->num_rows > 0 ? $oldValueResult->fetch_assoc()['setting_value'] : '21:00';
-                
-                // Atualizar no banco
                 $stmt = $conn->prepare("
                     INSERT INTO system_settings (setting_key, setting_value) 
                     VALUES ('reset_time', ?)
@@ -114,25 +108,20 @@ try {
                 ");
                 $stmt->bind_param('ss', $data['reset_time'], $data['reset_time']);
                 $stmt->execute();
-                
-                // Log da alteração
-                try {
-                    $logDetails = json_encode([
-                        'old_value' => $oldValue,
-                        'new_value' => $data['reset_time'],
-                        'timestamp' => date('Y-m-d H:i:s')
-                    ]);
-                    
-                    $logStmt = $conn->prepare("
-                        INSERT INTO admin_logs (action, details, created_at) 
-                        VALUES ('update_reset_time', ?, NOW())
-                    ");
-                    $logStmt->bind_param('s', $logDetails);
-                    $logStmt->execute();
-                } catch (Exception $e) {
-                    // Tabela de logs não existe, continuar sem logar
-                    error_log("Log table not found: " . $e->getMessage());
-                }
+            }
+
+            // Atualizar max_daily_spins
+            if (isset($data['max_daily_spins'])) {
+                $spins = (string)$data['max_daily_spins'];
+                $stmt = $conn->prepare("
+                    INSERT INTO system_settings (setting_key, setting_value) 
+                    VALUES ('max_daily_spins', ?)
+                    ON DUPLICATE KEY UPDATE 
+                        setting_value = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                ");
+                $stmt->bind_param('ss', $spins, $spins);
+                $stmt->execute();
             }
             
             // Atualizar limites de saque
@@ -164,15 +153,15 @@ try {
             if (isset($data['prize_values']) && is_array($data['prize_values'])) {
                 foreach ($data['prize_values'] as $key => $value) {
                     try {
+                        // Usar INSERT ON DUPLICATE KEY UPDATE para garantir que salve mesmo se a chave não existir
                         $stmt = $conn->prepare("
-                            UPDATE roulette_prizes 
-                            SET prize_value = ? 
-                            WHERE prize_key = ?
+                            INSERT INTO roulette_prizes (prize_key, prize_value) 
+                            VALUES (?, ?)
+                            ON DUPLICATE KEY UPDATE prize_value = ?
                         ");
-                        $stmt->bind_param('ds', $value, $key);
+                        $stmt->bind_param('sdd', $key, $value, $value);
                         $stmt->execute();
                     } catch (Exception $e) {
-                        // Tabela não existe ou erro, continuar
                         error_log("Roulette table error: " . $e->getMessage());
                     }
                 }
