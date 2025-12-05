@@ -1,7 +1,7 @@
 <?php
 /**
  * MoniTag Progress Endpoint
- * GET - Retorna progresso diário do usuário autenticado
+ * GET - Retorna progresso diário do usuário (SEM AUTENTICAÇÃO)
  */
 
 // CORS MUST be first
@@ -10,69 +10,68 @@ require_once __DIR__ . '/../cors.php';
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../database.php';
-require_once __DIR__ . '/../auth.php';
+
+function sendSuccess($data = []) {
+    echo json_encode(['success' => true, 'data' => $data]);
+    exit;
+}
+
+function sendError($message, $code = 400) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'error' => $message]);
+    exit;
+}
+
+// Apenas GET
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    sendError('Método não permitido', 405);
+}
+
+$user_id = $_GET['user_id'] ?? null;
+
+if (!$user_id || !is_numeric($user_id)) {
+    sendError('user_id é obrigatório e deve ser numérico');
+}
+
+$user_id = (int)$user_id;
 
 try {
-    // Autenticar usuário
-    $user = authenticateUser();
-    
-    if (!$user) {
-        throw new Exception('Usuário não autenticado');
-    }
-    
     $conn = getDbConnection();
     
-    // Buscar progresso de hoje
+    // Buscar progresso do dia
+    $today = date('Y-m-d');
     $stmt = $conn->prepare("
         SELECT 
-            SUM(CASE WHEN event_type = 'impression' THEN 1 ELSE 0 END) as impressions_today,
-            SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END) as clicks_today,
-            MAX(created_at) as last_activity
+            COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
+            COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
         FROM monetag_events
-        WHERE user_id = ? AND DATE(created_at) = CURDATE()
+        WHERE user_id = ? AND DATE(created_at) = ?
     ");
-    
-    $stmt->bind_param('i', $user['id']);
+    $stmt->bind_param("is", $user_id, $today);
     $stmt->execute();
     $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    
-    $impressions = (int)($row['impressions_today'] ?? 0);
-    $clicks = (int)($row['clicks_today'] ?? 0);
-    
-    // Metas
-    $REQUIRED_IMPRESSIONS = 5;
-    $REQUIRED_CLICKS = 1;
-    
-    $impressionsCompleted = $impressions >= $REQUIRED_IMPRESSIONS;
-    $clicksCompleted = $clicks >= $REQUIRED_CLICKS;
-    $missionCompleted = $impressionsCompleted && $clicksCompleted;
-    
+    $progress = $result->fetch_assoc();
     $stmt->close();
     $conn->close();
     
-    echo json_encode([
-        'success' => true,
-        'data' => [
-            'impressions' => [
-                'current' => $impressions,
-                'required' => $REQUIRED_IMPRESSIONS,
-                'completed' => $impressionsCompleted,
-                'progress' => min(100, ($impressions / $REQUIRED_IMPRESSIONS) * 100)
-            ],
-            'clicks' => [
-                'current' => $clicks,
-                'required' => $REQUIRED_CLICKS,
-                'completed' => $clicksCompleted,
-                'progress' => min(100, ($clicks / $REQUIRED_CLICKS) * 100)
-            ],
-            'mission_completed' => $missionCompleted,
-            'last_activity' => $row['last_activity']
-        ]
-    ]);
+    // Metas
+    $required_impressions = 5;
+    $required_clicks = 1;
+    
+    $response = [
+        'impressions' => (int)$progress['impressions'],
+        'clicks' => (int)$progress['clicks'],
+        'required_impressions' => $required_impressions,
+        'required_clicks' => $required_clicks,
+        'impressions_completed' => (int)$progress['impressions'] >= $required_impressions,
+        'clicks_completed' => (int)$progress['clicks'] >= $required_clicks,
+        'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks
+    ];
+    
+    sendSuccess($response);
     
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    error_log("MoniTag Progress Error: " . $e->getMessage());
+    sendError('Erro ao buscar progresso: ' . $e->getMessage(), 500);
 }
 ?>
