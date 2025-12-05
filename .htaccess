@@ -23,6 +23,10 @@ php_value auto_prepend_file "/home/ubuntu/youngmoney-api/global_security_middlew
     RewriteCond %{REQUEST_URI} ^/api/
     RewriteRule ^ - [L]
     
+    # Permitir acesso direto a arquivos na pasta /monetag/
+    RewriteCond %{REQUEST_URI} ^/monetag/
+    RewriteRule ^ - [L]
+    
     # Redirecionar outras requisições para index.php (se necessário)
     # RewriteCond %{REQUEST_FILENAME} !-f
     # RewriteCond %{REQUEST_FILENAME} !-d
