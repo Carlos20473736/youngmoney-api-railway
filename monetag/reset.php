@@ -21,11 +21,15 @@ $user_id = intval($_GET['user_id']);
 
 // Conectar ao banco de dados
 try {
-    $host = getenv('MYSQL_HOST') ?: 'localhost';
-    $user = getenv('MYSQL_USER') ?: 'root';
-    $password = getenv('MYSQL_PASSWORD') ?: '';
-    $database = getenv('MYSQL_DATABASE') ?: 'youngmoney';
-    $port = intval(getenv('MYSQL_PORT') ?: 3306);
+    // Variáveis do Railway
+    $host = getenv('MYSQL_HOST') ?: getenv('DB_HOST') ?: 'localhost';
+    $user = getenv('MYSQL_USER') ?: getenv('DB_USER') ?: 'root';
+    $password = getenv('MYSQL_PASSWORD') ?: getenv('DB_PASSWORD') ?: '';
+    $database = getenv('MYSQL_DATABASE') ?: getenv('DB_NAME') ?: 'railway';
+    $port = intval(getenv('MYSQL_PORT') ?: getenv('DB_PORT') ?: 3306);
+    
+    // Debug
+    error_log("Reset: host=$host, user=$user, database=$database, port=$port");
 
     $pdo = new PDO(
         "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4",
