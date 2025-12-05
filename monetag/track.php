@@ -1,7 +1,8 @@
 <?php
 /**
- * MoniTag Event Tracking Endpoint
- * POST - Registra impressões e cliques de anúncios (SEM AUTENTICAÇÃO)
+ * MoniTag Postback Endpoint
+ * Recebe postbacks do MoniTag via GET
+ * URL: /monetag/track.php?event_type={event_type}&zone_id={zone_id}&sub_id={sub_id}&sub_id2={sub_id2}&click_id={ymid}&revenue={estimated_price}
  */
 
 // CORS MUST be first
@@ -22,49 +23,56 @@ function sendError($message, $code = 400) {
     exit;
 }
 
-// Apenas POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    sendError('Método não permitido', 405);
-}
+// Log para debug
+error_log("MoniTag Postback - Method: " . $_SERVER['REQUEST_METHOD']);
+error_log("MoniTag Postback - GET params: " . json_encode($_GET));
 
-// Obter dados JSON
-$input = file_get_contents('php://input');
-$data = json_decode($input, true);
+// Aceitar GET ou POST
+$event_type = $_GET['event_type'] ?? $_POST['event_type'] ?? null;
+$zone_id = $_GET['zone_id'] ?? $_POST['zone_id'] ?? null;
+$sub_id = $_GET['sub_id'] ?? $_POST['sub_id'] ?? null; // user_id
+$sub_id2 = $_GET['sub_id2'] ?? $_POST['sub_id2'] ?? null; // email
+$click_id = $_GET['click_id'] ?? $_POST['click_id'] ?? null;
+$revenue = $_GET['revenue'] ?? $_POST['revenue'] ?? 0;
 
-if (!$data) {
-    sendError('JSON inválido');
-}
+error_log("MoniTag Postback - Parsed: event_type=$event_type, sub_id=$sub_id, sub_id2=$sub_id2");
 
-$event_type = $data['event_type'] ?? null;
-$session_id = $data['session_id'] ?? null;
-
-if (!$event_type || !$session_id) {
-    sendError('event_type e session_id são obrigatórios');
+// Validar event_type
+if (!$event_type) {
+    sendError('event_type é obrigatório');
 }
 
 if (!in_array($event_type, ['impression', 'click'])) {
     sendError('event_type deve ser impression ou click');
 }
 
-// Extrair user_id do session_id (formato: userId_timestamp)
-$parts = explode('_', $session_id);
-$user_id = isset($parts[0]) && is_numeric($parts[0]) ? (int)$parts[0] : null;
-
-if (!$user_id) {
-    sendError('session_id inválido');
+// Validar user_id (sub_id)
+$user_id = null;
+if ($sub_id && is_numeric($sub_id)) {
+    $user_id = (int)$sub_id;
+} else {
+    error_log("MoniTag Postback - sub_id inválido: $sub_id");
+    sendError('sub_id (user_id) é obrigatório e deve ser numérico');
 }
+
+// Gerar session_id único
+$session_id = $click_id ?? ($user_id . '_' . time());
 
 try {
     $conn = getDbConnection();
     
     // Inserir evento
     $stmt = $conn->prepare("
-        INSERT INTO monetag_events (user_id, event_type, session_id, created_at)
-        VALUES (?, ?, ?, NOW())
+        INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
+        VALUES (?, ?, ?, ?, NOW())
     ");
-    $stmt->bind_param("iss", $user_id, $event_type, $session_id);
+    $revenue_float = (float)$revenue;
+    $stmt->bind_param("issd", $user_id, $event_type, $session_id, $revenue_float);
     $stmt->execute();
+    $event_id = $stmt->insert_id;
     $stmt->close();
+    
+    error_log("MoniTag Postback - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type");
     
     // Buscar progresso atualizado do dia
     $today = date('Y-m-d');
@@ -88,7 +96,9 @@ try {
     
     $response = [
         'event_registered' => true,
+        'event_id' => $event_id,
         'event_type' => $event_type,
+        'user_id' => $user_id,
         'progress' => [
             'impressions' => [
                 'current' => (int)$progress['impressions'],
@@ -104,10 +114,11 @@ try {
         ]
     ];
     
+    error_log("MoniTag Postback - Success: " . json_encode($response));
     sendSuccess($response);
     
 } catch (Exception $e) {
-    error_log("MoniTag Track Error: " . $e->getMessage());
+    error_log("MoniTag Postback Error: " . $e->getMessage());
     sendError('Erro ao registrar evento: ' . $e->getMessage(), 500);
 }
 ?>
