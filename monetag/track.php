@@ -2,7 +2,15 @@
 /**
  * MoniTag Postback Endpoint
  * Recebe postbacks do MoniTag via GET
- * URL: /monetag/track.php?event_type={event_type}&zone_id={zone_id}&sub_id={sub_id}&sub_id2={sub_id2}&click_id={ymid}&revenue={estimated_price}
+ * URL: /monetag/track.php?event_type={event_type}&zone_id={zone_id}&sub_id={sub_id}&sub_id2={sub_id2}&ymid={ymid}&revenue={estimated_price}&request_var={request_var}
+ * 
+ * event_type: 'impression' (anúncio exibido) ou 'click' (anúncio clicado - NÃO é clique no botão de fechar)
+ * zone_id: ID da zona de anúncios MoniTag
+ * sub_id: user_id (numérico)
+ * sub_id2: email do usuário
+ * ymid: ID único da sessão do anúncio
+ * revenue: valor estimado do clique/impressão
+ * request_var: parâmetro de validação da MoniTag
  */
 
 // CORS MUST be first
@@ -32,10 +40,11 @@ $event_type = $_GET['event_type'] ?? $_POST['event_type'] ?? null;
 $zone_id = $_GET['zone_id'] ?? $_POST['zone_id'] ?? null;
 $sub_id = $_GET['sub_id'] ?? $_POST['sub_id'] ?? null; // user_id
 $sub_id2 = $_GET['sub_id2'] ?? $_POST['sub_id2'] ?? null; // email
-$click_id = $_GET['click_id'] ?? $_POST['click_id'] ?? null;
+$ymid = $_GET['ymid'] ?? $_POST['ymid'] ?? null; // click_id / session_id
 $revenue = $_GET['revenue'] ?? $_POST['revenue'] ?? 0;
+$request_var = $_GET['request_var'] ?? $_POST['request_var'] ?? null;
 
-error_log("MoniTag Postback - Parsed: event_type=$event_type, sub_id=$sub_id, sub_id2=$sub_id2");
+error_log("MoniTag Postback - Parsed: event_type=$event_type, sub_id=$sub_id, sub_id2=$sub_id2, ymid=$ymid, request_var=$request_var");
 
 // Validar event_type
 if (!$event_type) {
@@ -44,6 +53,11 @@ if (!$event_type) {
 
 if (!in_array($event_type, ['impression', 'click'])) {
     sendError('event_type deve ser impression ou click');
+}
+
+// Validar zone_id
+if (!$zone_id) {
+    sendError('zone_id é obrigatório');
 }
 
 // Validar user_id (sub_id)
@@ -55,24 +69,50 @@ if ($sub_id && is_numeric($sub_id)) {
     sendError('sub_id (user_id) é obrigatório e deve ser numérico');
 }
 
-// Gerar session_id único
-$session_id = $click_id ?? ($user_id . '_' . time());
+// Validar ymid (session_id)
+if (!$ymid) {
+    error_log("MoniTag Postback - ymid não fornecido");
+    sendError('ymid (session_id) é obrigatório');
+}
+
+// Gerar session_id único baseado em ymid
+$session_id = $ymid;
 
 try {
     $conn = getDbConnection();
     
+    // Verificar se este evento já foi registrado (evitar duplicatas)
+    $check_stmt = $conn->prepare("
+        SELECT id FROM monetag_events 
+        WHERE user_id = ? AND event_type = ? AND session_id = ? 
+        LIMIT 1
+    ");
+    $check_stmt->bind_param("iss", $user_id, $event_type, $session_id);
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+    
+    if ($check_result->num_rows > 0) {
+        // Evento já foi registrado
+        error_log("MoniTag Postback - Evento duplicado detectado: user_id=$user_id, event_type=$event_type, session_id=$session_id");
+        $check_stmt->close();
+        $conn->close();
+        sendSuccess(['event_registered' => false, 'message' => 'Evento já foi registrado']);
+    }
+    
+    $check_stmt->close();
+    
     // Inserir evento
     $stmt = $conn->prepare("
-        INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
-        VALUES (?, ?, ?, ?, NOW())
+        INSERT INTO monetag_events (user_id, event_type, session_id, zone_id, email, revenue, request_var, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
     ");
     $revenue_float = (float)$revenue;
-    $stmt->bind_param("issd", $user_id, $event_type, $session_id, $revenue_float);
+    $stmt->bind_param("issssd s", $user_id, $event_type, $session_id, $zone_id, $sub_id2, $revenue_float, $request_var);
     $stmt->execute();
     $event_id = $stmt->insert_id;
     $stmt->close();
     
-    error_log("MoniTag Postback - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type");
+    error_log("MoniTag Postback - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type, zone_id=$zone_id");
     
     // Buscar progresso atualizado do dia
     $today = date('Y-m-d');
@@ -99,6 +139,8 @@ try {
         'event_id' => $event_id,
         'event_type' => $event_type,
         'user_id' => $user_id,
+        'zone_id' => $zone_id,
+        'session_id' => $session_id,
         'progress' => [
             'impressions' => [
                 'current' => (int)$progress['impressions'],
