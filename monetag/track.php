@@ -103,11 +103,11 @@ try {
     
     // Inserir evento
     $stmt = $conn->prepare("
-        INSERT INTO monetag_events (user_id, event_type, session_id, zone_id, email, revenue, request_var, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+        INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
+        VALUES (?, ?, ?, ?, NOW())
     ");
     $revenue_float = (float)$revenue;
-    $stmt->bind_param("issssd s", $user_id, $event_type, $session_id, $zone_id, $sub_id2, $revenue_float, $request_var);
+    $stmt->bind_param("issd", $user_id, $event_type, $session_id, $revenue_float);
     $stmt->execute();
     $event_id = $stmt->insert_id;
     $stmt->close();
@@ -139,7 +139,6 @@ try {
         'event_id' => $event_id,
         'event_type' => $event_type,
         'user_id' => $user_id,
-        'zone_id' => $zone_id,
         'session_id' => $session_id,
         'progress' => [
             'impressions' => [
