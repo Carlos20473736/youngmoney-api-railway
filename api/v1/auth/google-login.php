@@ -148,15 +148,15 @@ try {
             $stmtInvite->close();
         }
         
-        // INSERT com todos os dados de uma vez (incluindo telegram_id)
+        // INSERT com todos os dados de uma vez
         $stmt = $conn->prepare("
             INSERT INTO users (
                 google_id, email, name, profile_picture, 
                 invite_code, token, master_seed, session_salt,
-                telegram_id, points, created_at, salt_updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 0, NOW(), NOW())
+                points, created_at, salt_updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, '', ?, 0, NOW(), NOW())
         ");
-        $stmt->bind_param("ssssssss", $googleId, $email, $name, $profilePicture, $inviteCode, $token, $sessionSalt, $telegramId);
+        $stmt->bind_param("sssssss", $googleId, $email, $name, $profilePicture, $inviteCode, $token, $sessionSalt);
         $stmt->execute();
         $userId = $conn->insert_id;
         
@@ -184,14 +184,12 @@ try {
         'token' => $token,
         'encrypted_seed' => $encryptedSeed,
         'session_salt' => $sessionSalt,
-        'telegram_id' => $telegramId,
         'user' => [
             'id' => (int)$user['id'],
             'email' => $user['email'],
             'name' => $user['name'],
             'google_id' => $googleId,
             'profile_picture' => $user['profile_picture'],
-            'telegram_id' => $telegramId,
             'points' => (int)$user['points']
         ]
     ];
