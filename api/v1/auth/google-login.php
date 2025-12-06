@@ -79,6 +79,10 @@ try {
     $encryptedSeed = SecureKeyManager::encryptSeedWithPassword($masterSeed, $email);
     $token = bin2hex(random_bytes(32));
     
+    // 5.1 GERAR TELEGRAM ID FIXO (baseado no email para ser único e persistente)
+    $telegramId = 'tg_' . substr(hash('sha256', $email . 'youngmoney_salt'), 0, 16);
+    error_log("Generated Telegram ID: $telegramId for email: $email");
+    
     // 6. CRIPTOGRAFAR SEED PARA O BANCO
     $serverKey = getenv('SERVER_ENCRYPTION_KEY');
     if (!$serverKey) {
@@ -144,15 +148,15 @@ try {
             $stmtInvite->close();
         }
         
-        // INSERT com todos os dados de uma vez
+        // INSERT com todos os dados de uma vez (incluindo telegram_id)
         $stmt = $conn->prepare("
             INSERT INTO users (
                 google_id, email, name, profile_picture, 
                 invite_code, token, master_seed, session_salt,
-                points, created_at, salt_updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, '', ?, 0, NOW(), NOW())
+                telegram_id, points, created_at, salt_updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 0, NOW(), NOW())
         ");
-        $stmt->bind_param("sssssss", $googleId, $email, $name, $profilePicture, $inviteCode, $token, $sessionSalt);
+        $stmt->bind_param("ssssssss", $googleId, $email, $name, $profilePicture, $inviteCode, $token, $sessionSalt, $telegramId);
         $stmt->execute();
         $userId = $conn->insert_id;
         
@@ -180,12 +184,14 @@ try {
         'token' => $token,
         'encrypted_seed' => $encryptedSeed,
         'session_salt' => $sessionSalt,
+        'telegram_id' => $telegramId,
         'user' => [
             'id' => (int)$user['id'],
             'email' => $user['email'],
             'name' => $user['name'],
             'google_id' => $googleId,
             'profile_picture' => $user['profile_picture'],
+            'telegram_id' => $telegramId,
             'points' => (int)$user['points']
         ]
     ];
