@@ -109,7 +109,7 @@ try {
         $iv = substr(md5($userId), 0, 16);
         $encryptedSeedForDb = openssl_encrypt($masterSeed, 'AES-256-CBC', $serverKey, 0, $iv);
         
-        // UPDATE único com todos os dados
+        // UPDATE único com todos os dados (incluindo telegram_id se não existir)
         $stmt = $conn->prepare("
             UPDATE users 
             SET token = ?, 
@@ -118,17 +118,19 @@ try {
                 email = ?,
                 name = ?,
                 profile_picture = ?,
+                telegram_id = COALESCE(telegram_id, ?),
                 salt_updated_at = NOW(),
                 updated_at = NOW()
             WHERE id = ?
         ");
-        $stmt->bind_param("ssssssi", $token, $encryptedSeedForDb, $sessionSalt, $email, $name, $profilePicture, $userId);
+        $stmt->bind_param("sssssssi", $token, $encryptedSeedForDb, $sessionSalt, $email, $name, $profilePicture, $telegramId, $userId);
         $stmt->execute();
         
         // Usar dados do cache (não fazer SELECT novamente)
         $user['email'] = $email;
         $user['name'] = $name;
         $user['profile_picture'] = $profilePicture;
+        $user['telegram_id'] = $telegramId;
         
     } else {
         // CRIAR NOVO USUÁRIO
