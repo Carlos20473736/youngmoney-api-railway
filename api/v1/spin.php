@@ -167,10 +167,10 @@ try {
     try {
         // 1. Registrar giro no histórico
         $stmt = $conn->prepare("
-            INSERT INTO spin_history (user_id, prize_value, prize_index, created_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO spin_history (user_id, prize_value, created_at)
+            VALUES (?, ?, ?)
         ");
-        $stmt->bind_param("iiis", $userId, $prizeValue, $prizeIndex, $currentDateTime);
+        $stmt->bind_param("iis", $userId, $prizeValue, $currentDateTime);
         $stmt->execute();
         
         // 2. Adicionar pontos ao saldo do usuário (total E daily_points para ranking)
