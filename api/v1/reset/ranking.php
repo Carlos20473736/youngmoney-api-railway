@@ -54,60 +54,81 @@ if (empty($token) || $token !== $expectedToken) {
 date_default_timezone_set('America/Sao_Paulo');
 
 try {
-    // Conectar ao banco de dados
-    $host = getenv('MYSQLHOST') ?: (getenv('DB_HOST') ?: 'localhost');
-    $port = getenv('MYSQLPORT') ?: (getenv('DB_PORT') ?: '3306');
-    $dbname = getenv('MYSQLDATABASE') ?: (getenv('DB_NAME') ?: 'defaultdb');
-    $username = getenv('MYSQLUSER') ?: (getenv('DB_USER') ?: 'root');
-    $password = getenv('MYSQLPASSWORD') ?: (getenv('DB_PASSWORD') ?: '');
+    // Conectar ao banco de dados usando MySQLi
+    $db_host = $_ENV['MYSQLHOST'] ?? getenv('MYSQLHOST') ?: 'localhost';
+    $db_user = $_ENV['MYSQLUSER'] ?? getenv('MYSQLUSER') ?: 'root';
+    $db_pass = $_ENV['MYSQLPASSWORD'] ?? getenv('MYSQLPASSWORD') ?: '';
+    $db_name = $_ENV['MYSQLDATABASE'] ?? getenv('MYSQLDATABASE') ?: 'railway';
+    $db_port = $_ENV['MYSQLPORT'] ?? getenv('MYSQLPORT') ?: 3306;
     
-    $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
+    $conn = mysqli_init();
+    if (!$conn) {
+        throw new Exception("mysqli_init failed");
+    }
     
-    $pdo = new PDO($dsn, $username, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-    ]);
+    $success = $conn->real_connect($db_host, $db_user, $db_pass, $db_name, $db_port);
+    if (!$success) {
+        throw new Exception("Connection failed: " . $conn->connect_error);
+    }
+    
+    $conn->set_charset("utf8mb4");
     
     // Obter data e hora atual
     $current_date = date('Y-m-d');
     $current_datetime = date('Y-m-d H:i:s');
     
     // Iniciar transação
-    $pdo->beginTransaction();
+    $conn->begin_transaction();
     
     try {
         // Contar quantos usuários têm daily_points > 0
-        $countStmt = $pdo->prepare("
+        $stmt = $conn->prepare("
             SELECT COUNT(*) as total 
             FROM users 
             WHERE daily_points > 0
         ");
-        $countStmt->execute();
-        $countResult = $countStmt->fetch();
-        $usersAffected = $countResult['total'] ?? 0;
+        
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $usersAffected = $row['total'] ?? 0;
+        $stmt->close();
         
         // Resetar daily_points para 0 para todos os usuários
-        $stmt = $pdo->prepare("
+        $stmt = $conn->prepare("
             UPDATE users 
             SET daily_points = 0
         ");
-        $stmt->execute();
+        
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Execute failed: " . $stmt->error);
+        }
+        
+        $stmt->close();
         
         // Registrar log do reset (opcional)
-        try {
-            $stmt = $pdo->prepare("
-                INSERT INTO ranking_reset_logs 
-                (reset_type, triggered_by, users_affected, reset_datetime, status) 
-                VALUES ('manual', 'api-reset', :users, NOW(), 'success')
-            ");
-            $stmt->execute(['users' => $usersAffected]);
-        } catch (PDOException $e) {
-            // Tabela de logs pode não existir, ignorar erro
+        $stmt = $conn->prepare("
+            INSERT INTO ranking_reset_logs 
+            (reset_type, triggered_by, users_affected, reset_datetime, status) 
+            VALUES ('manual', 'api-reset', ?, NOW(), 'success')
+        ");
+        
+        if ($stmt) {
+            $stmt->bind_param("i", $usersAffected);
+            $stmt->execute();
+            $stmt->close();
         }
         
         // Commit da transação
-        $pdo->commit();
+        $conn->commit();
         
         // Retornar sucesso
         echo json_encode([
@@ -126,17 +147,12 @@ try {
         ], JSON_UNESCAPED_UNICODE);
         
     } catch (Exception $e) {
-        $pdo->rollBack();
+        $conn->rollback();
         throw $e;
     }
     
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Erro ao conectar ao banco de dados',
-        'details' => $e->getMessage()
-    ], JSON_UNESCAPED_UNICODE);
+    $conn->close();
+    
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode([
