@@ -105,8 +105,29 @@ try {
     
     $is_reset_time = ($current_hour === $reset_hour && $current_minute === $reset_minute);
     
-    // Iniciar transação
-    $conn->begin_transaction();
+    // SE NAO FOR A HORA CERTA, RETORNAR SEM FAZER RESET
+    if (!$is_reset_time) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'Reset agendado, mas ainda nao eh a hora certa',
+            'data' => [
+                'reset_type' => 'ranking_scheduled',
+                'description' => 'Reset nao foi executado - aguardando horario configurado',
+                'reset_time_configured' => $reset_time,
+                'is_reset_time' => false,
+                'current_time' => $current_time,
+                'users_affected' => 0,
+                'reset_date' => $current_date,
+                'reset_datetime' => $current_datetime,
+                'timezone' => 'America/Sao_Paulo (GMT-3)',
+                'timestamp' => time()
+            ]
+        ], JSON_UNESCAPED_UNICODE);
+        $conn->close();
+        exit;
+    }
+    
+    // Iniciar transacao
     
     try {
         // Contar quantos usuários têm daily_points > 0
