@@ -149,8 +149,8 @@ try {
         // Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO spin_reset_logs 
-            (reset_type, triggered_by, spins_deleted, reset_datetime, status) 
-            VALUES ('scheduled', 'cron-api', ?, NOW(), 'success')
+            (spins_deleted, reset_datetime) 
+            VALUES (?, NOW())
         ");
         
         if ($stmt) {

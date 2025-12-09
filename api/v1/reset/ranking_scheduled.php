@@ -145,8 +145,8 @@ try {
         // Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO ranking_reset_logs 
-            (reset_type, triggered_by, users_affected, reset_datetime, status) 
-            VALUES ('scheduled', 'cron-api', ?, NOW(), 'success')
+            (users_affected, reset_datetime) 
+            VALUES (?, NOW())
         ");
         
         if ($stmt) {
