@@ -114,18 +114,18 @@ try {
         
         $stmt->close();
         
-        // Registrar log do reset (opcional)
-        $stmt = $conn->prepare("
-            INSERT INTO ranking_reset_logs 
-            (reset_type, triggered_by, users_affected, reset_datetime, status) 
-            VALUES ('manual', 'api-reset', ?, NOW(), 'success')
-        ");
-        
-        if ($stmt) {
-            $stmt->bind_param("i", $usersAffected);
-            $stmt->execute();
-            $stmt->close();
-        }
+        // Registrar log do reset (opcional) - comentado pois a tabela existente tem estrutura diferente
+        // $stmt = $conn->prepare("
+        //     INSERT INTO ranking_reset_logs 
+        //     (reset_type, triggered_by, users_affected, reset_datetime, status) 
+        //     VALUES ('manual', 'api-reset', ?, NOW(), 'success')
+        // ");
+        // 
+        // if ($stmt) {
+        //     $stmt->bind_param("i", $usersAffected);
+        //     $stmt->execute();
+        //     $stmt->close();
+        // }
         
         // Commit da transação
         $conn->commit();
