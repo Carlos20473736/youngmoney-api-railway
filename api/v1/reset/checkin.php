@@ -55,11 +55,11 @@ date_default_timezone_set('America/Sao_Paulo');
 
 try {
     // Conectar ao banco de dados
-    $host = getenv('DB_HOST') ?: 'localhost';
-    $port = getenv('DB_PORT') ?: '3306';
-    $dbname = getenv('DB_NAME') ?: 'defaultdb';
-    $username = getenv('DB_USER') ?: 'root';
-    $password = getenv('DB_PASSWORD') ?: '';
+    $host = getenv('MYSQLHOST') ?: (getenv('DB_HOST') ?: 'localhost');
+    $port = getenv('MYSQLPORT') ?: (getenv('DB_PORT') ?: '3306');
+    $dbname = getenv('MYSQLDATABASE') ?: (getenv('DB_NAME') ?: 'defaultdb');
+    $username = getenv('MYSQLUSER') ?: (getenv('DB_USER') ?: 'root');
+    $password = getenv('MYSQLPASSWORD') ?: (getenv('DB_PASSWORD') ?: '');
     
     $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
     
