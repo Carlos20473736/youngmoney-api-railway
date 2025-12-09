@@ -80,54 +80,7 @@ try {
     $current_time = date('H:i:s');
     $current_datetime = date('Y-m-d H:i:s');
     
-    // Buscar hora de reset configurada no painel ADM
-    $stmt = $conn->prepare("
-        SELECT setting_value 
-        FROM system_settings 
-        WHERE setting_key = 'reset_time' 
-        LIMIT 1
-    ");
-    
-    if (!$stmt) {
-        throw new Exception("Prepare failed: " . $conn->error);
-    }
-    
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    $reset_time = $row['setting_value'] ?? '00:00:00';
-    $stmt->close();
-    
-    // Verificar se é a hora certa para resetar
-    $reset_hour = substr($reset_time, 0, 2);
-    $reset_minute = substr($reset_time, 3, 2);
-    $current_hour = date('H');
-    $current_minute = date('i');
-    
-    $is_reset_time = ($current_hour === $reset_hour && $current_minute === $reset_minute);
-    
-    // SE NAO FOR A HORA CERTA, RETORNAR SEM FAZER RESET
-    if (!$is_reset_time) {
-        echo json_encode([
-            'success' => true,
-            'message' => 'Reset agendado, mas ainda nao eh a hora certa',
-            'data' => [
-                'reset_type' => 'monetag_postback_scheduled',
-                'description' => 'Reset nao foi executado - aguardando horario configurado',
-                'reset_time_configured' => $reset_time,
-                'is_reset_time' => false,
-                'current_time' => $current_time,
-                'events_deleted' => 0,
-                'users_affected' => 0,
-                'reset_date' => $current_date,
-                'reset_datetime' => $current_datetime,
-                'timezone' => 'America/Sao_Paulo (GMT-3)',
-                'timestamp' => time()
-            ]
-        ], JSON_UNESCAPED_UNICODE);
-        $conn->close();
-        exit;
-    }
+    // RESETAR SEMPRE QUE CHAMAR (SEM VERIFICACAO DE HORARIO)
     
     // Iniciar transacao
     $conn->begin_transaction();
@@ -218,10 +171,8 @@ try {
             'success' => true,
             'message' => 'Reset do Monetag postback executado com sucesso!',
             'data' => [
-                'reset_type' => 'monetag_postback_scheduled',
+                'reset_type' => 'monetag_postback_manual',
                 'description' => 'Eventos de postback deletados e contadores resetados',
-                'reset_time_configured' => $reset_time,
-                'is_reset_time' => $is_reset_time,
                 'current_time' => $current_time,
                 'events_deleted' => $eventsDeleted,
                 'users_affected' => $usersAffected,
