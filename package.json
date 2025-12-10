@@ -1,0 +1,24 @@
+{
+  "name": "youngmoney-api",
+  "version": "2.0.0",
+  "description": "YoungMoney API com sistema de pagamento PIX",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["youngmoney", "api", "pix", "payment"],
+  "author": "YoungMoney Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1",
+    "mysql2": "^3.6.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "body-parser": "^1.20.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
