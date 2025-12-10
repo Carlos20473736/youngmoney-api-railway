@@ -1,17 +1,15 @@
 <?php
 /**
- * API de Reset do Monetag Postback Agendada
+ * API de Reset do Monetag Postback
  * 
  * Endpoint: POST /api/v1/reset/monetag_postback_scheduled.php
  * 
- * Função: Reseta impressões e clicks do Monetag baseado na hora configurada no painel ADM
+ * Função: Reseta impressões e clicks do Monetag deletando eventos
  * 
  * Lógica:
- * - Lê a hora de reset configurada em system_settings (reset_time)
- * - Verifica se é a hora certa para resetar
- * - Deleta eventos de postback do Monetag
- * - Reseta contadores de impressões e clicks de todos os usuários
+ * - Deleta TODOS os eventos de postback do Monetag (tabela monetag_events)
  * - Permite que usuários façam novos postbacks
+ * - Reseta contadores de impressões e clicks
  * 
  * Segurança:
  * - Token obrigatório via query parameter ou header
@@ -80,8 +78,6 @@ try {
     $current_time = date('H:i:s');
     $current_datetime = date('Y-m-d H:i:s');
     
-    // RESETAR SEMPRE QUE CHAMAR (SEM VERIFICACAO DE HORARIO)
-    
     // Iniciar transacao
     $conn->begin_transaction();
     
@@ -102,7 +98,23 @@ try {
         $eventsDeleted = $row['total'] ?? 0;
         $stmt->close();
         
-        // 2. Deletar TODOS os eventos de Monetag
+        // 2. Contar quantos usuários únicos têm eventos
+        $stmt = $conn->prepare("
+            SELECT COUNT(DISTINCT user_id) as total 
+            FROM monetag_events
+        ");
+        
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $usersAffected = $row['total'] ?? 0;
+        $stmt->close();
+        
+        // 3. Deletar TODOS os eventos de Monetag
         $stmt = $conn->prepare("
             DELETE FROM monetag_events
         ");
@@ -117,43 +129,11 @@ try {
         
         $stmt->close();
         
-        // 3. Contar TODOS os usuários que serão afetados
-        $stmt = $conn->prepare("
-            SELECT COUNT(*) as total 
-            FROM users
-        ");
-        
-        if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
-        }
-        
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $usersAffected = $row['total'] ?? 0;
-        $stmt->close();
-        
-        // 4. Resetar monetag_impressions e monetag_clicks para 0
-        $stmt = $conn->prepare("
-            UPDATE users 
-            SET monetag_impressions = 0, monetag_clicks = 0
-        ");
-        
-        if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
-        }
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Execute failed: " . $stmt->error);
-        }
-        
-        $stmt->close();
-        
-        // 5. Registrar log do reset
+        // 4. Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO monetag_reset_logs 
             (reset_type, triggered_by, events_deleted, users_affected, reset_datetime, status) 
-            VALUES ('scheduled', 'cron-api', ?, ?, NOW(), 'success')
+            VALUES ('manual', 'api-call', ?, ?, NOW(), 'success')
         ");
         
         if ($stmt) {
@@ -171,7 +151,7 @@ try {
             'message' => 'Reset do Monetag postback executado com sucesso!',
             'data' => [
                 'reset_type' => 'monetag_postback_manual',
-                'description' => 'Eventos de postback deletados e contadores resetados',
+                'description' => 'Todos os eventos de postback foram deletados',
                 'current_time' => $current_time,
                 'events_deleted' => $eventsDeleted,
                 'users_affected' => $usersAffected,
