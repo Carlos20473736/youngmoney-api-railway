@@ -117,11 +117,10 @@ try {
         
         $stmt->close();
         
-        // 3. Contar quantos usuários têm impressões ou clicks
+        // 3. Contar TODOS os usuários que serão afetados
         $stmt = $conn->prepare("
             SELECT COUNT(*) as total 
-            FROM users 
-            WHERE monetag_impressions > 0 OR monetag_clicks > 0
+            FROM users
         ");
         
         if (!$stmt) {
