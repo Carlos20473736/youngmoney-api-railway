@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Verificar token de segurança
 $token = $_GET['token'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-$expectedToken = getenv('RESET_TOKEN') ?: 'ym_reset_ranking_2024_secure';
+$expectedToken = getenv('RESET_TOKEN') ?: 'ym_reset_ranking_scheduled_2024_secure';
 
 // Remover "Bearer " se presente
 if (strpos($token, 'Bearer ') === 0) {
