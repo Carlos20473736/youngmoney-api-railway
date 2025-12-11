@@ -1,15 +1,22 @@
 <?php
 /**
- * API de Reset do Ranking
+ * API de Reset do Ranking com Pagamentos Automáticos
  * 
  * Endpoint: POST /api/v1/reset/ranking.php
  * 
- * Função: Reseta o ranking diário para zero
+ * Função: Reseta o ranking diário e cria pagamentos automáticos
  * 
  * Lógica:
+ * - Obtém o top 10 do ranking ANTES de resetar
+ * - Cria registros de pagamento pendentes na tabela pix_payments
  * - Zera daily_points de todos os usuários
  * - Permite que usuários acumulem pontos novamente
- * - Reseta o ranking para começar novo ciclo
+ * 
+ * Valores de Pagamento (conforme APK):
+ * - 1º lugar: R$ 20,00
+ * - 2º lugar: R$ 10,00
+ * - 3º lugar: R$ 5,00
+ * - 4º ao 10º lugar: R$ 1,00 cada
  * 
  * Segurança:
  * - Token obrigatório via query parameter ou header
@@ -81,7 +88,101 @@ try {
     $conn->begin_transaction();
     
     try {
-        // Contar quantos usuários têm daily_points > 0
+        // PASSO 1: Obter o top 10 do ranking ANTES de resetar
+        // Tabela de valores de pagamento conforme APK
+        $payment_values = [
+            1 => 20.00,  // 1º lugar: R$ 20,00
+            2 => 10.00,  // 2º lugar: R$ 10,00
+            3 => 5.00,   // 3º lugar: R$ 5,00
+            4 => 1.00,   // 4º ao 10º lugar: R$ 1,00
+            5 => 1.00,
+            6 => 1.00,
+            7 => 1.00,
+            8 => 1.00,
+            9 => 1.00,
+            10 => 1.00
+        ];
+        
+        // Buscar top 10 do ranking com suas chaves PIX
+        $stmt = $conn->prepare("
+            SELECT 
+                u.id as user_id,
+                u.name,
+                u.email,
+                u.daily_points,
+                pk.pix_key_type,
+                pk.pix_key
+            FROM users u
+            LEFT JOIN pix_keys pk ON u.id = pk.user_id
+            WHERE u.daily_points > 0
+            ORDER BY u.daily_points DESC, u.created_at ASC
+            LIMIT 10
+        ");
+        
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $top_10_users = [];
+        $position = 1;
+        $payments_created = 0;
+        $total_payment_amount = 0;
+        
+        while ($row = $result->fetch_assoc()) {
+            $user_id = $row['user_id'];
+            $amount = $payment_values[$position] ?? 1.00;
+            
+            $top_10_users[] = [
+                'position' => $position,
+                'user_id' => $user_id,
+                'name' => $row['name'],
+                'email' => $row['email'],
+                'daily_points' => (int)$row['daily_points'],
+                'pix_key_type' => $row['pix_key_type'],
+                'pix_key' => $row['pix_key'],
+                'payment_amount' => $amount
+            ];
+            
+            // PASSO 2: Criar registro de pagamento pendente
+            // Apenas criar pagamento se o usuário tem chave PIX
+            if (!empty($row['pix_key'])) {
+                $stmt_payment = $conn->prepare("
+                    INSERT INTO pix_payments 
+                    (user_id, position, amount, pix_key_type, pix_key, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, 'pending', NOW())
+                ");
+                
+                if (!$stmt_payment) {
+                    throw new Exception("Prepare payment failed: " . $conn->error);
+                }
+                
+                $stmt_payment->bind_param(
+                    "iidss",
+                    $user_id,
+                    $position,
+                    $amount,
+                    $row['pix_key_type'],
+                    $row['pix_key']
+                );
+                
+                if (!$stmt_payment->execute()) {
+                    throw new Exception("Execute payment failed: " . $stmt_payment->error);
+                }
+                
+                $stmt_payment->close();
+                $payments_created++;
+                $total_payment_amount += $amount;
+            }
+            
+            $position++;
+        }
+        
+        $stmt->close();
+        
+        // PASSO 3: Contar quantos usuários têm daily_points > 0
         $stmt = $conn->prepare("
             SELECT COUNT(*) as total 
             FROM users 
@@ -98,7 +199,7 @@ try {
         $usersAffected = $row['total'] ?? 0;
         $stmt->close();
         
-        // Resetar daily_points para 0 para todos os usuários
+        // PASSO 4: Resetar daily_points para 0 para todos os usuários
         $stmt = $conn->prepare("
             UPDATE users 
             SET daily_points = 0
@@ -114,35 +215,28 @@ try {
         
         $stmt->close();
         
-        // Registrar log do reset (opcional) - comentado pois a tabela existente tem estrutura diferente
-        // $stmt = $conn->prepare("
-        //     INSERT INTO ranking_reset_logs 
-        //     (reset_type, triggered_by, users_affected, reset_datetime, status) 
-        //     VALUES ('manual', 'api-reset', ?, NOW(), 'success')
-        // ");
-        // 
-        // if ($stmt) {
-        //     $stmt->bind_param("i", $usersAffected);
-        //     $stmt->execute();
-        //     $stmt->close();
-        // }
-        
         // Commit da transação
         $conn->commit();
         
-        // Retornar sucesso
+        // Retornar sucesso com informações dos pagamentos criados
         echo json_encode([
             'success' => true,
-            'message' => 'Ranking resetado com sucesso!',
+            'message' => 'Ranking resetado com sucesso! Pagamentos pendentes criados.',
             'data' => [
                 'reset_type' => 'ranking',
-                'description' => 'Todos os usuários tiveram daily_points zerado',
+                'description' => 'Todos os usuários tiveram daily_points zerado. Pagamentos pendentes criados para o top 10.',
                 'users_affected' => $usersAffected,
                 'daily_points_reset_to' => 0,
                 'reset_date' => $current_date,
                 'reset_datetime' => $current_datetime,
                 'timezone' => 'America/Sao_Paulo (GMT-3)',
-                'timestamp' => time()
+                'timestamp' => time(),
+                'payments' => [
+                    'total_created' => $payments_created,
+                    'total_amount' => round($total_payment_amount, 2),
+                    'status' => 'pending',
+                    'top_10_ranking' => $top_10_users
+                ]
             ]
         ], JSON_UNESCAPED_UNICODE);
         

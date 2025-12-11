@@ -1,16 +1,25 @@
 <?php
 /**
- * API de Reset do Ranking Agendada
+ * API de Reset do Ranking Agendada com Pagamentos Automáticos
  * 
  * Endpoint: POST /api/v1/reset/ranking_scheduled.php
  * 
  * Função: Reseta o ranking diário baseado na hora configurada no painel ADM
+ *         e cria pagamentos automáticos para o top 10 do ranking
  * 
  * Lógica:
  * - Lê a hora de reset configurada em system_settings (reset_time)
  * - Verifica se é a hora certa para resetar
+ * - Obtém o top 10 do ranking ANTES de resetar
+ * - Cria registros de pagamento pendentes na tabela pix_payments
  * - Zera daily_points de todos os usuários
  * - Permite que usuários acumulem pontos novamente
+ * 
+ * Valores de Pagamento (conforme APK):
+ * - 1º lugar: R$ 20,00
+ * - 2º lugar: R$ 10,00
+ * - 3º lugar: R$ 5,00
+ * - 4º ao 10º lugar: R$ 1,00 cada
  * 
  * Segurança:
  * - Token obrigatório via query parameter ou header
@@ -117,6 +126,7 @@ try {
                 'is_reset_time' => false,
                 'current_time' => $current_time,
                 'users_affected' => 0,
+                'payments_created' => 0,
                 'reset_date' => $current_date,
                 'reset_datetime' => $current_datetime,
                 'timezone' => 'America/Sao_Paulo (GMT-3)',
@@ -128,9 +138,104 @@ try {
     }
     
     // Iniciar transacao
+    $conn->begin_transaction();
     
     try {
-        // Contar quantos usuários têm daily_points > 0
+        // PASSO 1: Obter o top 10 do ranking ANTES de resetar
+        // Tabela de valores de pagamento conforme APK
+        $payment_values = [
+            1 => 20.00,  // 1º lugar: R$ 20,00
+            2 => 10.00,  // 2º lugar: R$ 10,00
+            3 => 5.00,   // 3º lugar: R$ 5,00
+            4 => 1.00,   // 4º ao 10º lugar: R$ 1,00
+            5 => 1.00,
+            6 => 1.00,
+            7 => 1.00,
+            8 => 1.00,
+            9 => 1.00,
+            10 => 1.00
+        ];
+        
+        // Buscar top 10 do ranking com suas chaves PIX
+        $stmt = $conn->prepare("
+            SELECT 
+                u.id as user_id,
+                u.name,
+                u.email,
+                u.daily_points,
+                pk.pix_key_type,
+                pk.pix_key
+            FROM users u
+            LEFT JOIN pix_keys pk ON u.id = pk.user_id
+            WHERE u.daily_points > 0
+            ORDER BY u.daily_points DESC, u.created_at ASC
+            LIMIT 10
+        ");
+        
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+        
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $top_10_users = [];
+        $position = 1;
+        $payments_created = 0;
+        $total_payment_amount = 0;
+        
+        while ($row = $result->fetch_assoc()) {
+            $user_id = $row['user_id'];
+            $amount = $payment_values[$position] ?? 1.00;
+            
+            $top_10_users[] = [
+                'position' => $position,
+                'user_id' => $user_id,
+                'name' => $row['name'],
+                'email' => $row['email'],
+                'daily_points' => (int)$row['daily_points'],
+                'pix_key_type' => $row['pix_key_type'],
+                'pix_key' => $row['pix_key'],
+                'payment_amount' => $amount
+            ];
+            
+            // PASSO 2: Criar registro de pagamento pendente
+            // Apenas criar pagamento se o usuário tem chave PIX
+            if (!empty($row['pix_key'])) {
+                $stmt_payment = $conn->prepare("
+                    INSERT INTO pix_payments 
+                    (user_id, position, amount, pix_key_type, pix_key, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, 'pending', NOW())
+                ");
+                
+                if (!$stmt_payment) {
+                    throw new Exception("Prepare payment failed: " . $conn->error);
+                }
+                
+                $stmt_payment->bind_param(
+                    "iidss",
+                    $user_id,
+                    $position,
+                    $amount,
+                    $row['pix_key_type'],
+                    $row['pix_key']
+                );
+                
+                if (!$stmt_payment->execute()) {
+                    throw new Exception("Execute payment failed: " . $stmt_payment->error);
+                }
+                
+                $stmt_payment->close();
+                $payments_created++;
+                $total_payment_amount += $amount;
+            }
+            
+            $position++;
+        }
+        
+        $stmt->close();
+        
+        // PASSO 3: Contar quantos usuários têm daily_points > 0
         $stmt = $conn->prepare("
             SELECT COUNT(*) as total 
             FROM users 
@@ -147,7 +252,7 @@ try {
         $usersAffected = $row['total'] ?? 0;
         $stmt->close();
         
-        // Resetar daily_points para 0 para todos os usuários
+        // PASSO 4: Resetar daily_points para 0 para todos os usuários
         $stmt = $conn->prepare("
             UPDATE users 
             SET daily_points = 0
@@ -163,7 +268,7 @@ try {
         
         $stmt->close();
         
-        // Registrar log do reset
+        // PASSO 5: Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO ranking_reset_logs 
             (users_affected, reset_datetime) 
@@ -179,13 +284,13 @@ try {
         // Commit da transação
         $conn->commit();
         
-        // Retornar sucesso
+        // Retornar sucesso com informações dos pagamentos criados
         echo json_encode([
             'success' => true,
-            'message' => 'Reset do ranking executado com sucesso!',
+            'message' => 'Reset do ranking executado com sucesso! Pagamentos pendentes criados.',
             'data' => [
                 'reset_type' => 'ranking_scheduled',
-                'description' => 'Todos os usuários tiveram daily_points zerado',
+                'description' => 'Todos os usuários tiveram daily_points zerado. Pagamentos pendentes criados para o top 10.',
                 'reset_time_configured' => $reset_time,
                 'is_reset_time' => $is_reset_time,
                 'current_time' => $current_time,
@@ -194,7 +299,13 @@ try {
                 'reset_date' => $current_date,
                 'reset_datetime' => $current_datetime,
                 'timezone' => 'America/Sao_Paulo (GMT-3)',
-                'timestamp' => time()
+                'timestamp' => time(),
+                'payments' => [
+                    'total_created' => $payments_created,
+                    'total_amount' => round($total_payment_amount, 2),
+                    'status' => 'pending',
+                    'top_10_ranking' => $top_10_users
+                ]
             ]
         ], JSON_UNESCAPED_UNICODE);
         
