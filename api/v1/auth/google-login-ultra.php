@@ -119,6 +119,27 @@ try {
     $stmt->close();
     $conn->close();
     
+    // 5.5. REGISTRAR NO MONETAG-POSTBACK-SERVER
+    try {
+        $monetagData = json_encode([
+            'ymid' => (string)$userId,
+            'email' => $email,
+            'telegram_id' => null
+        ]);
+        
+        $ch = curl_init('https://monetag-postback-server-production.up.railway.app/api/users/register');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $monetagData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_exec($ch);
+        curl_close($ch);
+    } catch (Exception $e) {
+        // Ignorar erros do monetag-postback-server
+        error_log("Erro ao registrar no monetag-postback-server: " . $e->getMessage());
+    }
+    
     // 6. RESPOSTA DIRETA (sem middleware, sem criptografia adicional)
     http_response_code(200);
     echo json_encode([
