@@ -156,19 +156,18 @@ try {
             10 => 1.00
         ];
         
-        // Buscar top 10 do ranking com suas chaves PIX
+        // Buscar top 10 do ranking com suas chaves PIX (agora na tabela users)
         $stmt = $conn->prepare("
             SELECT 
-                u.id as user_id,
-                u.name,
-                u.email,
-                u.daily_points,
-                pk.pix_key_type,
-                pk.pix_key
-            FROM users u
-            LEFT JOIN pix_keys pk ON u.id = pk.user_id
-            WHERE u.daily_points > 0
-            ORDER BY u.daily_points DESC, u.created_at ASC
+                id as user_id,
+                name,
+                email,
+                daily_points,
+                pix_key_type,
+                pix_key
+            FROM users
+            WHERE daily_points > 0
+            ORDER BY daily_points DESC, created_at ASC
             LIMIT 10
         ");
         
