@@ -18,6 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 date_default_timezone_set('America/Sao_Paulo');
 
+// Incluir configuração do banco de dados
+require_once __DIR__ . '/../db_config.php';
+
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         http_response_code(405);
@@ -28,26 +31,8 @@ try {
         exit;
     }
     
-    // Conectar ao banco
-    $db_host = $_ENV['DB_HOST'] ?? getenv('DB_HOST');
-    $db_user = $_ENV['DB_USER'] ?? getenv('DB_USER');
-    $db_pass = $_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD');
-    $db_name = $_ENV['DB_NAME'] ?? getenv('DB_NAME');
-    $db_port = $_ENV['DB_PORT'] ?? getenv('DB_PORT');
-    
-    $conn = mysqli_init();
-    
-    if (!$conn) {
-        throw new Exception("mysqli_init falhou");
-    }
-    
-    mysqli_ssl_set($conn, NULL, NULL, NULL, NULL, NULL);
-    
-    if (!mysqli_real_connect($conn, $db_host, $db_user, $db_pass, $db_name, $db_port, NULL, MYSQLI_CLIENT_SSL)) {
-        throw new Exception("Conexão falhou: " . mysqli_connect_error());
-    }
-    
-    mysqli_set_charset($conn, "utf8mb4");
+    // Usar a função helper do db_config.php
+    $conn = getMySQLiConnection();
     
     // Buscar valores ativos
     $result = $conn->query("
