@@ -8,7 +8,7 @@
  * 
  * Lógica:
  * - Obtém o top 10 do ranking ANTES de resetar
- * - Cria registros de pagamento pendentes na tabela pix_payments
+ * - Cria registros de pagamento pendentes na tabela withdrawals
  * - Zera daily_points de todos os usuários
  * - Permite que usuários acumulem pontos novamente
  * 
@@ -145,13 +145,13 @@ try {
                 'payment_amount' => $amount
             ];
             
-            // PASSO 2: Criar registro de pagamento pendente
+            // PASSO 2: Criar registro de pagamento pendente na tabela WITHDRAWALS
             // Apenas criar pagamento se o usuário tem chave PIX
             if (!empty($row['pix_key'])) {
                 $stmt_payment = $conn->prepare("
-                    INSERT INTO pix_payments 
-                    (user_id, position, amount, pix_key_type, pix_key, status, created_at)
-                    VALUES (?, ?, ?, ?, ?, 'pending', NOW())
+                    INSERT INTO withdrawals 
+                    (user_id, amount, pix_type, pix_key, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, 'pending', NOW(), NOW())
                 ");
                 
                 if (!$stmt_payment) {
@@ -159,9 +159,8 @@ try {
                 }
                 
                 $stmt_payment->bind_param(
-                    "iidss",
+                    "idss",
                     $user_id,
-                    $position,
                     $amount,
                     $row['pix_key_type'],
                     $row['pix_key']
