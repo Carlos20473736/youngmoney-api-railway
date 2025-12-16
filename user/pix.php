@@ -7,7 +7,7 @@
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, PUT, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Req');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -44,7 +44,7 @@ try {
             'has_pix' => !empty($pixData['pix_key'])
         ]);
         
-    } elseif ($method === 'PUT') {
+    } elseif ($method === 'PUT' || $method === 'POST') {
         // Atualizar/Salvar dados PIX do usuário
         $rawInput = file_get_contents('php://input');
         $data = json_decode($rawInput, true);
