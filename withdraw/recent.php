@@ -8,6 +8,7 @@
  * - Valor do saque
  * - Data/hora do saque
  * - Foto do usuário (se disponível)
+ * - URL do comprovante PIX (se disponível)
  */
 
 header('Content-Type: application/json');
@@ -55,8 +56,10 @@ try {
     }
     
     // Buscar saques recentes aprovados/completados
+    // Inclui receipt_url se existir na tabela
     $stmt = $conn->prepare("
-        SELECT w.id, w.amount, w.created_at, w.updated_at, u.email, u.profile_picture, u.photo_url
+        SELECT w.id, w.amount, w.created_at, w.updated_at, w.receipt_url,
+               u.email, u.profile_picture, u.photo_url
         FROM withdrawals w
         INNER JOIN users u ON w.user_id = u.id
         WHERE w.status IN ('approved', 'completed')
@@ -80,6 +83,7 @@ try {
             'amount' => (float)$row['amount'],
             'email' => maskEmail($row['email']),
             'photo_url' => $photoUrl,
+            'receipt_url' => $row['receipt_url'] ?? null,
             'created_at' => $paymentDate
         ];
     }
