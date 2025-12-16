@@ -2,6 +2,7 @@
 /**
  * Ranking List Endpoint
  * GET - Retorna lista do ranking de usuários por pontos
+ * IMPORTANTE: Só mostra usuários que têm chave PIX cadastrada
  */
 
 header('Content-Type: application/json');
@@ -30,11 +31,13 @@ try {
     // Obter limite (padrão: 100)
     $limit = isset($_GET['limit']) ? min((int)$_GET['limit'], 100) : 100;
     
-    // Buscar ranking (pontos diários)
+    // Buscar ranking (pontos diários) - APENAS usuários com chave PIX cadastrada
     $stmt = $conn->prepare("
         SELECT id, name, profile_picture, daily_points as points
         FROM users 
-        WHERE daily_points > 0
+        WHERE daily_points > 0 
+          AND pix_key IS NOT NULL 
+          AND pix_key != ''
         ORDER BY daily_points DESC, created_at ASC
         LIMIT ?
     ");
