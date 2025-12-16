@@ -24,9 +24,27 @@ try {
         sendError('Pontos inválidos', 400);
     }
     
-    // Adicionar pontos (total E daily_points para ranking)
-    $stmt = $conn->prepare("UPDATE users SET points = points + ?, daily_points = daily_points + ? WHERE id = ?");
-    $stmt->bind_param("iii", $points, $points, $user['id']);
+    // Verificar se usuário tem chave PIX cadastrada
+    $stmt = $conn->prepare("SELECT pix_key, pix_key_type FROM users WHERE id = ?");
+    $stmt->bind_param("i", $user['id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $pixData = $result->fetch_assoc();
+    $stmt->close();
+    
+    $hasPixKey = !empty($pixData['pix_key']);
+    
+    // Sempre adicionar pontos totais
+    // Só adicionar daily_points (ranking) se tiver chave PIX
+    if ($hasPixKey) {
+        // Usuário tem chave PIX - adiciona pontos totais E daily_points (ranking)
+        $stmt = $conn->prepare("UPDATE users SET points = points + ?, daily_points = daily_points + ? WHERE id = ?");
+        $stmt->bind_param("iii", $points, $points, $user['id']);
+    } else {
+        // Usuário NÃO tem chave PIX - adiciona apenas pontos totais (não entra no ranking)
+        $stmt = $conn->prepare("UPDATE users SET points = points + ? WHERE id = ?");
+        $stmt->bind_param("ii", $points, $user['id']);
+    }
     $stmt->execute();
     $stmt->close();
     
@@ -51,13 +69,23 @@ try {
     
     $conn->close();
     
-    sendSuccess([
+    $response = [
         'points_added' => $points,
         'new_balance' => $newBalance,
         'daily_points' => $dailyPoints,
         'total_points' => $newBalance,
         'message' => 'Pontos adicionados com sucesso!'
-    ]);
+    ];
+    
+    // Adicionar aviso se não tem chave PIX
+    if (!$hasPixKey) {
+        $response['ranking_warning'] = 'Cadastre sua chave PIX para participar do ranking!';
+        $response['ranking_eligible'] = false;
+    } else {
+        $response['ranking_eligible'] = true;
+    }
+    
+    sendSuccess($response);
     
 } catch (Exception $e) {
     error_log("ranking/add_points.php error: " . $e->getMessage());
