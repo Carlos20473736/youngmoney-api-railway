@@ -5,6 +5,7 @@
  */
 
 require_once __DIR__ . '/AntiScriptValidator.php';
+require_once __DIR__ . '/RotatingKeyValidator.php';
 
 // ========================================
 // VALIDAÇÃO OBRIGATÓRIA DE HEADERS ANTI-SCRIPT
@@ -120,6 +121,37 @@ if (!$_isPublicEndpoint) {
     }
     
     error_log("[AntiScript] Request validated - Fingerprint: " . substr($_headers['x-device-fingerprint'], 0, 16) . "...");
+    
+    // ======= VALIDAÇÃO DE CHAVE ROTATIVA NATIVA =======
+    // Verifica chave que muda a cada 5 segundos (gerada em C++)
+    if (RotatingKeyValidator::hasRotatingKeyHeaders($_headers)) {
+        $_rotatingValidation = RotatingKeyValidator::validate(
+            $_headers['x-rotating-key'] ?? '',
+            $_headers['x-native-signature'] ?? '',
+            (int)($_headers['x-key-window'] ?? 0),
+            $_currentUri,
+            file_get_contents('php://input') ?: '',
+            (int)($_headers['x-timestamp'] ?? 0),
+            $_headers['x-nonce'] ?? ''
+        );
+        
+        if (!$_rotatingValidation['valid']) {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Native security validation failed',
+                'code' => $_rotatingValidation['error']
+            ]);
+            exit;
+        }
+        
+        error_log("[RotatingKey] Chave rotativa validada com sucesso");
+    } else {
+        // Se não tem headers de chave rotativa, permitir por enquanto
+        // (para compatibilidade com versões antigas do app)
+        error_log("[RotatingKey] Headers de chave rotativa não encontrados - permitindo por compatibilidade");
+    }
 }
 
 // ========================================
