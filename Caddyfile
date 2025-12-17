@@ -5,19 +5,43 @@
 
 :80 {
     root * /app
-    php_server
     
-    # Configuração CORS
-    header {
-        Access-Control-Allow-Origin "https://satisfied-connection-production-deb1.up.railway.app"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-        Access-Control-Allow-Credentials "true"
+    # Executar middleware de segurança antes de cada requisição PHP
+    php_server {
+        # O middleware será carregado via auto_prepend_file no php.ini
     }
     
-    # Responder a requisições OPTIONS
+    # Configuração CORS com todos os headers de segurança
+    header {
+        # CORS
+        Access-Control-Allow-Origin "https://satisfied-connection-production-deb1.up.railway.app"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Device-ID, X-Timestamp, X-Signature, X-Proof-Of-Work, X-Challenge, X-Response, X-Request-ID, X-Client-Nonce, X-App-Version, X-Platform, X-Platform-Version, X-Device-Model, X-Session-ID, X-Device-Fingerprint, X-Body-Hash, X-Headers-Hash, X-Full-Request-Hash, X-Encryption-Version, X-Key-Window, X-Security-Level, X-Cipher-Algorithm, X-HMAC-Algorithm, X-API-Version, X-Client-Type, X-User-Agent-Hash, X-Origin-Validation, X-Access-Token-Hash, X-Request-Window, X-Nonce-Signature, X-Rate-Limit-Key, X-Request-Priority, X-Challenge-Response, X-Request-Sequence, X-Request-Timestamp"
+        Access-Control-Allow-Credentials "true"
+        Access-Control-Max-Age "86400"
+        
+        # Security Headers
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        
+        # Cache Control
+        Cache-Control "no-store, no-cache, must-revalidate"
+        Pragma "no-cache"
+    }
+    
+    # Responder a requisições OPTIONS (preflight)
     @options {
         method OPTIONS
     }
     respond @options 200
+    
+    # Bloquear acesso a arquivos sensíveis
+    @blocked {
+        path *.env *.sql *.log *.bak *.config .git/*
+    }
+    respond @blocked 403
 }
