@@ -18,7 +18,10 @@ $publicEndpoints = [
     '/admin/',
     '/api/v1/cron/',
     '/health',
-    '/ping'
+    '/ping',
+    '/index.php',
+    '/run_security_migration.php',
+    '/api/v1/security/status.php'
 ];
 
 // Endpoints que precisam apenas de autenticação básica (sem PoW)
@@ -32,6 +35,11 @@ $basicAuthEndpoints = [
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $isPublicEndpoint = false;
 $isBasicAuthEndpoint = false;
+
+// Verificar se é endpoint raiz
+if ($requestUri === '/' || $requestUri === '') {
+    $isPublicEndpoint = true;
+}
 
 foreach ($publicEndpoints as $endpoint) {
     if (strpos($requestUri, $endpoint) !== false) {
