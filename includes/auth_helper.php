@@ -3,6 +3,8 @@
  * Auth Helper - Funções auxiliares para autenticação
  */
 
+require_once __DIR__ . '/AntiScriptValidator.php';
+
 /**
  * Obtém o usuário autenticado a partir do token Bearer
  * 
@@ -86,5 +88,33 @@ function sendError($message, $code = 400) {
         'message' => $message
     ]);
     exit;
+}
+
+/**
+ * Valida headers de segurança anti-script
+ * 
+ * @param mysqli $conn Conexão com o banco de dados
+ * @param bool $strict Se true, bloqueia requisições sem headers
+ * @return bool True se válido
+ */
+function validateSecurityHeadersAntiScript($conn, $strict = false) {
+    $validator = new AntiScriptValidator($conn);
+    
+    if (!$validator->validate($strict)) {
+        error_log("[AntiScript] Validation failed: " . implode(', ', $validator->getErrors()));
+        
+        if ($strict) {
+            http_response_code(403);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Security validation failed',
+                'code' => 'ANTI_SCRIPT_BLOCKED',
+                'debug' => $validator->getDebugInfo()
+            ]);
+            exit;
+        }
+    }
+    
+    return true;
 }
 ?>
