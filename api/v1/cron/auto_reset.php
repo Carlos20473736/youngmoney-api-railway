@@ -8,16 +8,9 @@
  * 1. Ranking (daily_points = 0)
  * 2. Spin (DELETE registros de HOJE)
  * 3. Check-in (Atualiza last_reset_datetime - histórico preservado)
- * 
- * Lógica:
- * - Busca o horário configurado no painel admin
- * - Busca o último horário em que o reset foi executado
- * - Se horário atual >= horário configurado E ainda não resetou neste horário:
- *   * Reseta daily_points de todos os usuários
- *   * Deleta registros de spin_history de HOJE
- *   * Deleta registros de daily_checkin de HOJE
- *   * Atualiza last_reset_time
  */
+
+header('Content-Type: application/json');
 
 // Verificar token de segurança
 $token = $_GET['token'] ?? '';
@@ -35,20 +28,12 @@ if ($token !== $expectedToken) {
 // Configurar timezone
 date_default_timezone_set('America/Sao_Paulo');
 
+// Incluir arquivo de conexão
+require_once __DIR__ . '/../../../database.php';
+
 try {
-    // Conectar ao banco de dados
-    $host = getenv('DB_HOST') ?: 'localhost';
-    $port = getenv('DB_PORT') ?: '3306';
-    $dbname = getenv('DB_NAME') ?: 'defaultdb';
-    $username = getenv('DB_USER') ?: 'root';
-    $password = getenv('DB_PASSWORD') ?: '';
-    
-    $dsn = "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4";
-    
-    $pdo = new PDO($dsn, $username, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
+    // Usar a função de conexão padrão
+    $mysqli = getDbConnection();
     
     // Obter horário atual
     $current_time = date('H:i');
@@ -58,14 +43,15 @@ try {
     $current_minute = (int)date('i');
     
     // Buscar horário configurado no painel admin
-    $stmt = $pdo->prepare("
+    $stmt = $mysqli->prepare("
         SELECT setting_value 
         FROM system_settings 
         WHERE setting_key = 'reset_time'
         LIMIT 1
     ");
     $stmt->execute();
-    $reset_time_config = $stmt->fetch();
+    $result = $stmt->get_result();
+    $reset_time_config = $result->fetch_assoc();
     
     // Se não houver configuração, retornar erro
     if (!$reset_time_config || empty($reset_time_config['setting_value'])) {
@@ -85,14 +71,15 @@ try {
     $reset_minute = (int)$reset_minute;
     
     // Buscar último horário de reset
-    $stmt = $pdo->prepare("
+    $stmt = $mysqli->prepare("
         SELECT setting_value 
         FROM system_settings 
         WHERE setting_key = 'last_reset_time'
         LIMIT 1
     ");
     $stmt->execute();
-    $last_reset = $stmt->fetch();
+    $result = $stmt->get_result();
+    $last_reset = $result->fetch_assoc();
     $last_reset_time = $last_reset ? $last_reset['setting_value'] : null;
     
     // Verificar se deve resetar
@@ -137,51 +124,54 @@ try {
     // ============================================
     
     // Iniciar transação
-    $pdo->beginTransaction();
+    $mysqli->begin_transaction();
     
     // 1. RANKING - Contar e resetar daily_points
-    $countStmt = $pdo->query("SELECT COUNT(*) as total FROM users WHERE daily_points > 0");
-    $usersAffected = $countStmt->fetch()['total'];
-    $pdo->exec("UPDATE users SET daily_points = 0");
+    $countResult = $mysqli->query("SELECT COUNT(*) as total FROM users WHERE daily_points > 0");
+    $usersAffected = $countResult->fetch_assoc()['total'];
+    $mysqli->query("UPDATE users SET daily_points = 0");
     
     // 2. SPIN - Deletar registros de HOJE
-    $spinsDeleted = $pdo->exec("DELETE FROM spin_history WHERE DATE(created_at) = '$current_date'");
+    $spinsDeleted = $mysqli->query("DELETE FROM spin_history WHERE DATE(created_at) = '$current_date'");
+    $spinsDeletedCount = $mysqli->affected_rows;
     
     // 3. CHECK-IN - Atualizar last_reset_datetime (histórico preservado)
-    $stmt = $pdo->prepare("
+    $stmt = $mysqli->prepare("
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
-        VALUES ('last_reset_datetime', :datetime, NOW())
+        VALUES ('last_reset_datetime', ?, NOW())
         ON DUPLICATE KEY UPDATE 
-            setting_value = :datetime,
+            setting_value = ?,
             updated_at = NOW()
     ");
-    $stmt->execute(['datetime' => $current_datetime]);
-    $checkinsDeleted = 0; // Não deleta, apenas atualiza timestamp
+    $stmt->bind_param("ss", $current_datetime, $current_datetime);
+    $stmt->execute();
     
     // 4. Atualizar último horário de reset
-    $stmt = $pdo->prepare("
+    $stmt = $mysqli->prepare("
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
-        VALUES ('last_reset_time', :time, NOW())
+        VALUES ('last_reset_time', ?, NOW())
         ON DUPLICATE KEY UPDATE 
-            setting_value = :time,
+            setting_value = ?,
             updated_at = NOW()
     ");
-    $stmt->execute(['time' => $reset_time]);
+    $stmt->bind_param("ss", $reset_time, $reset_time);
+    $stmt->execute();
     
     // 5. Registrar log do reset (opcional)
     try {
-        $stmt = $pdo->prepare("
+        $stmt = $mysqli->prepare("
             INSERT INTO ranking_reset_logs 
             (reset_type, triggered_by, users_affected, status, reset_time) 
-            VALUES ('automatic', 'cron-job.org', :users, 'success', NOW())
+            VALUES ('automatic', 'cron-job.org', ?, 'success', NOW())
         ");
-        $stmt->execute(['users' => $usersAffected]);
-    } catch (PDOException $e) {
+        $stmt->bind_param("i", $usersAffected);
+        $stmt->execute();
+    } catch (Exception $e) {
         // Tabela de logs pode não existir, ignorar erro
     }
     
     // Commit da transação
-    $pdo->commit();
+    $mysqli->commit();
     
     // Retornar sucesso
     echo json_encode([
@@ -194,11 +184,11 @@ try {
                 'description' => 'daily_points resetado para 0'
             ],
             'spin' => [
-                'records_deleted' => $spinsDeleted,
+                'records_deleted' => $spinsDeletedCount,
                 'description' => 'Registros de giros de hoje deletados'
             ],
             'checkin' => [
-                'records_deleted' => $checkinsDeleted,
+                'records_deleted' => 0,
                 'description' => 'Usa dia virtual baseado em last_reset_datetime - histórico preservado'
             ],
             'reset_date' => $current_date,
@@ -209,21 +199,10 @@ try {
         ]
     ], JSON_UNESCAPED_UNICODE);
     
-} catch (PDOException $e) {
-    // Rollback em caso de erro
-    if (isset($pdo) && $pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-    
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Erro ao conectar ao banco de dados: ' . $e->getMessage()
-    ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
     // Rollback em caso de erro
-    if (isset($pdo) && $pdo->inTransaction()) {
-        $pdo->rollBack();
+    if (isset($mysqli) && $mysqli->ping()) {
+        $mysqli->rollback();
     }
     
     http_response_code(500);
