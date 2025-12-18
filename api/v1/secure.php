@@ -195,6 +195,8 @@ $endpointMap = [
     // Invite
     '/api/v1/invite/validate.php' => __DIR__ . '/invite/validate.php',
     '/api/v1/invite/apply.php' => __DIR__ . '/invite/apply.php',
+    '/invite/my_code.php' => __DIR__ . '/../../invite/my_code.php',
+    '/api/v1/invite.php' => __DIR__ . '/invite.php',
     
     // User PIX
     '/user/pix/save.php' => __DIR__ . '/../../user/pix/save.php',
