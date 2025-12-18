@@ -30,12 +30,16 @@ class HeadersValidator {
         if (function_exists('getallheaders')) {
             $this->headers = getallheaders();
         } else {
-            // Método 2: $_SERVER (Nginx/outros)
-            foreach ($_SERVER as $key => $value) {
-                if (substr($key, 0, 5) === 'HTTP_') {
-                    $header = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
-                    $this->headers[$header] = $value;
-                }
+            $this->headers = [];
+        }
+        
+        // Método 2: $_SERVER (Nginx/outros e chamadas via secure.php)
+        // IMPORTANTE: Sempre verificar $_SERVER para pegar headers passados via secure.php
+        foreach ($_SERVER as $key => $value) {
+            if (substr($key, 0, 5) === 'HTTP_') {
+                $header = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
+                // Sobrescrever com valor do $_SERVER (prioridade para chamadas via secure.php)
+                $this->headers[$header] = $value;
             }
         }
         
