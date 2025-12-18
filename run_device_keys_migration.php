@@ -11,6 +11,8 @@ require_once __DIR__ . '/database.php';
 
 try {
     echo "✓ Conexão com banco de dados estabelecida\n";
+ob_flush();
+flush();
     
     // Criar tabela device_keys
     $sql1 = "CREATE TABLE IF NOT EXISTS device_keys (
