@@ -26,8 +26,14 @@ require_once __DIR__ . '/../../../includes/SecureKeyManager.php';
 require_once __DIR__ . '/../../../includes/DecryptMiddleware.php';
 
 try {
-    // 1. PROCESSAR REQUISIÇÃO - APENAS JSON PURO (SEM CRIPTOGRAFIA)
-    if (!empty($_POST)) {
+    // 1. PROCESSAR REQUISIÇÃO - ACEITA TÚNEL SEGURO OU JSON PURO
+    $data = null;
+    
+    // Primeiro, verificar se veio do túnel seguro
+    if (!empty($GLOBALS['_SECURE_REQUEST_BODY'])) {
+        $data = json_decode($GLOBALS['_SECURE_REQUEST_BODY'], true);
+        error_log("google-login.php - Data from SECURE TUNNEL: " . json_encode($data));
+    } elseif (!empty($_POST)) {
         $data = $_POST;
         error_log("google-login.php - Data from \$_POST: " . json_encode($data));
     } else {

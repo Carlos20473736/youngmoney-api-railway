@@ -173,15 +173,26 @@ function executeInternalRequest($url, $method, $headers, $body, $conn) {
         }
     }
     
-    // Configurar body
+    // Configurar body - criar stream temporário para php://input
     if ($body) {
         $GLOBALS['_SECURE_REQUEST_BODY'] = $body;
+        // Criar arquivo temporário com o body para simular php://input
+        $tempFile = tempnam(sys_get_temp_dir(), 'secure_body_');
+        file_put_contents($tempFile, $body);
+        $GLOBALS['_SECURE_BODY_FILE'] = $tempFile;
     }
     
     // Capturar output
     ob_start();
     
     try {
+        // Sobrescrever file_get_contents para php://input
+        if (!empty($body)) {
+            // Definir variável global que o endpoint pode usar
+            $_POST = json_decode($body, true) ?: [];
+            $GLOBALS['HTTP_RAW_POST_DATA'] = $body;
+        }
+        
         include $targetFile;
         $output = ob_get_clean();
         
