@@ -1,12 +1,13 @@
 <?php
 /**
  * Secure API Endpoint - Ponto de entrada para requisições criptografadas
+ * Dados de segurança são enviados nos HEADERS, dados criptografados no BODY
  */
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-Device-ID, X-Timestamp, X-Rotating-Key, X-Nonce, X-Signature');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Device-ID, X-Timestamp, X-Rotating-Key, X-Nonce, X-Signature');
 
 // Handle preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -32,26 +33,73 @@ try {
     exit;
 }
 
-// Obter corpo da requisição
+// Função para obter header de múltiplas fontes
+function getHeader($name) {
+    // Tentar $_SERVER primeiro (formato HTTP_X_HEADER_NAME)
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+    if (!empty($_SERVER[$serverKey])) {
+        return $_SERVER[$serverKey];
+    }
+    
+    // Tentar getallheaders()
+    $headers = getallheaders();
+    if ($headers) {
+        // Case-insensitive search
+        foreach ($headers as $key => $value) {
+            if (strcasecmp($key, $name) === 0) {
+                return $value;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Obter dados de segurança dos HEADERS
+$deviceId = getHeader('X-Device-ID');
+$timestamp = getHeader('X-Timestamp');
+$rotatingKey = getHeader('X-Rotating-Key');
+$nonce = getHeader('X-Nonce');
+$signature = getHeader('X-Signature');
+
+// Validar headers obrigatórios
+$missingHeaders = [];
+if (empty($deviceId)) $missingHeaders[] = 'X-Device-ID';
+if (empty($timestamp)) $missingHeaders[] = 'X-Timestamp';
+if (empty($rotatingKey)) $missingHeaders[] = 'X-Rotating-Key';
+if (empty($nonce)) $missingHeaders[] = 'X-Nonce';
+if (empty($signature)) $missingHeaders[] = 'X-Signature';
+
+if (!empty($missingHeaders)) {
+    http_response_code(400);
+    echo json_encode([
+        'error' => 'Missing security headers',
+        'code' => 'MISSING_HEADERS',
+        'missing' => $missingHeaders
+    ]);
+    exit;
+}
+
+$timestamp = (int) $timestamp;
+
+// Obter dados criptografados do BODY
 $rawBody = file_get_contents('php://input');
 $requestData = json_decode($rawBody, true);
 
-// Validar campos obrigatórios
-$requiredFields = ['encrypted_data', 'device_id', 'timestamp', 'rotating_key', 'nonce', 'signature'];
-foreach ($requiredFields as $field) {
-    if (empty($requestData[$field])) {
-        http_response_code(400);
-        echo json_encode(['error' => "Missing field: $field", 'code' => 'MISSING_FIELD']);
-        exit;
-    }
+// O body deve conter apenas encrypted_data
+$encryptedData = null;
+if (!empty($requestData['encrypted_data'])) {
+    $encryptedData = $requestData['encrypted_data'];
+} else if (!empty($rawBody) && strpos($rawBody, '{') === false) {
+    // Se o body não é JSON, assume que é o dado criptografado direto
+    $encryptedData = $rawBody;
 }
 
-$encryptedData = $requestData['encrypted_data'];
-$deviceId = $requestData['device_id'];
-$timestamp = (int) $requestData['timestamp'];
-$rotatingKey = $requestData['rotating_key'];
-$nonce = $requestData['nonce'];
-$signature = $requestData['signature'];
+if (empty($encryptedData)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Missing encrypted_data in body', 'code' => 'MISSING_DATA']);
+    exit;
+}
 
 // Criar validador
 $validator = new DeviceKeyValidator($conn);
@@ -80,201 +128,132 @@ if ($decryptedData === null) {
 }
 
 // Parse dos dados descriptografados
-$requestInfo = json_decode($decryptedData, true);
+$innerRequest = json_decode($decryptedData, true);
 
-if (!$requestInfo || !isset($requestInfo['url']) || !isset($requestInfo['method'])) {
+if (!$innerRequest || empty($innerRequest['endpoint'])) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid decrypted data format', 'code' => 'INVALID_FORMAT']);
     exit;
 }
 
-$targetUrl = $requestInfo['url'];
-$method = $requestInfo['method'];
-$targetHeaders = $requestInfo['headers'] ?? [];
-$targetBody = $requestInfo['body'] ?? '';
+$endpoint = $innerRequest['endpoint'];
+$method = $innerRequest['method'] ?? 'GET';
+$headers = $innerRequest['headers'] ?? [];
+$body = $innerRequest['body'] ?? null;
 
-// Log da requisição (para debug)
-error_log("Secure request: $method $targetUrl from device $deviceId");
+// Mapear endpoints para arquivos
+$endpointMap = [
+    // Auth
+    '/api/v1/auth/google-login.php' => __DIR__ . '/auth/google-login.php',
+    '/api/v1/auth/device-login.php' => __DIR__ . '/auth/device-login.php',
+    '/auth/google-login.php' => __DIR__ . '/auth/google-login.php',
+    '/auth/device-login.php' => __DIR__ . '/auth/device-login.php',
+    
+    // User
+    '/user/profile.php' => __DIR__ . '/../../user/profile.php',
+    '/user/balance.php' => __DIR__ . '/../../user/balance.php',
+    '/user/greeting.php' => __DIR__ . '/../../user/greeting.php',
+    '/api/v1/users.php' => __DIR__ . '/users.php',
+    
+    // Ranking
+    '/ranking/list.php' => __DIR__ . '/../../ranking/list.php',
+    '/ranking/add_points.php' => __DIR__ . '/../../ranking/add_points.php',
+    '/ranking/user_position.php' => __DIR__ . '/../../ranking/user_position.php',
+    '/api/v1/ranking/list.php' => __DIR__ . '/../../ranking/list.php',
+    
+    // Notifications
+    '/notifications/list.php' => __DIR__ . '/../../notifications/list.php',
+    '/notifications/mark_read.php' => __DIR__ . '/../../notifications/mark_read.php',
+    
+    // Withdraw
+    '/withdraw/request.php' => __DIR__ . '/../../withdraw/request.php',
+    '/withdraw/history.php' => __DIR__ . '/../../withdraw/history.php',
+    '/withdraw/recent.php' => __DIR__ . '/../../withdraw/recent.php',
+    '/api/v1/withdraw/request.php' => __DIR__ . '/../../withdraw/request.php',
+    
+    // Monetag
+    '/monetag/reward.php' => __DIR__ . '/../../monetag/reward.php',
+    '/monetag/callback.php' => __DIR__ . '/../../monetag/callback.php',
+    '/monetag/status.php' => __DIR__ . '/../../monetag/status.php',
+    '/api/v1/monetag/reward.php' => __DIR__ . '/../../monetag/reward.php',
+    
+    // Check-in
+    '/api/v1/checkin.php' => __DIR__ . '/checkin.php',
+    '/checkin.php' => __DIR__ . '/checkin.php',
+    
+    // Settings
+    '/settings/app.php' => __DIR__ . '/../../settings/app.php',
+    '/settings/pix.php' => __DIR__ . '/../../settings/pix.php',
+    
+    // History
+    '/history/points.php' => __DIR__ . '/../../history/points.php',
+    
+    // Payments
+    '/api/v1/payments/pix.php' => __DIR__ . '/payments/pix.php',
+    '/api/v1/payments/status.php' => __DIR__ . '/payments/status.php',
+    
+    // Invite
+    '/api/v1/invite/validate.php' => __DIR__ . '/invite/validate.php',
+    '/api/v1/invite/apply.php' => __DIR__ . '/invite/apply.php',
+    
+    // User PIX
+    '/user/pix/save.php' => __DIR__ . '/../../user/pix/save.php',
+    '/user/pix/get.php' => __DIR__ . '/../../user/pix/get.php',
+];
 
-// Executar a requisição real internamente
-$response = executeInternalRequest($targetUrl, $method, $targetHeaders, $targetBody, $conn);
+// Encontrar arquivo do endpoint
+$targetFile = null;
+foreach ($endpointMap as $pattern => $file) {
+    if ($endpoint === $pattern || strpos($endpoint, $pattern) !== false) {
+        $targetFile = $file;
+        break;
+    }
+}
+
+if (!$targetFile || !file_exists($targetFile)) {
+    http_response_code(404);
+    echo json_encode(['status' => 'error', 'message' => "Endpoint not found: $endpoint"]);
+    exit;
+}
+
+// Configurar ambiente para o endpoint interno
+$_SERVER['REQUEST_METHOD'] = $method;
+$_SERVER['REQUEST_URI'] = $endpoint;
+
+// Passar headers para o endpoint interno
+foreach ($headers as $key => $value) {
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
+    $_SERVER[$serverKey] = $value;
+}
+
+// Passar body para o endpoint interno
+if ($body) {
+    $GLOBALS['_SECURE_REQUEST_BODY'] = is_string($body) ? $body : json_encode($body);
+}
+
+// Capturar output do endpoint
+ob_start();
+try {
+    include $targetFile;
+} catch (Exception $e) {
+    ob_end_clean();
+    http_response_code(500);
+    echo json_encode(['error' => 'Internal error: ' . $e->getMessage()]);
+    exit;
+}
+$response = ob_get_clean();
 
 // Criptografar resposta
-$responseTimestamp = round(microtime(true) * 1000);
-$encryptedResponse = $validator->encryptData($deviceKey, json_encode($response), $responseTimestamp);
+$encryptedResponse = $validator->encryptData($deviceKey, $response, $timestamp);
+
+if ($encryptedResponse === null) {
+    // Se falhar criptografia, retornar resposta sem criptografia (fallback)
+    echo $response;
+    exit;
+}
 
 // Retornar resposta criptografada
 echo json_encode([
     'encrypted_response' => $encryptedResponse,
-    'timestamp' => $responseTimestamp,
-    'status' => 'success'
+    'timestamp' => round(microtime(true) * 1000)
 ]);
-
-$conn->close();
-
-/**
- * Executa uma requisição interna
- */
-function executeInternalRequest($url, $method, $headers, $body, $conn) {
-    // Remover base URL se presente
-    $url = preg_replace('#^https?://[^/]+#', '', $url);
-    
-    // Mapear URLs para arquivos PHP - TODAS AS ROTAS
-    $routes = [
-        // User
-        '/user/profile' => '/user/profile.php',
-        '/user/profile.php' => '/user/profile.php',
-        '/user/pix' => '/user/pix.php',
-        '/user/pix.php' => '/user/pix.php',
-        '/user/balance' => '/user/balance.php',
-        '/user/balance.php' => '/user/balance.php',
-        '/user/greeting' => '/user/greeting.php',
-        '/user/greeting.php' => '/user/greeting.php',
-        
-        // Auth
-        '/api/v1/auth/google-login' => '/api/v1/auth/google-login.php',
-        '/api/v1/auth/google-login.php' => '/api/v1/auth/google-login.php',
-        '/api/v1/auth/device-login' => '/api/v1/auth/device-login.php',
-        '/api/v1/auth/device-login.php' => '/api/v1/auth/device-login.php',
-        '/api/v1/auth/login_v2' => '/api/v1/auth/login_v2.php',
-        '/api/v1/auth/login_v2.php' => '/api/v1/auth/login_v2.php',
-        
-        // API v1
-        '/api/v1/users' => '/api/v1/users.php',
-        '/api/v1/users.php' => '/api/v1/users.php',
-        '/api/v1/spin' => '/api/v1/spin.php',
-        '/api/v1/spin.php' => '/api/v1/spin.php',
-        '/api/v1/checkin' => '/api/v1/checkin.php',
-        '/api/v1/checkin.php' => '/api/v1/checkin.php',
-        '/api/v1/invite' => '/api/v1/invite.php',
-        '/api/v1/invite.php' => '/api/v1/invite.php',
-        '/api/v1/points' => '/api/v1/points.php',
-        '/api/v1/points.php' => '/api/v1/points.php',
-        '/api/v1/config' => '/api/v1/config.php',
-        '/api/v1/config.php' => '/api/v1/config.php',
-        '/api/v1/withdrawals' => '/api/v1/withdrawals.php',
-        '/api/v1/withdrawals.php' => '/api/v1/withdrawals.php',
-        '/api/v1/withdrawal_values' => '/api/v1/withdrawal_values.php',
-        '/api/v1/withdrawal_values.php' => '/api/v1/withdrawal_values.php',
-        
-        // Ranking
-        '/ranking/list' => '/ranking/list.php',
-        '/ranking/list.php' => '/ranking/list.php',
-        '/ranking/add_points' => '/ranking/add_points.php',
-        '/ranking/add_points.php' => '/ranking/add_points.php',
-        '/ranking/user_position' => '/ranking/user_position.php',
-        '/ranking/user_position.php' => '/ranking/user_position.php',
-        
-        // Notifications
-        '/notifications/list' => '/notifications/list.php',
-        '/notifications/list.php' => '/notifications/list.php',
-        '/notifications/mark_read' => '/notifications/mark_read.php',
-        '/notifications/mark_read.php' => '/notifications/mark_read.php',
-        
-        // Withdraw
-        '/withdraw/request' => '/withdraw/request.php',
-        '/withdraw/request.php' => '/withdraw/request.php',
-        '/withdraw/history' => '/withdraw/history.php',
-        '/withdraw/history.php' => '/withdraw/history.php',
-        '/withdraw/recent' => '/withdraw/recent.php',
-        '/withdraw/recent.php' => '/withdraw/recent.php',
-        
-        // Invite
-        '/invite/my_code' => '/invite/my_code.php',
-        '/invite/my_code.php' => '/invite/my_code.php',
-        '/api/v1/invite/validate' => '/api/v1/invite/validate.php',
-        '/api/v1/invite/validate.php' => '/api/v1/invite/validate.php',
-        
-        // Monetag
-        '/monetag/progress' => '/monetag/progress.php',
-        '/monetag/progress.php' => '/monetag/progress.php',
-        '/monetag/track' => '/monetag/track.php',
-        '/monetag/track.php' => '/monetag/track.php',
-        '/monetag/reset' => '/monetag/reset.php',
-        '/monetag/reset.php' => '/monetag/reset.php',
-        '/monetag/session/start' => '/monetag/session/start.php',
-        '/monetag/session/start.php' => '/monetag/session/start.php',
-        
-        // Settings
-        '/settings/get' => '/settings/get.php',
-        '/settings/get.php' => '/settings/get.php',
-        '/settings/update' => '/settings/update.php',
-        '/settings/update.php' => '/settings/update.php',
-        
-        // History
-        '/history/points' => '/history/points.php',
-        '/history/points.php' => '/history/points.php',
-        
-        // Payments
-        '/api/v1/payments/pending' => '/api/v1/payments/pending.php',
-        '/api/v1/payments/pending.php' => '/api/v1/payments/pending.php',
-        '/api/v1/payments/complete' => '/api/v1/payments/complete.php',
-        '/api/v1/payments/complete.php' => '/api/v1/payments/complete.php',
-    ];
-    
-    // Encontrar arquivo correspondente
-    $targetFile = null;
-    foreach ($routes as $route => $file) {
-        if (strpos($url, $route) === 0) {
-            $targetFile = __DIR__ . '/../..' . $file;
-            break;
-        }
-    }
-    
-    if (!$targetFile || !file_exists($targetFile)) {
-        return ['status' => 'error', 'message' => 'Endpoint not found: ' . $url];
-    }
-    
-    // Simular ambiente da requisição
-    $_SERVER['REQUEST_METHOD'] = strtoupper($method);
-    $_SERVER['REQUEST_URI'] = $url;
-    
-    // Configurar headers
-    if (is_array($headers)) {
-        foreach ($headers as $key => $value) {
-            $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
-            $_SERVER[$serverKey] = $value;
-            
-            // Authorization header especial
-            if (strtolower($key) === 'authorization') {
-                $_SERVER['HTTP_AUTHORIZATION'] = $value;
-            }
-        }
-    }
-    
-    // Configurar body - criar stream temporário para php://input
-    if ($body) {
-        $GLOBALS['_SECURE_REQUEST_BODY'] = $body;
-        // Criar arquivo temporário com o body para simular php://input
-        $tempFile = tempnam(sys_get_temp_dir(), 'secure_body_');
-        file_put_contents($tempFile, $body);
-        $GLOBALS['_SECURE_BODY_FILE'] = $tempFile;
-    }
-    
-    // Capturar output
-    ob_start();
-    
-    try {
-        // Sobrescrever file_get_contents para php://input
-        if (!empty($body)) {
-            // Definir variável global que o endpoint pode usar
-            $_POST = json_decode($body, true) ?: [];
-            $GLOBALS['HTTP_RAW_POST_DATA'] = $body;
-        }
-        
-        include $targetFile;
-        $output = ob_get_clean();
-        
-        // Tentar decodificar como JSON
-        $jsonResponse = json_decode($output, true);
-        if ($jsonResponse !== null) {
-            return $jsonResponse;
-        }
-        
-        return ['raw_response' => $output];
-        
-    } catch (Exception $e) {
-        ob_end_clean();
-        return ['status' => 'error', 'message' => 'Internal error: ' . $e->getMessage()];
-    }
-}
