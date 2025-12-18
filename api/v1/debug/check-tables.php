@@ -1,6 +1,14 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 header('Content-Type: application/json');
-require_once __DIR__ . '/../../../database.php';
+
+try {
+    require_once __DIR__ . '/../../../database.php';
+} catch (Exception $e) {
+    echo json_encode(['error' => 'DB connection failed: ' . $e->getMessage()]);
+    exit;
+}
 
 try {
     // Verificar tabelas existentes
