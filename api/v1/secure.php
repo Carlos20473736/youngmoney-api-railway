@@ -3,17 +3,23 @@
  * Secure API Endpoint - Ponto de entrada para requisições criptografadas
  * 
  * Todas as requisições do app passam por aqui:
- * 1. Recebe dados criptografados
- * 2. Descriptografa usando chave rotativa
- * 3. Executa a requisição real
- * 4. Criptografa a resposta
- * 5. Retorna resposta criptografada
+ * 1. Recebe dados criptografados com chave única do dispositivo
+ * 2. Valida chave rotativa (muda a cada 5 segundos)
+ * 3. Descriptografa usando chave do dispositivo
+ * 4. Executa a requisição real
+ * 5. Criptografa a resposta
+ * 6. Retorna resposta criptografada
+ * 
+ * Scripts NÃO conseguem usar porque:
+ * - Cada dispositivo tem chave única
+ * - Chave rotativa muda a cada 5 segundos
+ * - Sem a chave, não consegue criptografar/descriptografar
  */
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Request-ID, X-Timestamp, X-Nonce, X-Rotating-Key, X-Signature');
+header('Access-Control-Allow-Headers: Content-Type, X-Device-ID, X-Timestamp, X-Rotating-Key, X-Nonce, X-Signature');
 
 // Handle preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -28,18 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Habilitar erros para debug
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
-
-try {
-    require_once __DIR__ . '/../../includes/NativeCrypto.php';
-    require_once __DIR__ . '/../../database.php';
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Include error: ' . $e->getMessage()]);
-    exit;
-}
+require_once __DIR__ . '/../../database.php';
+require_once __DIR__ . '/../../includes/DeviceKeyValidator.php';
 
 // Obter headers
 $headers = [];
@@ -58,177 +54,163 @@ if (function_exists('getallheaders')) {
 $rawBody = file_get_contents('php://input');
 $requestData = json_decode($rawBody, true);
 
-if (!$requestData) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid JSON body']);
-    exit;
-}
-
 // Validar campos obrigatórios
-$requiredFields = ['encrypted_request', 'timestamp', 'nonce', 'rotating_key', 'signature'];
+$requiredFields = ['encrypted_data', 'device_id', 'timestamp', 'rotating_key', 'nonce', 'signature'];
 foreach ($requiredFields as $field) {
     if (empty($requestData[$field])) {
         http_response_code(400);
-        echo json_encode(['error' => "Missing field: $field"]);
+        echo json_encode(['error' => "Missing field: $field", 'code' => 'MISSING_FIELD']);
         exit;
     }
 }
 
-$encryptedRequest = $requestData['encrypted_request'];
+$encryptedData = $requestData['encrypted_data'];
+$deviceId = $requestData['device_id'];
 $timestamp = (int) $requestData['timestamp'];
-$nonce = $requestData['nonce'];
 $rotatingKey = $requestData['rotating_key'];
+$nonce = $requestData['nonce'];
 $signature = $requestData['signature'];
 
-// Validar timestamp (máximo 2 minutos de diferença)
-$currentTime = round(microtime(true) * 1000);
-$timeDiff = abs($currentTime - $timestamp);
-if ($timeDiff > 120000) {
+// Criar validador
+$validator = new DeviceKeyValidator($pdo);
+
+// Validar requisição
+$validation = $validator->validateRequest($deviceId, $rotatingKey, $timestamp, $nonce, $signature);
+
+if (!$validation['valid']) {
     http_response_code(403);
     echo json_encode([
-        'error' => 'Request expired',
-        'code' => 'TIMESTAMP_EXPIRED'
+        'error' => $validation['message'],
+        'code' => $validation['error']
     ]);
     exit;
 }
 
-// Validar chave rotativa
-if (!NativeCrypto::validateRotatingKey($rotatingKey, $timestamp)) {
-    http_response_code(403);
-    echo json_encode([
-        'error' => 'Invalid rotating key',
-        'code' => 'INVALID_ROTATING_KEY'
-    ]);
-    exit;
-}
+$deviceKey = $validation['device_key'];
 
-// Descriptografar requisição
-$decryptedRequest = NativeCrypto::decrypt($encryptedRequest, $timestamp);
-if ($decryptedRequest === null) {
-    http_response_code(403);
-    echo json_encode([
-        'error' => 'Decryption failed',
-        'code' => 'DECRYPTION_FAILED'
-    ]);
-    exit;
-}
+// Descriptografar dados da requisição
+$decryptedData = $validator->decryptData($deviceKey, $encryptedData, $timestamp);
 
-// Parse da requisição descriptografada
-$request = json_decode($decryptedRequest, true);
-if (!$request) {
+if ($decryptedData === null) {
     http_response_code(400);
-    echo json_encode(['error' => 'Invalid decrypted request format']);
+    echo json_encode(['error' => 'Failed to decrypt request', 'code' => 'DECRYPT_ERROR']);
     exit;
 }
 
-// Extrair dados da requisição
-$endpoint = $request['endpoint'] ?? '';
-$method = strtoupper($request['method'] ?? 'GET');
-$requestHeaders = $request['headers'] ?? [];
-$body = $request['body'] ?? '';
+// Parse dos dados descriptografados
+$requestInfo = json_decode($decryptedData, true);
 
-error_log("[SecureAPI] Requisição descriptografada - Endpoint: $endpoint, Method: $method");
+if (!$requestInfo || !isset($requestInfo['url']) || !isset($requestInfo['method'])) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Invalid decrypted data format', 'code' => 'INVALID_FORMAT']);
+    exit;
+}
+
+$targetUrl = $requestInfo['url'];
+$method = $requestInfo['method'];
+$targetHeaders = $requestInfo['headers'] ?? [];
+$targetBody = $requestInfo['body'] ?? '';
+
+// Log da requisição (para debug)
+error_log("Secure request: $method $targetUrl from device $deviceId");
 
 // Executar a requisição real internamente
-$response = executeInternalRequest($endpoint, $method, $requestHeaders, $body, $conn);
+$response = executeInternalRequest($targetUrl, $method, $targetHeaders, $targetBody, $pdo);
 
 // Criptografar resposta
 $responseTimestamp = round(microtime(true) * 1000);
-$encryptedResponse = NativeCrypto::encrypt(json_encode($response), $responseTimestamp);
+$encryptedResponse = $validator->encryptData($deviceKey, json_encode($response), $responseTimestamp);
 
 // Retornar resposta criptografada
 echo json_encode([
     'encrypted_response' => $encryptedResponse,
     'timestamp' => $responseTimestamp,
-    'rotating_key' => NativeCrypto::generateRotatingKey($responseTimestamp)
+    'status' => 'success'
 ]);
 
 /**
  * Executa uma requisição interna
  */
-function executeInternalRequest(string $endpoint, string $method, array $headers, string $body, $conn): array {
-    // Mapear endpoints para arquivos PHP
-    $endpointMap = [
+function executeInternalRequest($url, $method, $headers, $body, $pdo) {
+    // Remover base URL se presente
+    $url = preg_replace('#^https?://[^/]+#', '', $url);
+    
+    // Mapear URLs para arquivos PHP
+    $routes = [
         '/user/profile' => '/user/profile.php',
         '/user/profile.php' => '/user/profile.php',
-        '/user/update' => '/user/update.php',
         '/user/pix' => '/user/pix.php',
         '/user/pix.php' => '/user/pix.php',
+        '/user/withdraw' => '/user/withdraw.php',
+        '/user/withdraw.php' => '/user/withdraw.php',
         '/api/v1/auth/google-login' => '/api/v1/auth/google-login.php',
         '/api/v1/auth/google-login.php' => '/api/v1/auth/google-login.php',
+        '/api/v1/auth/device-login' => '/api/v1/auth/device-login.php',
+        '/api/v1/auth/device-login.php' => '/api/v1/auth/device-login.php',
         '/api/v1/users' => '/api/v1/users.php',
         '/api/v1/users.php' => '/api/v1/users.php',
-        '/api/v1/tasks' => '/api/v1/tasks.php',
-        '/api/v1/tasks.php' => '/api/v1/tasks.php',
         '/api/v1/spin' => '/api/v1/spin.php',
         '/api/v1/spin.php' => '/api/v1/spin.php',
-        '/api/v1/rewards' => '/api/v1/rewards.php',
-        '/api/v1/rewards.php' => '/api/v1/rewards.php',
-        '/api/v1/withdraw' => '/api/v1/withdraw.php',
-        '/api/v1/withdraw.php' => '/api/v1/withdraw.php',
+        '/api/v1/daily-bonus' => '/api/v1/daily-bonus.php',
+        '/api/v1/daily-bonus.php' => '/api/v1/daily-bonus.php',
         '/api/v1/invite' => '/api/v1/invite.php',
         '/api/v1/invite.php' => '/api/v1/invite.php',
+        '/api/v1/leaderboard' => '/api/v1/leaderboard.php',
+        '/api/v1/leaderboard.php' => '/api/v1/leaderboard.php',
     ];
     
     // Encontrar arquivo correspondente
-    $filePath = null;
-    foreach ($endpointMap as $pattern => $file) {
-        if (strpos($endpoint, $pattern) !== false) {
-            $filePath = __DIR__ . '/../../' . ltrim($file, '/');
+    $targetFile = null;
+    foreach ($routes as $route => $file) {
+        if (strpos($url, $route) === 0) {
+            $targetFile = __DIR__ . '/../..' . $file;
             break;
         }
     }
     
-    if (!$filePath || !file_exists($filePath)) {
-        return [
-            'status' => 'error',
-            'message' => 'Endpoint not found',
-            'endpoint' => $endpoint
-        ];
+    if (!$targetFile || !file_exists($targetFile)) {
+        return ['status' => 'error', 'message' => 'Endpoint not found: ' . $url];
     }
     
     // Simular ambiente da requisição
-    $_SERVER['REQUEST_METHOD'] = $method;
-    $_SERVER['REQUEST_URI'] = $endpoint;
+    $_SERVER['REQUEST_METHOD'] = strtoupper($method);
+    $_SERVER['REQUEST_URI'] = $url;
     
-    // Configurar headers (especialmente Authorization)
+    // Configurar headers
     foreach ($headers as $key => $value) {
         $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
         $_SERVER[$serverKey] = $value;
+        
+        // Authorization header especial
+        if (strtolower($key) === 'authorization') {
+            $_SERVER['HTTP_AUTHORIZATION'] = $value;
+        }
     }
     
     // Configurar body
-    if (!empty($body)) {
-        // Criar stream temporário para php://input
-        $GLOBALS['_SECURE_API_BODY'] = $body;
+    if ($body) {
+        // Criar stream temporário com o body
+        $GLOBALS['_SECURE_REQUEST_BODY'] = $body;
     }
     
     // Capturar output
     ob_start();
     
     try {
-        // Incluir o arquivo do endpoint
-        include $filePath;
+        // Incluir o arquivo PHP
+        include $targetFile;
+        $output = ob_get_clean();
+        
+        // Tentar decodificar como JSON
+        $jsonResponse = json_decode($output, true);
+        if ($jsonResponse !== null) {
+            return $jsonResponse;
+        }
+        
+        return ['raw_response' => $output];
+        
     } catch (Exception $e) {
         ob_end_clean();
-        return [
-            'status' => 'error',
-            'message' => 'Internal error: ' . $e->getMessage()
-        ];
+        return ['status' => 'error', 'message' => 'Internal error: ' . $e->getMessage()];
     }
-    
-    $output = ob_get_clean();
-    
-    // Tentar decodificar como JSON
-    $decoded = json_decode($output, true);
-    if ($decoded !== null) {
-        return $decoded;
-    }
-    
-    // Retornar como string se não for JSON
-    return [
-        'status' => 'success',
-        'raw_response' => $output
-    ];
 }
-?>
