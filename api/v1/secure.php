@@ -181,6 +181,9 @@ $endpointMap = [
     '/api/v1/checkin.php' => __DIR__ . '/checkin.php',
     '/checkin.php' => __DIR__ . '/checkin.php',
     
+    // Spin (Roleta)
+    '/api/v1/spin.php' => __DIR__ . '/spin.php',
+    
     // Settings
     '/settings/app.php' => __DIR__ . '/../../settings/app.php',
     '/settings/pix.php' => __DIR__ . '/../../settings/pix.php',
