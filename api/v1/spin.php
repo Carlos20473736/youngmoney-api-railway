@@ -40,9 +40,11 @@ require_once __DIR__ . '/../../includes/auth_helper.php';
 // Obter conexão
 $conn = getDbConnection();
 
-// Validar headers de segurança
-$validator = validateRequestHeaders($conn, true);
-if (!$validator) exit; // Já enviou resposta de erro
+// Autenticar usuário usando auth_helper (mesma lógica do profile.php)
+$user = getAuthenticatedUser($conn);
+if (!$user) {
+    sendUnauthorizedError();
+}
 
 
 // Verificar e fazer reset automático se necessário
@@ -85,15 +87,7 @@ try {
 }
 
 try {
-    // Validar autenticação usando auth_helper
-    $user = getAuthenticatedUser($conn);
-    if (!$user) {
-        sendUnauthorizedError();
-    }
-    
-    // VALIDAÇÃO DE HEADERS REMOVIDA - estava bloqueando requisições legítimas
-    // validateSecurityHeaders($conn, $user);
-    
+    // Usuário já autenticado acima
     $userId = $user['id'];
     
     // Obter data atual no servidor (timezone configurável)
