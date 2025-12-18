@@ -236,10 +236,38 @@ $_SERVER['REQUEST_URI'] = $endpoint;
 
 // Passar headers para o endpoint interno
 error_log("[SECURE] Headers recebidos: " . json_encode($headers));
+
+// IMPORTANTE: Garantir que Authorization seja passado corretamente
 foreach ($headers as $key => $value) {
-    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
+    // Normalizar o nome do header para HTTP_*
+    $normalizedKey = strtoupper(str_replace('-', '_', $key));
+    
+    // Se já começa com HTTP_, não adicionar novamente
+    if (strpos($normalizedKey, 'HTTP_') !== 0) {
+        $serverKey = 'HTTP_' . $normalizedKey;
+    } else {
+        $serverKey = $normalizedKey;
+    }
+    
     $_SERVER[$serverKey] = $value;
-    error_log("[SECURE] Header: $key => $serverKey = $value");
+    error_log("[SECURE] Header: $key => $serverKey = " . substr($value, 0, 50) . "...");
+}
+
+// Garantir que Authorization esteja disponível em múltiplos formatos
+// Buscar de forma case-insensitive
+$authFound = false;
+foreach ($headers as $hKey => $hValue) {
+    if (strcasecmp($hKey, 'Authorization') === 0) {
+        $_SERVER['HTTP_AUTHORIZATION'] = $hValue;
+        error_log("[SECURE] Authorization set from headers['$hKey']: " . substr($hValue, 0, 30) . "...");
+        $authFound = true;
+        break;
+    }
+}
+
+if (!$authFound) {
+    error_log("[SECURE] WARNING: Authorization header NOT found in inner request headers!");
+    error_log("[SECURE] Available header keys: " . implode(', ', array_keys($headers)));
 }
 
 // Passar body para o endpoint interno
