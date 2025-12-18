@@ -201,6 +201,7 @@ $endpointMap = [
     // User PIX
     '/user/pix/save.php' => __DIR__ . '/../../user/pix/save.php',
     '/user/pix/get.php' => __DIR__ . '/../../user/pix/get.php',
+    '/user/pix.php' => __DIR__ . '/../../user/pix.php',
 ];
 
 // Encontrar arquivo do endpoint
