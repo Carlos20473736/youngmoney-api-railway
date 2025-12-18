@@ -141,6 +141,14 @@ $method = $innerRequest['method'] ?? 'GET';
 $headers = $innerRequest['headers'] ?? [];
 $body = $innerRequest['body'] ?? null;
 
+// Garantir que headers seja um array
+if (is_string($headers)) {
+    $headers = json_decode($headers, true) ?? [];
+}
+
+error_log("[SECURE] Endpoint: $endpoint, Method: $method");
+error_log("[SECURE] Headers type: " . gettype($headers) . ", count: " . count($headers));
+
 // Mapear endpoints para arquivos
 $endpointMap = [
     // Auth
