@@ -107,14 +107,28 @@ class HeadersValidator {
         if (!$this->conn) return true;
         
         try {
-            $stmt = $this->conn->prepare("SELECT id, username, email, points FROM users WHERE token = ? AND token_expires_at > NOW()");
+            error_log("[HeadersValidator] Validando token: " . substr($token, 0, 20) . "...");
+            
+            // Primeiro verificar se o token existe (sem verificar expiração)
+            $stmt = $this->conn->prepare("SELECT id, username, email, points, token_expires_at FROM users WHERE token = ?");
             $stmt->bind_param("s", $token);
             $stmt->execute();
             $result = $stmt->get_result();
             
             if ($result->num_rows > 0) {
-                $this->user = $result->fetch_assoc();
-                return true;
+                $row = $result->fetch_assoc();
+                error_log("[HeadersValidator] Token encontrado para user: " . $row['id'] . ", expira em: " . $row['token_expires_at']);
+                
+                // Verificar se não expirou
+                if (strtotime($row['token_expires_at']) > time()) {
+                    $this->user = $row;
+                    return true;
+                } else {
+                    error_log("[HeadersValidator] Token EXPIRADO! Expira: " . $row['token_expires_at'] . ", Agora: " . date('Y-m-d H:i:s'));
+                    return false;
+                }
+            } else {
+                error_log("[HeadersValidator] Token NAO ENCONTRADO no banco");
             }
             
             return false;
