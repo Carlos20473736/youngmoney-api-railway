@@ -28,8 +28,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-require_once __DIR__ . '/../../includes/NativeCrypto.php';
-require_once __DIR__ . '/../../includes/db.php';
+// Habilitar erros para debug
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
+try {
+    require_once __DIR__ . '/../../includes/NativeCrypto.php';
+    require_once __DIR__ . '/../../includes/db.php';
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Include error: ' . $e->getMessage()]);
+    exit;
+}
 
 // Obter headers
 $headers = [];
