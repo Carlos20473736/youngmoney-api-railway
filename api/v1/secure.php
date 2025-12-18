@@ -119,28 +119,97 @@ function executeInternalRequest($url, $method, $headers, $body, $conn) {
     // Remover base URL se presente
     $url = preg_replace('#^https?://[^/]+#', '', $url);
     
-    // Mapear URLs para arquivos PHP
+    // Mapear URLs para arquivos PHP - TODAS AS ROTAS
     $routes = [
+        // User
         '/user/profile' => '/user/profile.php',
         '/user/profile.php' => '/user/profile.php',
         '/user/pix' => '/user/pix.php',
         '/user/pix.php' => '/user/pix.php',
-        '/user/withdraw' => '/user/withdraw.php',
-        '/user/withdraw.php' => '/user/withdraw.php',
+        '/user/balance' => '/user/balance.php',
+        '/user/balance.php' => '/user/balance.php',
+        '/user/greeting' => '/user/greeting.php',
+        '/user/greeting.php' => '/user/greeting.php',
+        
+        // Auth
         '/api/v1/auth/google-login' => '/api/v1/auth/google-login.php',
         '/api/v1/auth/google-login.php' => '/api/v1/auth/google-login.php',
         '/api/v1/auth/device-login' => '/api/v1/auth/device-login.php',
         '/api/v1/auth/device-login.php' => '/api/v1/auth/device-login.php',
+        '/api/v1/auth/login_v2' => '/api/v1/auth/login_v2.php',
+        '/api/v1/auth/login_v2.php' => '/api/v1/auth/login_v2.php',
+        
+        // API v1
         '/api/v1/users' => '/api/v1/users.php',
         '/api/v1/users.php' => '/api/v1/users.php',
         '/api/v1/spin' => '/api/v1/spin.php',
         '/api/v1/spin.php' => '/api/v1/spin.php',
-        '/api/v1/daily-bonus' => '/api/v1/daily-bonus.php',
-        '/api/v1/daily-bonus.php' => '/api/v1/daily-bonus.php',
+        '/api/v1/checkin' => '/api/v1/checkin.php',
+        '/api/v1/checkin.php' => '/api/v1/checkin.php',
         '/api/v1/invite' => '/api/v1/invite.php',
         '/api/v1/invite.php' => '/api/v1/invite.php',
-        '/api/v1/leaderboard' => '/api/v1/leaderboard.php',
-        '/api/v1/leaderboard.php' => '/api/v1/leaderboard.php',
+        '/api/v1/points' => '/api/v1/points.php',
+        '/api/v1/points.php' => '/api/v1/points.php',
+        '/api/v1/config' => '/api/v1/config.php',
+        '/api/v1/config.php' => '/api/v1/config.php',
+        '/api/v1/withdrawals' => '/api/v1/withdrawals.php',
+        '/api/v1/withdrawals.php' => '/api/v1/withdrawals.php',
+        '/api/v1/withdrawal_values' => '/api/v1/withdrawal_values.php',
+        '/api/v1/withdrawal_values.php' => '/api/v1/withdrawal_values.php',
+        
+        // Ranking
+        '/ranking/list' => '/ranking/list.php',
+        '/ranking/list.php' => '/ranking/list.php',
+        '/ranking/add_points' => '/ranking/add_points.php',
+        '/ranking/add_points.php' => '/ranking/add_points.php',
+        '/ranking/user_position' => '/ranking/user_position.php',
+        '/ranking/user_position.php' => '/ranking/user_position.php',
+        
+        // Notifications
+        '/notifications/list' => '/notifications/list.php',
+        '/notifications/list.php' => '/notifications/list.php',
+        '/notifications/mark_read' => '/notifications/mark_read.php',
+        '/notifications/mark_read.php' => '/notifications/mark_read.php',
+        
+        // Withdraw
+        '/withdraw/request' => '/withdraw/request.php',
+        '/withdraw/request.php' => '/withdraw/request.php',
+        '/withdraw/history' => '/withdraw/history.php',
+        '/withdraw/history.php' => '/withdraw/history.php',
+        '/withdraw/recent' => '/withdraw/recent.php',
+        '/withdraw/recent.php' => '/withdraw/recent.php',
+        
+        // Invite
+        '/invite/my_code' => '/invite/my_code.php',
+        '/invite/my_code.php' => '/invite/my_code.php',
+        '/api/v1/invite/validate' => '/api/v1/invite/validate.php',
+        '/api/v1/invite/validate.php' => '/api/v1/invite/validate.php',
+        
+        // Monetag
+        '/monetag/progress' => '/monetag/progress.php',
+        '/monetag/progress.php' => '/monetag/progress.php',
+        '/monetag/track' => '/monetag/track.php',
+        '/monetag/track.php' => '/monetag/track.php',
+        '/monetag/reset' => '/monetag/reset.php',
+        '/monetag/reset.php' => '/monetag/reset.php',
+        '/monetag/session/start' => '/monetag/session/start.php',
+        '/monetag/session/start.php' => '/monetag/session/start.php',
+        
+        // Settings
+        '/settings/get' => '/settings/get.php',
+        '/settings/get.php' => '/settings/get.php',
+        '/settings/update' => '/settings/update.php',
+        '/settings/update.php' => '/settings/update.php',
+        
+        // History
+        '/history/points' => '/history/points.php',
+        '/history/points.php' => '/history/points.php',
+        
+        // Payments
+        '/api/v1/payments/pending' => '/api/v1/payments/pending.php',
+        '/api/v1/payments/pending.php' => '/api/v1/payments/pending.php',
+        '/api/v1/payments/complete' => '/api/v1/payments/complete.php',
+        '/api/v1/payments/complete.php' => '/api/v1/payments/complete.php',
     ];
     
     // Encontrar arquivo correspondente
