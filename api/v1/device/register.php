@@ -1,14 +1,6 @@
 <?php
 /**
  * Device Register - Registra a chave secreta do dispositivo
- * 
- * Cada dispositivo gera uma chave única na primeira execução.
- * Esta chave é sincronizada com o backend para permitir criptografia E2E.
- * 
- * A chave é armazenada de forma segura no banco de dados e usada para:
- * - Validar requisições criptografadas
- * - Gerar chaves rotativas (muda a cada 5 segundos)
- * - Identificar dispositivos únicos
  */
 
 header('Content-Type: application/json');
@@ -31,6 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_once __DIR__ . '/../../../database.php';
 
+try {
+    $conn = getDbConnection();
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database connection failed']);
+    exit;
+}
+
 // Obter dados da requisição
 $rawBody = file_get_contents('php://input');
 $data = json_decode($rawBody, true);
@@ -45,85 +45,68 @@ foreach ($requiredFields as $field) {
     }
 }
 
-$deviceId = $data['device_id'];
-$deviceKey = $data['device_key'];
-$deviceFingerprint = $data['device_fingerprint'];
-$appHash = $data['app_hash'];
-$deviceInfo = $data['device_info'] ?? [];
+$deviceId = $conn->real_escape_string($data['device_id']);
+$deviceKey = $conn->real_escape_string($data['device_key']);
+$deviceFingerprint = $conn->real_escape_string($data['device_fingerprint']);
+$appHash = $conn->real_escape_string($data['app_hash']);
+$deviceInfo = isset($data['device_info']) ? $conn->real_escape_string(json_encode($data['device_info'])) : '{}';
 
-try {
-    // Verificar se dispositivo já existe
-    $stmt = $pdo->prepare("SELECT id, device_key, created_at FROM device_keys WHERE device_id = ?");
-    $stmt->execute([$deviceId]);
-    $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+// Verificar se dispositivo já existe
+$result = $conn->query("SELECT id, device_key, created_at FROM device_keys WHERE device_id = '$deviceId'");
+
+if ($result && $result->num_rows > 0) {
+    $existing = $result->fetch_assoc();
     
-    if ($existing) {
-        // Dispositivo já registrado - verificar se a chave é a mesma
-        if ($existing['device_key'] === $deviceKey) {
-            // Atualizar último acesso
-            $stmt = $pdo->prepare("UPDATE device_keys SET last_seen = NOW(), request_count = request_count + 1 WHERE device_id = ?");
-            $stmt->execute([$deviceId]);
-            
-            echo json_encode([
-                'status' => 'success',
-                'message' => 'Device already registered',
-                'device_id' => $deviceId,
-                'registered_at' => $existing['created_at'],
-                'key_valid' => true
-            ]);
-        } else {
-            // Chave diferente - possível tentativa de fraude ou reinstalação
-            // Atualizar a chave (permite reinstalação)
-            $stmt = $pdo->prepare("
-                UPDATE device_keys 
-                SET device_key = ?, 
-                    device_fingerprint = ?,
-                    app_hash = ?,
-                    device_info = ?,
-                    last_seen = NOW(),
-                    key_updated_at = NOW()
-                WHERE device_id = ?
-            ");
-            $stmt->execute([
-                $deviceKey,
-                $deviceFingerprint,
-                $appHash,
-                json_encode($deviceInfo),
-                $deviceId
-            ]);
-            
-            echo json_encode([
-                'status' => 'success',
-                'message' => 'Device key updated',
-                'device_id' => $deviceId,
-                'key_valid' => true
-            ]);
-        }
-    } else {
-        // Novo dispositivo - registrar
-        $stmt = $pdo->prepare("
-            INSERT INTO device_keys 
-            (device_id, device_key, device_fingerprint, app_hash, device_info, created_at, last_seen) 
-            VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-        ");
-        $stmt->execute([
-            $deviceId,
-            $deviceKey,
-            $deviceFingerprint,
-            $appHash,
-            json_encode($deviceInfo)
-        ]);
+    if ($existing['device_key'] === $data['device_key']) {
+        // Atualizar último acesso
+        $conn->query("UPDATE device_keys SET last_seen = NOW(), request_count = request_count + 1 WHERE device_id = '$deviceId'");
         
         echo json_encode([
             'status' => 'success',
-            'message' => 'Device registered successfully',
-            'device_id' => $deviceId,
+            'message' => 'Device already registered',
+            'device_id' => $data['device_id'],
+            'registered_at' => $existing['created_at'],
+            'key_valid' => true
+        ]);
+    } else {
+        // Atualizar a chave (permite reinstalação)
+        $conn->query("
+            UPDATE device_keys 
+            SET device_key = '$deviceKey', 
+                device_fingerprint = '$deviceFingerprint',
+                app_hash = '$appHash',
+                device_info = '$deviceInfo',
+                last_seen = NOW(),
+                key_updated_at = NOW()
+            WHERE device_id = '$deviceId'
+        ");
+        
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Device key updated',
+            'device_id' => $data['device_id'],
             'key_valid' => true
         ]);
     }
+} else {
+    // Novo dispositivo - registrar
+    $insertResult = $conn->query("
+        INSERT INTO device_keys 
+        (device_id, device_key, device_fingerprint, app_hash, device_info, created_at, last_seen) 
+        VALUES ('$deviceId', '$deviceKey', '$deviceFingerprint', '$appHash', '$deviceInfo', NOW(), NOW())
+    ");
     
-} catch (PDOException $e) {
-    error_log("Device register error: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['error' => 'Database error']);
+    if ($insertResult) {
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Device registered successfully',
+            'device_id' => $data['device_id'],
+            'key_valid' => true
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['error' => 'Failed to register device: ' . $conn->error]);
+    }
 }
+
+$conn->close();

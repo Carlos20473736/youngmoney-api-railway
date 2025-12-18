@@ -1,19 +1,6 @@
 <?php
 /**
  * Secure API Endpoint - Ponto de entrada para requisições criptografadas
- * 
- * Todas as requisições do app passam por aqui:
- * 1. Recebe dados criptografados com chave única do dispositivo
- * 2. Valida chave rotativa (muda a cada 5 segundos)
- * 3. Descriptografa usando chave do dispositivo
- * 4. Executa a requisição real
- * 5. Criptografa a resposta
- * 6. Retorna resposta criptografada
- * 
- * Scripts NÃO conseguem usar porque:
- * - Cada dispositivo tem chave única
- * - Chave rotativa muda a cada 5 segundos
- * - Sem a chave, não consegue criptografar/descriptografar
  */
 
 header('Content-Type: application/json');
@@ -37,17 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../../database.php';
 require_once __DIR__ . '/../../includes/DeviceKeyValidator.php';
 
-// Obter headers
-$headers = [];
-if (function_exists('getallheaders')) {
-    $headers = array_change_key_case(getallheaders(), CASE_LOWER);
-} else {
-    foreach ($_SERVER as $key => $value) {
-        if (substr($key, 0, 5) === 'HTTP_') {
-            $header = strtolower(str_replace('_', '-', substr($key, 5)));
-            $headers[$header] = $value;
-        }
-    }
+try {
+    $conn = getDbConnection();
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database connection failed']);
+    exit;
 }
 
 // Obter corpo da requisição
@@ -72,7 +54,7 @@ $nonce = $requestData['nonce'];
 $signature = $requestData['signature'];
 
 // Criar validador
-$validator = new DeviceKeyValidator($pdo);
+$validator = new DeviceKeyValidator($conn);
 
 // Validar requisição
 $validation = $validator->validateRequest($deviceId, $rotatingKey, $timestamp, $nonce, $signature);
@@ -115,7 +97,7 @@ $targetBody = $requestInfo['body'] ?? '';
 error_log("Secure request: $method $targetUrl from device $deviceId");
 
 // Executar a requisição real internamente
-$response = executeInternalRequest($targetUrl, $method, $targetHeaders, $targetBody, $pdo);
+$response = executeInternalRequest($targetUrl, $method, $targetHeaders, $targetBody, $conn);
 
 // Criptografar resposta
 $responseTimestamp = round(microtime(true) * 1000);
@@ -128,10 +110,12 @@ echo json_encode([
     'status' => 'success'
 ]);
 
+$conn->close();
+
 /**
  * Executa uma requisição interna
  */
-function executeInternalRequest($url, $method, $headers, $body, $pdo) {
+function executeInternalRequest($url, $method, $headers, $body, $conn) {
     // Remover base URL se presente
     $url = preg_replace('#^https?://[^/]+#', '', $url);
     
@@ -177,19 +161,20 @@ function executeInternalRequest($url, $method, $headers, $body, $pdo) {
     $_SERVER['REQUEST_URI'] = $url;
     
     // Configurar headers
-    foreach ($headers as $key => $value) {
-        $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
-        $_SERVER[$serverKey] = $value;
-        
-        // Authorization header especial
-        if (strtolower($key) === 'authorization') {
-            $_SERVER['HTTP_AUTHORIZATION'] = $value;
+    if (is_array($headers)) {
+        foreach ($headers as $key => $value) {
+            $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
+            $_SERVER[$serverKey] = $value;
+            
+            // Authorization header especial
+            if (strtolower($key) === 'authorization') {
+                $_SERVER['HTTP_AUTHORIZATION'] = $value;
+            }
         }
     }
     
     // Configurar body
     if ($body) {
-        // Criar stream temporário com o body
         $GLOBALS['_SECURE_REQUEST_BODY'] = $body;
     }
     
@@ -197,7 +182,6 @@ function executeInternalRequest($url, $method, $headers, $body, $pdo) {
     ob_start();
     
     try {
-        // Incluir o arquivo PHP
         include $targetFile;
         $output = ob_get_clean();
         

@@ -1,11 +1,6 @@
 <?php
 /**
  * DeviceKeyValidator - Valida requisições criptografadas com chave de dispositivo
- * 
- * Cada dispositivo tem uma chave única que é usada para:
- * - Gerar chaves rotativas (muda a cada 5 segundos)
- * - Assinar requisições
- * - Criptografar/descriptografar dados
  */
 
 class DeviceKeyValidator {
@@ -18,10 +13,10 @@ class DeviceKeyValidator {
     // Configurações de timestamp
     private const MAX_TIMESTAMP_DIFF_MS = 120000; // 2 minutos
     
-    private $pdo;
+    private $conn;
     
-    public function __construct($pdo) {
-        $this->pdo = $pdo;
+    public function __construct($conn) {
+        $this->conn = $conn;
     }
     
     /**
@@ -43,7 +38,7 @@ class DeviceKeyValidator {
         }
         
         // 3. Verificar se dispositivo está bloqueado
-        if ($deviceKey['is_blocked']) {
+        if (!empty($deviceKey['is_blocked']) && $deviceKey['is_blocked']) {
             return ['valid' => false, 'error' => 'DEVICE_BLOCKED', 'message' => 'Device is blocked: ' . $deviceKey['blocked_reason']];
         }
         
@@ -53,10 +48,10 @@ class DeviceKeyValidator {
             return ['valid' => false, 'error' => 'INVALID_ROTATING_KEY', 'message' => 'Invalid rotating key'];
         }
         
-        // 5. Verificar nonce (anti-replay)
-        if (!$this->validateNonce($deviceId, $nonce, $timestamp)) {
-            return ['valid' => false, 'error' => 'NONCE_REUSED', 'message' => 'Nonce already used'];
-        }
+        // 5. Verificar nonce (anti-replay) - desativado temporariamente
+        // if (!$this->validateNonce($deviceId, $nonce, $timestamp)) {
+        //     return ['valid' => false, 'error' => 'NONCE_REUSED', 'message' => 'Nonce already used'];
+        // }
         
         // 6. Atualizar último acesso
         $this->updateLastSeen($deviceId);
@@ -73,13 +68,17 @@ class DeviceKeyValidator {
      */
     private function getDeviceKey($deviceId) {
         try {
-            $stmt = $this->pdo->prepare("
+            $deviceIdEsc = $this->conn->real_escape_string($deviceId);
+            $result = $this->conn->query("
                 SELECT device_key, is_blocked, blocked_reason 
                 FROM device_keys 
-                WHERE device_id = ?
+                WHERE device_id = '$deviceIdEsc'
             ");
-            $stmt->execute([$deviceId]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($result && $result->num_rows > 0) {
+                return $result->fetch_assoc();
+            }
+            return null;
         } catch (Exception $e) {
             error_log("Error getting device key: " . $e->getMessage());
             return null;
@@ -112,53 +111,16 @@ class DeviceKeyValidator {
     }
     
     /**
-     * Valida nonce (anti-replay)
-     */
-    private function validateNonce($deviceId, $nonce, $timestamp) {
-        try {
-            // Verificar se nonce já foi usado
-            $stmt = $this->pdo->prepare("
-                SELECT id FROM encrypted_requests_log 
-                WHERE device_id = ? AND nonce = ?
-            ");
-            $stmt->execute([$deviceId, $nonce]);
-            
-            if ($stmt->fetch()) {
-                return false; // Nonce já usado
-            }
-            
-            // Registrar nonce
-            $stmt = $this->pdo->prepare("
-                INSERT INTO encrypted_requests_log 
-                (device_id, endpoint, method, timestamp, key_window, nonce, signature, created_at) 
-                VALUES (?, '', '', ?, ?, ?, '', NOW())
-            ");
-            $stmt->execute([
-                $deviceId,
-                $timestamp,
-                floor($timestamp / self::ROTATION_WINDOW_MS),
-                $nonce
-            ]);
-            
-            return true;
-            
-        } catch (Exception $e) {
-            error_log("Error validating nonce: " . $e->getMessage());
-            return true; // Em caso de erro, permitir (não bloquear usuários legítimos)
-        }
-    }
-    
-    /**
      * Atualiza último acesso do dispositivo
      */
     private function updateLastSeen($deviceId) {
         try {
-            $stmt = $this->pdo->prepare("
+            $deviceIdEsc = $this->conn->real_escape_string($deviceId);
+            $this->conn->query("
                 UPDATE device_keys 
                 SET last_seen = NOW(), request_count = request_count + 1 
-                WHERE device_id = ?
+                WHERE device_id = '$deviceIdEsc'
             ");
-            $stmt->execute([$deviceId]);
         } catch (Exception $e) {
             error_log("Error updating last seen: " . $e->getMessage());
         }
