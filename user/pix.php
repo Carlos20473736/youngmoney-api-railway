@@ -46,7 +46,12 @@ try {
         
     } elseif ($method === 'PUT' || $method === 'POST') {
         // Atualizar/Salvar dados PIX do usuário
-        $rawInput = file_get_contents('php://input');
+        // Verificar se veio via secure.php (túnel criptografado)
+        if (isset($GLOBALS['_SECURE_REQUEST_BODY']) && !empty($GLOBALS['_SECURE_REQUEST_BODY'])) {
+            $rawInput = $GLOBALS['_SECURE_REQUEST_BODY'];
+        } else {
+            $rawInput = file_get_contents('php://input');
+        }
         $data = json_decode($rawInput, true);
         
         if (!$data) {
