@@ -34,7 +34,7 @@ error_reporting(E_ALL);
 
 try {
     require_once __DIR__ . '/../../includes/NativeCrypto.php';
-    require_once __DIR__ . '/../../includes/db.php';
+    require_once __DIR__ . '/../../database.php';
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Include error: ' . $e->getMessage()]);
