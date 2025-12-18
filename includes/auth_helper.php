@@ -66,12 +66,32 @@ if (!$_isPublicEndpoint) {
  * @return array|null Dados do usuário ou null se não autenticado
  */
 function getAuthenticatedUser($conn) {
-    // Obter o header Authorization
-    $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
+    // Obter o header Authorization - verificar múltiplas fontes
+    $authHeader = null;
+    
+    // 1. Primeiro, verificar se veio do túnel seguro via $_SERVER
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+        error_log("auth_helper: Authorization from _SERVER: " . substr($authHeader, 0, 30) . "...");
+    }
+    
+    // 2. Se não, tentar getallheaders()
+    if (!$authHeader) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? null;
+        if ($authHeader) {
+            error_log("auth_helper: Authorization from getallheaders: " . substr($authHeader, 0, 30) . "...");
+        }
+    }
+    
+    // 3. Se ainda não, verificar $_SERVER com outros formatos
+    if (!$authHeader) {
+        $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+    }
     
     if (!$authHeader) {
-        error_log("auth_helper: No Authorization header");
+        error_log("auth_helper: No Authorization header found in any source");
+        error_log("auth_helper: _SERVER keys: " . implode(', ', array_keys($_SERVER)));
         return null;
     }
     
