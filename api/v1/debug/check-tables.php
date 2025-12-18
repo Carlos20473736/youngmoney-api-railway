@@ -3,17 +3,17 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 header('Content-Type: application/json');
 
-try {
-    require_once __DIR__ . '/../../../database.php';
-} catch (Exception $e) {
-    echo json_encode(['error' => 'DB connection failed: ' . $e->getMessage()]);
-    exit;
-}
+require_once __DIR__ . '/../../../database.php';
 
 try {
+    $conn = getDbConnection();
+    
     // Verificar tabelas existentes
-    $stmt = $pdo->query("SHOW TABLES");
-    $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $result = $conn->query("SHOW TABLES");
+    $tables = [];
+    while ($row = $result->fetch_array()) {
+        $tables[] = $row[0];
+    }
     
     // Verificar se device_keys existe
     $deviceKeysExists = in_array('device_keys', $tables);
@@ -39,7 +39,7 @@ try {
             INDEX idx_last_seen (last_seen),
             INDEX idx_is_blocked (is_blocked)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        $pdo->exec($sql1);
+        $conn->query($sql1);
         $deviceKeysExists = true;
     }
     
@@ -59,9 +59,11 @@ try {
             INDEX idx_timestamp (timestamp),
             INDEX idx_nonce (nonce)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
-        $pdo->exec($sql2);
+        $conn->query($sql2);
         $encryptedLogExists = true;
     }
+    
+    $conn->close();
     
     echo json_encode([
         'status' => 'success',
@@ -71,7 +73,7 @@ try {
         'message' => 'Tables created/verified successfully'
     ]);
     
-} catch (PDOException $e) {
+} catch (Exception $e) {
     echo json_encode([
         'status' => 'error',
         'message' => $e->getMessage()
