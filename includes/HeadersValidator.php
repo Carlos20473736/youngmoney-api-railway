@@ -45,6 +45,9 @@ class HeadersValidator {
         
         // Normalizar chaves (case-insensitive)
         $this->headers = array_change_key_case($this->headers, CASE_LOWER);
+        
+        // Debug: logar headers carregados
+        error_log("[HeadersValidator] Headers carregados: " . json_encode($this->headers));
     }
     
     /**

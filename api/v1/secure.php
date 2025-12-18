@@ -227,9 +227,11 @@ $_SERVER['REQUEST_METHOD'] = $method;
 $_SERVER['REQUEST_URI'] = $endpoint;
 
 // Passar headers para o endpoint interno
+error_log("[SECURE] Headers recebidos: " . json_encode($headers));
 foreach ($headers as $key => $value) {
     $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $key));
     $_SERVER[$serverKey] = $value;
+    error_log("[SECURE] Header: $key => $serverKey = $value");
 }
 
 // Passar body para o endpoint interno
