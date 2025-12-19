@@ -4,8 +4,8 @@
  * 
  * Gerencia os levels e pontos dos usuários no jogo Candy
  * 
- * GET: Busca o level atual e pontos acumulados do usuário
- * POST: Atualiza o level e pontos do usuário quando passa de fase
+ * GET: Busca o level atual e pontos do level anterior
+ * POST: Atualiza o level e salva os pontos do level que passou
  */
 
 // Incluir configurações do banco de dados
@@ -33,13 +33,14 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Criar tabela se não existir (com campo total_score)
+// Criar tabela se não existir (com campo last_level_score)
 $createTableSQL = "CREATE TABLE IF NOT EXISTS game_levels (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
     level INT NOT NULL DEFAULT 1,
     highest_level INT NOT NULL DEFAULT 1,
     total_score INT NOT NULL DEFAULT 0,
+    last_level_score INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id),
@@ -48,8 +49,8 @@ $createTableSQL = "CREATE TABLE IF NOT EXISTS game_levels (
 
 $conn->query($createTableSQL);
 
-// Adicionar coluna total_score se não existir (para tabelas já criadas)
-$addColumnSQL = "ALTER TABLE game_levels ADD COLUMN IF NOT EXISTS total_score INT NOT NULL DEFAULT 0";
+// Adicionar coluna last_level_score se não existir (para tabelas já criadas)
+$addColumnSQL = "ALTER TABLE game_levels ADD COLUMN IF NOT EXISTS last_level_score INT NOT NULL DEFAULT 0";
 $conn->query($addColumnSQL);
 
 // Obter usuário autenticado
@@ -68,7 +69,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
     // Buscar level e pontos do usuário
-    $stmt = $conn->prepare("SELECT level, highest_level, total_score, updated_at FROM game_levels WHERE user_id = ?");
+    $stmt = $conn->prepare("SELECT level, highest_level, total_score, last_level_score, updated_at FROM game_levels WHERE user_id = ?");
     $stmt->bind_param("i", $userId);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -82,6 +83,7 @@ if ($method === 'GET') {
                 'level' => (int)$row['level'],
                 'highest_level' => (int)$row['highest_level'],
                 'total_score' => (int)$row['total_score'],
+                'last_level_score' => (int)$row['last_level_score'],
                 'updated_at' => $row['updated_at']
             ]
         ]);
@@ -94,6 +96,7 @@ if ($method === 'GET') {
                 'level' => 1,
                 'highest_level' => 1,
                 'total_score' => 0,
+                'last_level_score' => 0,
                 'updated_at' => null
             ]
         ]);
@@ -112,6 +115,7 @@ if ($method === 'GET') {
     
     $newLevel = (int)$input['level'];
     $totalScore = isset($input['total_score']) ? (int)$input['total_score'] : 0;
+    $lastLevelScore = isset($input['last_level_score']) ? (int)$input['last_level_score'] : 0;
     
     if ($newLevel < 1) {
         http_response_code(400);
@@ -132,8 +136,8 @@ if ($method === 'GET') {
         
         // Atualizar registro existente
         $stmt->close();
-        $stmt = $conn->prepare("UPDATE game_levels SET level = ?, highest_level = ?, total_score = ? WHERE user_id = ?");
-        $stmt->bind_param("iiii", $newLevel, $newHighest, $totalScore, $userId);
+        $stmt = $conn->prepare("UPDATE game_levels SET level = ?, highest_level = ?, total_score = ?, last_level_score = ? WHERE user_id = ?");
+        $stmt->bind_param("iiiii", $newLevel, $newHighest, $totalScore, $lastLevelScore, $userId);
         
         if ($stmt->execute()) {
             echo json_encode([
@@ -143,7 +147,8 @@ if ($method === 'GET') {
                     'user_id' => $userId,
                     'level' => $newLevel,
                     'highest_level' => $newHighest,
-                    'total_score' => $totalScore
+                    'total_score' => $totalScore,
+                    'last_level_score' => $lastLevelScore
                 ]
             ]);
         } else {
@@ -153,8 +158,8 @@ if ($method === 'GET') {
     } else {
         // Inserir novo registro
         $stmt->close();
-        $stmt = $conn->prepare("INSERT INTO game_levels (user_id, level, highest_level, total_score) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("iiii", $userId, $newLevel, $newLevel, $totalScore);
+        $stmt = $conn->prepare("INSERT INTO game_levels (user_id, level, highest_level, total_score, last_level_score) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("iiiii", $userId, $newLevel, $newLevel, $totalScore, $lastLevelScore);
         
         if ($stmt->execute()) {
             echo json_encode([
@@ -164,7 +169,8 @@ if ($method === 'GET') {
                     'user_id' => $userId,
                     'level' => $newLevel,
                     'highest_level' => $newLevel,
-                    'total_score' => $totalScore
+                    'total_score' => $totalScore,
+                    'last_level_score' => $lastLevelScore
                 ]
             ]);
         } else {
