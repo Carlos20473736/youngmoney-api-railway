@@ -33,10 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Valores iniciais das habilidades
-define('INITIAL_CASCADE', 10);
-define('INITIAL_TIME_FREEZE', 6);
-define('INITIAL_DOUBLE_POINTS', 2);
+// Valores iniciais das habilidades (começam em 0, só ganham assistindo vídeo)
+define('INITIAL_CASCADE', 0);
+define('INITIAL_TIME_FREEZE', 0);
+define('INITIAL_DOUBLE_POINTS', 0);
+
+// Valores ao restaurar (após assistir vídeo)
+define('RESTORE_CASCADE', 10);
+define('RESTORE_TIME_FREEZE', 6);
+define('RESTORE_DOUBLE_POINTS', 2);
 
 // Conectar ao banco de dados
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
@@ -51,9 +56,9 @@ if ($conn->connect_error) {
 $createTableSQL = "CREATE TABLE IF NOT EXISTS game_abilities (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
-    cascade_charges INT NOT NULL DEFAULT 10,
-    time_freeze_charges INT NOT NULL DEFAULT 6,
-    double_points_charges INT NOT NULL DEFAULT 2,
+    cascade_charges INT NOT NULL DEFAULT 0,
+    time_freeze_charges INT NOT NULL DEFAULT 0,
+    double_points_charges INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id),
@@ -127,10 +132,10 @@ if ($method === 'GET') {
     $restoreAll = isset($input['restore_all']) && $input['restore_all'] === true;
     
     if ($restoreAll) {
-        // Restaurar todas as habilidades para valores iniciais
-        $cascade = INITIAL_CASCADE;
-        $timeFreeze = INITIAL_TIME_FREEZE;
-        $doublePoints = INITIAL_DOUBLE_POINTS;
+        // Restaurar todas as habilidades para valores de recompensa (após assistir vídeo)
+        $cascade = RESTORE_CASCADE;
+        $timeFreeze = RESTORE_TIME_FREEZE;
+        $doublePoints = RESTORE_DOUBLE_POINTS;
     } else {
         // Atualizar valores específicos
         if (!isset($input['cascade']) && !isset($input['time_freeze']) && !isset($input['double_points'])) {
