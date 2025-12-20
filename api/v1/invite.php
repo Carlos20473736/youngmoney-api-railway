@@ -1,50 +1,50 @@
 <?php
-// Endpoint da API para Sistema de Convites (v1)
-
-
+/**
+ * Endpoint da API para Sistema de Convites (v1)
+ * Usa auth_helper.php para autenticação consistente com outros endpoints
+ */
 
 header("Content-Type: application/json");
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Req');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Request-ID');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-require_once '../../database.php';
-require_once __DIR__ . '/../../includes/HeadersValidator.php';
+// Usar os mesmos includes que battery.php
+require_once __DIR__ . '/../../db_config.php';
+require_once __DIR__ . '/../../includes/auth_helper.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
-$conn = getDbConnection();
 
-// Validar headers de segurança
-$validator = validateRequestHeaders($conn, true);
-if (!$validator) exit; // Já enviou resposta de erro
+error_log("[INVITE] Request started - Method: $method");
 
-
-// Função para validar token JWT
-function getUserFromToken($conn) {
-    $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? '';
-    
-    if (empty($authHeader) || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-        return null;
-    }
-    
-    $token = $matches[1];
-    
-    // Buscar usuário pelo token
-    $stmt = $conn->prepare("SELECT id, name, email FROM users WHERE token = ?");
-    $stmt->bind_param("s", $token);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc();
+// Conectar ao banco de dados
+try {
+    $conn = getMySQLiConnection();
+    error_log("[INVITE] Database connection OK");
+} catch (Exception $e) {
+    error_log("[INVITE] Database connection failed: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Database connection failed']);
+    exit;
 }
 
-// Tentar obter usuário do token (se houver)
-$userFromToken = getUserFromToken($conn);
+// Obter usuário autenticado (mesmo método que battery.php)
+$user = getAuthenticatedUser($conn);
+
+if (!$user) {
+    error_log("[INVITE] User not authenticated");
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Unauthorized - Invalid or missing token']);
+    exit;
+}
+
+$userId = $user['id'];
+error_log("[INVITE] User ID: $userId");
 
 // Função para buscar pontos de recompensa do banco
 function getInvitePoints($conn) {
@@ -73,103 +73,95 @@ function getInvitePoints($conn) {
     return $points;
 }
 
+// Função para gerar código de convite único
+function generateInviteCode($userId) {
+    $timestamp = time();
+    $hash = md5($userId . $timestamp);
+    $code = '';
+    
+    for ($i = 0; $i < 6; $i++) {
+        $code .= hexdec($hash[$i]) % 10;
+    }
+    
+    return $code;
+}
+
 // Buscar pontos de recompensa do banco
 $invitePoints = getInvitePoints($conn);
-define('POINTS_INVITER', $invitePoints['inviter']);
-define('POINTS_INVITED', $invitePoints['invited']);
+$POINTS_INVITER = $invitePoints['inviter'];
+$POINTS_INVITED = $invitePoints['invited'];
 
 switch ($method) {
     case 'GET':
-        // GET /api/v1/invite.php?user_id=1 - Obter código de convite e estatísticas
-        if (isset($_GET['user_id'])) {
-            $userId = intval($_GET['user_id']);
-            
-            // Buscar código de convite do usuário e se já usou código
-            $stmt = $conn->prepare("SELECT invite_code, has_used_invite_code FROM users WHERE id = ?");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $user = $result->fetch_assoc();
-            $stmt->close();
-            
-            if (!$user) {
-                http_response_code(404);
-                echo json_encode(['success' => false, 'error' => 'Usuário não encontrado']);
-                exit;
-            }
-            
-            $inviteCode = $user['invite_code'];
-            
-            // Se não tem código, gerar um
-            if (!$inviteCode) {
-                $inviteCode = generateInviteCode($userId);
-                $stmt = $conn->prepare("UPDATE users SET invite_code = ? WHERE id = ?");
-                $stmt->bind_param("si", $inviteCode, $userId);
-                $stmt->execute();
-                $stmt->close();
-            }
-            
-            // Contar amigos convidados
-            $stmt = $conn->prepare("SELECT COUNT(*) as total FROM users WHERE invited_by = ?");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $stats = $result->fetch_assoc();
-            $stmt->close();
-            
-            // Calcular pontos ganhos
-            $pointsEarned = $stats['total'] * POINTS_INVITER;
-            
-            echo json_encode([
-                'success' => true,
-                'data' => [
-                    'invite_code' => $inviteCode,
-                    'friends_invited' => intval($stats['total']),
-                    'points_earned' => $pointsEarned,
-                    'points_per_invite' => POINTS_INVITER,
-                    'points_for_friend' => POINTS_INVITED,
-                    'has_used_invite_code' => (bool)($user['has_used_invite_code'] ?? 0)
-                ]
-            ]);
-        } else {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'user_id é obrigatório']);
+        // GET /api/v1/invite.php - Obter código de convite e estatísticas do usuário autenticado
+        
+        // Buscar código de convite do usuário e se já usou código
+        $stmt = $conn->prepare("SELECT invite_code, has_used_invite_code FROM users WHERE id = ?");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $userData = $result->fetch_assoc();
+        $stmt->close();
+        
+        if (!$userData) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Usuário não encontrado']);
+            exit;
         }
+        
+        $inviteCode = $userData['invite_code'];
+        
+        // Se não tem código, gerar um
+        if (!$inviteCode) {
+            $inviteCode = generateInviteCode($userId);
+            $stmt = $conn->prepare("UPDATE users SET invite_code = ? WHERE id = ?");
+            $stmt->bind_param("si", $inviteCode, $userId);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+        // Contar amigos convidados
+        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM users WHERE invited_by = ?");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $stats = $result->fetch_assoc();
+        $stmt->close();
+        
+        // Calcular pontos ganhos
+        $pointsEarned = $stats['total'] * $POINTS_INVITER;
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'invite_code' => $inviteCode,
+                'friends_invited' => intval($stats['total']),
+                'points_earned' => $pointsEarned,
+                'points_per_invite' => $POINTS_INVITER,
+                'points_for_friend' => $POINTS_INVITED,
+                'has_used_invite_code' => (bool)($userData['has_used_invite_code'] ?? 0)
+            ]
+        ]);
         break;
         
     case 'POST':
         // POST /api/v1/invite.php - Validar e usar código de convite
-        $input = json_decode(file_get_contents('php://input'), true);
         
-        // Pegar user_id do body OU do token (verificar ambos)
-        $userId = null;
-        if (isset($input['user_id']) && !empty($input['user_id'])) {
-            $userId = intval($input['user_id']);
-        } else if ($userFromToken && isset($userFromToken['id'])) {
-            $userId = intval($userFromToken['id']);
-        }
+        // Obter body da requisição (mesmo método que battery.php)
+        $rawBody = $GLOBALS['_SECURE_REQUEST_BODY'] ?? file_get_contents('php://input');
+        $input = json_decode($rawBody, true);
         
-        if (!$userId || !isset($input['invite_code'])) {
+        error_log("[INVITE] POST - Raw body: " . substr($rawBody, 0, 200));
+        
+        if (!isset($input['invite_code']) || empty(trim($input['invite_code']))) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'user_id e invite_code são obrigatórios']);
+            echo json_encode(['success' => false, 'error' => 'invite_code é obrigatório']);
             exit;
         }
         
         $inviteCode = trim($input['invite_code']);
         
-        // Verificar se usuário existe
-        $stmt = $conn->prepare("SELECT id FROM users WHERE id = ?");
-        $stmt->bind_param("i", $userId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $user = $result->fetch_assoc();
-        $stmt->close();
-        
-        if (!$user) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Usuário não encontrado']);
-            exit;
-        }
+        error_log("[INVITE] Validating invite code: $inviteCode for user $userId");
         
         // Verificar se já usou um código de convite
         $stmt = $conn->prepare("SELECT id FROM referrals WHERE referred_user_id = ?");
@@ -217,41 +209,42 @@ switch ($method) {
             
             // Dar pontos para quem convidou
             $stmt = $conn->prepare("UPDATE users SET points = points + ?, daily_points = daily_points + ? WHERE id = ?");
-            $stmt->bind_param("iii", $pointsInviter, $pointsInviter, $inviter['id']);
-            $pointsInviter = POINTS_INVITER;
+            $stmt->bind_param("iii", $POINTS_INVITER, $POINTS_INVITER, $inviter['id']);
             $stmt->execute();
             $stmt->close();
             
             // Dar pontos para quem foi convidado e marcar que já usou código
             $stmt = $conn->prepare("UPDATE users SET points = points + ?, daily_points = daily_points + ?, has_used_invite_code = 1 WHERE id = ?");
-            $stmt->bind_param("iii", $pointsInvited, $pointsInvited, $userId);
-            $pointsInvited = POINTS_INVITED;
+            $stmt->bind_param("iii", $POINTS_INVITED, $POINTS_INVITED, $userId);
             $stmt->execute();
             $stmt->close();
             
             // Registrar no histórico de pontos
-            $description = "Código de Convite - Ganhou {$pointsInvited} pontos";
+            $description = "Código de Convite - Ganhou {$POINTS_INVITED} pontos";
             $stmt = $conn->prepare("
                 INSERT INTO points_history (user_id, points, description, created_at)
                 VALUES (?, ?, ?, NOW())
             ");
-            $stmt->bind_param("iis", $userId, $pointsInvited, $description);
+            $stmt->bind_param("iis", $userId, $POINTS_INVITED, $description);
             $stmt->execute();
             $stmt->close();
             
             $conn->commit();
             
+            error_log("[INVITE] Success! User $userId used code from user " . $inviter['id']);
+            
             echo json_encode([
                 'success' => true,
                 'message' => 'Código validado com sucesso!',
                 'data' => [
-                    'points_earned' => POINTS_INVITED,
+                    'points_earned' => $POINTS_INVITED,
                     'inviter_name' => $inviter['name']
                 ]
             ]);
             
         } catch (Exception $e) {
             $conn->rollback();
+            error_log("[INVITE] Error: " . $e->getMessage());
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Erro ao processar convite: ' . $e->getMessage()]);
         }
@@ -264,19 +257,4 @@ switch ($method) {
 }
 
 $conn->close();
-
-// Função para gerar código de convite único
-function generateInviteCode($userId) {
-    // Gerar código de 6 dígitos baseado no user_id + timestamp
-    $timestamp = time();
-    $hash = md5($userId . $timestamp);
-    $code = '';
-    
-    // Extrair 6 dígitos do hash
-    for ($i = 0; $i < 6; $i++) {
-        $code .= hexdec($hash[$i]) % 10;
-    }
-    
-    return $code;
-}
 ?>
