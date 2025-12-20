@@ -14,12 +14,34 @@
  * { "status": "success", "data": { "added": false, "score": 180, "previous_best": 200, "message": "Pontuação menor que a anterior" } }
  */
 
-// Includes necessários
-require_once __DIR__ . '/../../../db_config.php';
-require_once __DIR__ . '/../../../includes/auth_helper.php';
+// Tratamento de erros
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => "PHP Error: $errstr in $errfile:$errline"]);
+    exit;
+});
+
+try {
+    // Includes necessários
+    require_once __DIR__ . '/../../../db_config.php';
+    require_once __DIR__ . '/../../../includes/auth_helper.php';
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Include error: ' . $e->getMessage()]);
+    exit;
+}
 
 // Headers
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Request-ID');
+
+// Handle preflight
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
 // Obter conexão
 $conn = getMySQLiConnection();
