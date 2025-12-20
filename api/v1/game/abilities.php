@@ -43,12 +43,12 @@ define('RESTORE_CASCADE', 10);
 define('RESTORE_TIME_FREEZE', 6);
 define('RESTORE_DOUBLE_POINTS', 2);
 
-// Conectar ao banco de dados
-$conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-
-if ($conn->connect_error) {
+// Conectar ao banco de dados usando a função helper
+try {
+    $conn = getMySQLiConnection();
+} catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Database connection failed']);
+    echo json_encode(['success' => false, 'error' => 'Database connection failed: ' . $e->getMessage()]);
     exit;
 }
 
