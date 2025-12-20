@@ -9,10 +9,20 @@
  * - A bateria reseta para 100% no dia seguinte
  */
 
+// Capturar erros
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("[BATTERY] PHP Error: $errstr in $errfile:$errline");
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
+
+try {
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+error_log("[BATTERY] Request started - Method: " . $_SERVER['REQUEST_METHOD']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -52,20 +62,26 @@ if (!$user) {
 }
 
 $userId = $user['id'];
+error_log("[BATTERY] User ID: $userId");
 
 // Criar tabela de bateria se não existir
-$conn->exec("
-    CREATE TABLE IF NOT EXISTS user_battery (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL UNIQUE,
-        battery_percent INT DEFAULT 100,
-        last_reset_date DATE NOT NULL,
-        last_used_at TIMESTAMP NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-");
+try {
+    $conn->exec("
+        CREATE TABLE IF NOT EXISTS user_battery (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL UNIQUE,
+            battery_percent INT DEFAULT 100,
+            last_reset_date DATE NOT NULL,
+            last_used_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ");
+    error_log("[BATTERY] Table check/create OK");
+} catch (Exception $e) {
+    error_log("[BATTERY] Table creation error: " . $e->getMessage());
+    // Tabela pode já existir, continuar
+}
 
 // Obter data atual (timezone Brasil)
 date_default_timezone_set('America/Sao_Paulo');
@@ -172,3 +188,9 @@ if ($method === 'POST') {
 
 http_response_code(405);
 echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
+
+} catch (Exception $e) {
+    error_log("[BATTERY] Exception: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Internal error: ' . $e->getMessage()]);
+}
