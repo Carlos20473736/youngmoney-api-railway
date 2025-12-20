@@ -131,9 +131,9 @@ try {
         // Calcular pontos a adicionar (diferença entre novo e anterior)
         $pointsToAdd = $newScore - $previousBest;
         
-        // Adicionar pontos ao ranking do usuário
-        $stmt = $conn->prepare("UPDATE users SET points = points + ? WHERE id = ?");
-        $stmt->bind_param("ii", $pointsToAdd, $userId);
+        // Adicionar pontos ao ranking do usuário (daily_points para o ranking diário)
+        $stmt = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
+        $stmt->bind_param("iii", $pointsToAdd, $pointsToAdd, $userId);
         $stmt->execute();
         $stmt->close();
         
