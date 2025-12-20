@@ -69,7 +69,9 @@ if ($method !== 'POST') {
 }
 
 // Obter dados do body
-$input = json_decode(file_get_contents('php://input'), true);
+// Ler body da variável global (quando passa pelo secure.php) ou do php://input
+$rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
+$input = json_decode($rawBody, true);
 
 if (!isset($input['score']) || !is_numeric($input['score'])) {
     http_response_code(400);
