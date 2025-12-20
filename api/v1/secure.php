@@ -192,6 +192,10 @@ $endpointMap = [
     // Spin (Roleta)
     '/api/v1/spin.php' => __DIR__ . '/spin.php',
     
+    // Game (Candy)
+    '/api/v1/game/abilities.php' => __DIR__ . '/game/abilities.php',
+    '/api/v1/game/level.php' => __DIR__ . '/game/level.php',
+    
     // Settings
     '/settings/app.php' => __DIR__ . '/../../settings/app.php',
     '/settings/pix.php' => __DIR__ . '/../../settings/pix.php',
