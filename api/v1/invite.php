@@ -46,6 +46,40 @@ if (!$user) {
 $userId = $user['id'];
 error_log("[INVITE] User ID: $userId");
 
+// Criar tabela referrals se não existir
+$createTableSQL = "CREATE TABLE IF NOT EXISTS referrals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    referrer_user_id INT NOT NULL COMMENT 'ID do usuário que convidou',
+    referred_user_id INT NOT NULL COMMENT 'ID do usuário que foi convidado',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data do convite',
+    INDEX idx_referrer (referrer_user_id),
+    INDEX idx_referred (referred_user_id),
+    UNIQUE KEY unique_referred (referred_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+if (!$conn->query($createTableSQL)) {
+    error_log("[INVITE] Table creation error: " . $conn->error);
+    // Continuar mesmo se falhar (tabela pode já existir)
+}
+
+// Criar tabela system_settings se não existir
+$createSettingsSQL = "CREATE TABLE IF NOT EXISTS system_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+if (!$conn->query($createSettingsSQL)) {
+    error_log("[INVITE] Settings table creation error: " . $conn->error);
+}
+
+// Inserir valores padrão para pontos de convite se não existirem
+$conn->query("INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES ('invite_points_inviter', '500'), ('invite_points_invited', '500')");
+
+// Adicionar coluna has_used_invite_code na tabela users se não existir
+$conn->query("ALTER TABLE users ADD COLUMN IF NOT EXISTS has_used_invite_code TINYINT(1) DEFAULT 0");
+$conn->query("ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code VARCHAR(20) DEFAULT NULL");
+
 // Função para buscar pontos de recompensa do banco
 function getInvitePoints($conn) {
     $stmt = $conn->prepare("
