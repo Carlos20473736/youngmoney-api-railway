@@ -126,7 +126,9 @@ if ($method === 'GET') {
     
 } elseif ($method === 'POST') {
     // Atualizar habilidades do usuário
-    $input = json_decode(file_get_contents('php://input'), true);
+    // Ler body da variável global (quando passa pelo secure.php) ou do php://input
+    $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
+    $input = json_decode($rawBody, true);
     
     // Verificar se é para restaurar todas as habilidades (assistiu vídeo)
     $restoreAll = isset($input['restore_all']) && $input['restore_all'] === true;
