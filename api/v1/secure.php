@@ -196,6 +196,7 @@ $endpointMap = [
     '/api/v1/game/abilities.php' => __DIR__ . '/game/abilities.php',
     '/api/v1/game/level.php' => __DIR__ . '/game/level.php',
     '/api/v1/game/battery.php' => __DIR__ . '/game/battery.php',
+    '/api/v1/game/score.php' => __DIR__ . '/game/score.php',
     
     // Settings
     '/settings/app.php' => __DIR__ . '/../../settings/app.php',
