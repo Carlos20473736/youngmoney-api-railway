@@ -133,15 +133,15 @@ try {
     error_log("Reset Completo: Impressões randomizadas para: $random_impressions");
     
     // ========================================
-    // 4. RESETAR ROLETA (DELETAR SPIN_HISTORY)
+    // 4. RESETAR ROLETA (DELETAR TODOS OS SPINS)
     // ========================================
     // Contar quantos spins serão deletados
-    $count_result = $conn->query("SELECT COUNT(*) as total FROM spin_history WHERE DATE(created_at) < '$current_date'");
+    $count_result = $conn->query("SELECT COUNT(*) as total FROM spin_history");
     $count_row = $count_result->fetch_assoc();
     $spins_to_delete = $count_row['total'] ?? 0;
     
-    // Deletar registros de spin anteriores a hoje
-    $conn->query("DELETE FROM spin_history WHERE DATE(created_at) < '$current_date'");
+    // Deletar TODOS os registros de spin (reset completo)
+    $conn->query("DELETE FROM spin_history");
     $results['roulette']['spins_deleted'] = $conn->affected_rows;
     
     error_log("Reset Completo: Deletados {$results['roulette']['spins_deleted']} spins da roleta");
