@@ -81,8 +81,8 @@ if (!$conn->query($createSettingsSQL)) {
     error_log("[INVITE] Settings table creation error: " . $conn->error);
 }
 
-// Inserir valores padrão para pontos de convite se não existirem
-$conn->query("INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES ('invite_points_inviter', '500'), ('invite_points_invited', '500')");
+// Inserir valores padrão para pontos de convite se não existirem (1000 pontos para cada)
+$conn->query("INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES ('invite_points_inviter', '1000'), ('invite_points_invited', '1000')");
 
 // Adicionar colunas na tabela users se não existirem
 // Verificar se coluna existe antes de adicionar
@@ -107,8 +107,8 @@ function getInvitePoints($conn) {
     $result = $stmt->get_result();
     
     $points = [
-        'inviter' => 500,  // Padrão
-        'invited' => 500   // Padrão
+        'inviter' => 1000,  // Padrão: 1000 pontos
+        'invited' => 1000   // Padrão: 1000 pontos
     ];
     
     while ($row = $result->fetch_assoc()) {
