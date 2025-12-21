@@ -26,8 +26,9 @@ require_once __DIR__ . '/../includes/auth_helper.php';
 
 /**
  * Mascara o email para privacidade
- * Ex: carlos@gmail.com -> ca***@gmail.com
- * Ex: teste@hotmail.com -> te***@hotmail.com
+ * Ex: carlos@gmail.com -> carl***@gmail.com
+ * Ex: carloshenrique@gmail.com -> carloshenri***@gmail.com
+ * Mostra o e-mail quase inteiro, oculta apenas os 3 últimos caracteres antes do @
  */
 function maskEmail($email) {
     if (empty($email) || strpos($email, '@') === false) {
@@ -38,9 +39,16 @@ function maskEmail($email) {
     $localPart = $parts[0];
     $domain = $parts[1];
     
-    // Mostrar apenas os primeiros 2 caracteres do local part
-    $visibleChars = min(2, strlen($localPart));
-    $maskedLocal = substr($localPart, 0, $visibleChars) . '***';
+    // Mostrar quase todo o local part, ocultar apenas os 3 últimos caracteres
+    $localLength = strlen($localPart);
+    if ($localLength <= 3) {
+        // Se tiver 3 ou menos caracteres, ocultar tudo
+        $maskedLocal = '***';
+    } else {
+        // Mostrar tudo exceto os 3 últimos caracteres
+        $visiblePart = substr($localPart, 0, $localLength - 3);
+        $maskedLocal = $visiblePart . '***';
+    }
     
     return $maskedLocal . '@' . $domain;
 }
