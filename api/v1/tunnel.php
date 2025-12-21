@@ -207,6 +207,7 @@ if (!$requestData) {
 }
 
 error_log("[Tunnel] Request descriptografada: " . $requestData['method'] . " " . $requestData['url']);
+error_log("[Tunnel] Body: " . ($requestData['body'] ?? 'EMPTY'));
 
 // ============================================
 // EXECUTAR REQUISIÇÃO INTERNA
