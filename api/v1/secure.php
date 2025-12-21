@@ -172,6 +172,7 @@ $endpointMap = [
     // Notifications
     '/notifications/list.php' => __DIR__ . '/../../notifications/list.php',
     '/notifications/mark_read.php' => __DIR__ . '/../../notifications/mark_read.php',
+    '/notifications/mark_all_read.php' => __DIR__ . '/../../notifications/mark_all_read.php',
     
     // Withdraw
     '/withdraw/request.php' => __DIR__ . '/../../withdraw/request.php',
