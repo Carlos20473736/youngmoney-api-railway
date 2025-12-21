@@ -166,16 +166,14 @@ try {
             if ($hasPixKey) {
                 // Criar solicitação de saque automática (status: pending)
                 $stmt = $mysqli->prepare("
-                    INSERT INTO withdrawals (user_id, amount, pix_key, pix_key_type, status, description, created_at)
-                    VALUES (?, ?, ?, ?, 'pending', ?, NOW())
+                    INSERT INTO withdrawals (user_id, amount, pix_key, pix_type, status, created_at)
+                    VALUES (?, ?, ?, ?, 'pending', NOW())
                 ");
-                $description = "Prêmio Ranking Diário - {$position}º lugar";
-                $stmt->bind_param("idsss", 
+                $stmt->bind_param("idss", 
                     $user['id'], 
                     $prizeAmount, 
                     $user['pix_key'], 
-                    $user['pix_key_type'],
-                    $description
+                    $user['pix_key_type']
                 );
                 $stmt->execute();
                 
