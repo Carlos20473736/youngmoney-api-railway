@@ -114,6 +114,21 @@ try {
     
     error_log("MoniTag Postback - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type, zone_id=$zone_id");
     
+    // Buscar número de impressões necessárias do banco (randomizado)
+    $required_impressions = 5; // valor padrão
+    $required_clicks = 1; // fixo
+    
+    $settings_stmt = $conn->prepare("
+        SELECT setting_value FROM roulette_settings 
+        WHERE setting_key = 'monetag_required_impressions'
+    ");
+    $settings_stmt->execute();
+    $settings_result = $settings_stmt->get_result();
+    if ($settings_row = $settings_result->fetch_assoc()) {
+        $required_impressions = (int)$settings_row['setting_value'];
+    }
+    $settings_stmt->close();
+    
     // Buscar progresso atualizado do dia
     $today = date('Y-m-d');
     $stmt = $conn->prepare("
@@ -129,10 +144,6 @@ try {
     $progress = $result->fetch_assoc();
     $stmt->close();
     $conn->close();
-    
-    // Metas
-    $required_impressions = 5;
-    $required_clicks = 1;
     
     $response = [
         'event_registered' => true,

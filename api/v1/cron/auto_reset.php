@@ -249,7 +249,42 @@ try {
     $stmt->bind_param("ss", $reset_time, $reset_time);
     $stmt->execute();
     
-    // 5. Registrar log do reset (opcional)
+    // 5. MONETAG - Randomizar número de impressões necessárias (5 a 30)
+    $random_impressions = rand(5, 30);
+    
+    // Verificar se a configuração já existe
+    $check_stmt = $mysqli->prepare("
+        SELECT id FROM roulette_settings 
+        WHERE setting_key = 'monetag_required_impressions'
+    ");
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+    
+    if ($check_result->num_rows > 0) {
+        // Atualizar valor existente
+        $stmt = $mysqli->prepare("
+            UPDATE roulette_settings 
+            SET setting_value = ?, updated_at = NOW()
+            WHERE setting_key = 'monetag_required_impressions'
+        ");
+        $stmt->bind_param("s", $random_impressions);
+        $stmt->execute();
+    } else {
+        // Inserir novo valor
+        $stmt = $mysqli->prepare("
+            INSERT INTO roulette_settings (setting_key, setting_value, description)
+            VALUES ('monetag_required_impressions', ?, 'Número de impressões necessárias para desbloquear roleta')
+        ");
+        $stmt->bind_param("s", $random_impressions);
+        $stmt->execute();
+    }
+    $check_stmt->close();
+    
+    // 6. MONETAG - Deletar eventos de monetag de todos os usuários (resetar progresso)
+    $monetagDeleted = $mysqli->query("DELETE FROM monetag_events");
+    $monetagDeletedCount = $mysqli->affected_rows;
+    
+    // 7. Registrar log do reset (opcional)
     try {
         $stmt = $mysqli->prepare("
             INSERT INTO ranking_reset_logs 
@@ -287,6 +322,11 @@ try {
             'checkin' => [
                 'records_deleted' => 0,
                 'description' => 'Usa dia virtual baseado em last_reset_datetime - histórico preservado'
+            ],
+            'monetag' => [
+                'events_deleted' => $monetagDeletedCount,
+                'new_required_impressions' => $random_impressions,
+                'description' => 'Eventos resetados e impressões randomizadas (5-30)'
             ],
             'reset_date' => $current_date,
             'reset_time' => $current_time,

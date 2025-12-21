@@ -36,12 +36,48 @@ try {
             $stmt->execute();
         }
         
+        // 4. Randomizar número de impressões necessárias (5 a 30)
+        $random_impressions = rand(5, 30);
+        
+        // Verificar se a configuração já existe
+        $check_stmt = $conn->prepare("
+            SELECT id FROM roulette_settings 
+            WHERE setting_key = 'monetag_required_impressions'
+        ");
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        
+        if ($check_result->num_rows > 0) {
+            // Atualizar valor existente
+            $stmt = $conn->prepare("
+                UPDATE roulette_settings 
+                SET setting_value = ?, updated_at = NOW()
+                WHERE setting_key = 'monetag_required_impressions'
+            ");
+            $stmt->bind_param("s", $random_impressions);
+            $stmt->execute();
+        } else {
+            // Inserir novo valor
+            $stmt = $conn->prepare("
+                INSERT INTO roulette_settings (setting_key, setting_value, description)
+                VALUES ('monetag_required_impressions', ?, 'Número de impressões necessárias para desbloquear roleta')
+            ");
+            $stmt->bind_param("s", $random_impressions);
+            $stmt->execute();
+        }
+        $check_stmt->close();
+        
+        // 5. Deletar eventos de monetag de todos os usuários (resetar progresso)
+        $stmt = $conn->prepare("DELETE FROM monetag_events");
+        $stmt->execute();
+        
         // Commit da transação
         $conn->commit();
         
         echo json_encode([
             'success' => true,
-            'message' => 'Sistema resetado com sucesso! (Ranking + Spin + Check-in)'
+            'message' => 'Sistema resetado com sucesso! (Ranking + Spin + Check-in + MoniTag)',
+            'monetag_impressions' => $random_impressions
         ]);
         
     } catch (Exception $e) {
