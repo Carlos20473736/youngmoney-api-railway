@@ -282,13 +282,23 @@ switch ($method) {
             $stmt->execute();
             $stmt->close();
             
-            // Registrar no histórico de pontos
-            $description = "Código de Convite - Ganhou {$POINTS_INVITED} pontos";
+            // Registrar no histórico de pontos - quem foi convidado
+            $descriptionInvited = "Convite - Ganhou {$POINTS_INVITED} pontos";
             $stmt = $conn->prepare("
                 INSERT INTO points_history (user_id, points, description, created_at)
                 VALUES (?, ?, ?, NOW())
             ");
-            $stmt->bind_param("iis", $userId, $POINTS_INVITED, $description);
+            $stmt->bind_param("iis", $userId, $POINTS_INVITED, $descriptionInvited);
+            $stmt->execute();
+            $stmt->close();
+            
+            // Registrar no histórico de pontos - quem convidou
+            $descriptionInviter = "Convite - Ganhou {$POINTS_INVITER} pontos";
+            $stmt = $conn->prepare("
+                INSERT INTO points_history (user_id, points, description, created_at)
+                VALUES (?, ?, ?, NOW())
+            ");
+            $stmt->bind_param("iis", $inviter['id'], $POINTS_INVITER, $descriptionInviter);
             $stmt->execute();
             $stmt->close();
             
