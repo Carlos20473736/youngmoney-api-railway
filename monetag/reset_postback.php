@@ -149,8 +149,8 @@ try {
     // Registrar log do reset (se a tabela existir)
     $log_stmt = $conn->prepare("
         INSERT INTO spin_reset_logs 
-        (spins_deleted, reset_datetime) 
-        VALUES (?, NOW())
+        (spins_deleted, reset_datetime, triggered_by) 
+        VALUES (?, NOW(), 'cron_reset_postback')
     ");
     if ($log_stmt) {
         $log_stmt->bind_param("i", $results['roulette']['spins_deleted']);
