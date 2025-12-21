@@ -17,9 +17,10 @@ try {
     // Log para debug
     error_log("mark_read.php: User ID = " . $user['id']);
     
-    // Obter dados do request
-    $rawInput = file_get_contents('php://input');
+    // Obter dados do request - verificar se veio pelo túnel seguro
+    $rawInput = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
     error_log("mark_read.php: Raw input = " . $rawInput);
+    error_log("mark_read.php: Source = " . (isset($GLOBALS['_SECURE_REQUEST_BODY']) ? 'SECURE_TUNNEL' : 'php://input'));
     
     $input = json_decode($rawInput, true);
     error_log("mark_read.php: Parsed input = " . print_r($input, true));

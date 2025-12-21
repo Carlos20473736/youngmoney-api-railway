@@ -277,8 +277,10 @@ if (!$authFound) {
 }
 
 // Passar body para o endpoint interno
+error_log("[SECURE] Body type: " . gettype($body) . ", value: " . (is_string($body) ? $body : json_encode($body)));
 if ($body) {
     $GLOBALS['_SECURE_REQUEST_BODY'] = is_string($body) ? $body : json_encode($body);
+    error_log("[SECURE] _SECURE_REQUEST_BODY set to: " . $GLOBALS['_SECURE_REQUEST_BODY']);
 }
 
 // Capturar output do endpoint
