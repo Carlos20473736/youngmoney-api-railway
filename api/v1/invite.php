@@ -76,9 +76,9 @@ if (!$conn->query($createSettingsSQL)) {
 // Inserir valores padrão para pontos de convite se não existirem
 $conn->query("INSERT IGNORE INTO system_settings (setting_key, setting_value) VALUES ('invite_points_inviter', '500'), ('invite_points_invited', '500')");
 
-// Adicionar coluna has_used_invite_code na tabela users se não existir
-$conn->query("ALTER TABLE users ADD COLUMN IF NOT EXISTS has_used_invite_code TINYINT(1) DEFAULT 0");
-$conn->query("ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code VARCHAR(20) DEFAULT NULL");
+// Adicionar colunas na tabela users se não existirem (ignorar erro se já existem)
+$conn->query("ALTER TABLE users ADD COLUMN has_used_invite_code TINYINT(1) DEFAULT 0");
+$conn->query("ALTER TABLE users ADD COLUMN invite_code VARCHAR(20) DEFAULT NULL");
 
 // Função para buscar pontos de recompensa do banco
 function getInvitePoints($conn) {
