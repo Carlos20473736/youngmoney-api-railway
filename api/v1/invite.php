@@ -170,13 +170,26 @@ switch ($method) {
             $stmt->close();
         }
         
-        // Contar amigos convidados
-        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM users WHERE invited_by = ?");
+        // Contar amigos convidados (da tabela referrals)
+        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM referrals WHERE referrer_user_id = ?");
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $result = $stmt->get_result();
         $stats = $result->fetch_assoc();
         $stmt->close();
+        
+        // Verificar se já usou código de convite (verificar na tabela referrals também)
+        $hasUsedInviteCode = (bool)($userData['has_used_invite_code'] ?? 0);
+        if (!$hasUsedInviteCode) {
+            // Verificar na tabela referrals se este usuário foi convidado por alguém
+            $stmt = $conn->prepare("SELECT COUNT(*) as count FROM referrals WHERE referred_user_id = ?");
+            $stmt->bind_param("i", $userId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $referralCheck = $result->fetch_assoc();
+            $stmt->close();
+            $hasUsedInviteCode = ($referralCheck['count'] > 0);
+        }
         
         // Calcular pontos ganhos
         $pointsEarned = $stats['total'] * $POINTS_INVITER;
@@ -189,7 +202,7 @@ switch ($method) {
                 'points_earned' => $pointsEarned,
                 'points_per_invite' => $POINTS_INVITER,
                 'points_for_friend' => $POINTS_INVITED,
-                'has_used_invite_code' => (bool)($userData['has_used_invite_code'] ?? 0)
+                'has_used_invite_code' => $hasUsedInviteCode
             ]
         ]);
         break;
