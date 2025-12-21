@@ -46,20 +46,28 @@ if (!$user) {
 $userId = $user['id'];
 error_log("[INVITE] User ID: $userId");
 
-// Criar tabela referrals se não existir
-$createTableSQL = "CREATE TABLE IF NOT EXISTS referrals (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    referrer_user_id INT NOT NULL COMMENT 'ID do usuário que convidou',
-    referred_user_id INT NOT NULL COMMENT 'ID do usuário que foi convidado',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data do convite',
-    INDEX idx_referrer (referrer_user_id),
-    INDEX idx_referred (referred_user_id),
-    UNIQUE KEY unique_referred (referred_user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-
-if (!$conn->query($createTableSQL)) {
-    error_log("[INVITE] Table creation error: " . $conn->error);
-    // Continuar mesmo se falhar (tabela pode já existir)
+// Verificar se tabela referrals existe e tem as colunas corretas
+$tableCheck = $conn->query("SHOW COLUMNS FROM referrals LIKE 'referred_user_id'");
+if (!$tableCheck || $tableCheck->num_rows == 0) {
+    // Tabela não existe ou não tem a coluna correta - dropar e recriar
+    error_log("[INVITE] Dropping and recreating referrals table");
+    $conn->query("DROP TABLE IF EXISTS referrals");
+    
+    $createTableSQL = "CREATE TABLE referrals (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        referrer_user_id INT NOT NULL COMMENT 'ID do usuário que convidou',
+        referred_user_id INT NOT NULL COMMENT 'ID do usuário que foi convidado',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Data do convite',
+        INDEX idx_referrer (referrer_user_id),
+        INDEX idx_referred (referred_user_id),
+        UNIQUE KEY unique_referred (referred_user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+    
+    if (!$conn->query($createTableSQL)) {
+        error_log("[INVITE] Table creation error: " . $conn->error);
+    } else {
+        error_log("[INVITE] Referrals table created successfully");
+    }
 }
 
 // Criar tabela system_settings se não existir
