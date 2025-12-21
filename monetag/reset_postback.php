@@ -1,21 +1,22 @@
 <?php
 /**
- * API ÚNICA DE RESET DO POSTBACK MONETAG
+ * API ÚNICA DE RESET COMPLETO - POSTBACK MONETAG + ROLETA
  * 
- * Endpoint para resetar todos os dados de postback da MoneyTag
- * e randomizar o número de impressões necessárias (5 a 30)
+ * Endpoint: GET /monetag/reset_postback.php
  * 
- * URL: GET /monetag/reset_postback.php
- * 
- * O que faz:
+ * O que faz (TUDO DE UMA VEZ):
  * 1. Deleta todos os eventos de monetag_events (todos os usuários)
  * 2. Reseta contadores de impressões/cliques dos usuários
  * 3. Randomiza o número de impressões necessárias (5 a 30)
+ * 4. Reseta os giros da roleta (deleta spin_history)
  * 
- * Usar no CronJob para resetar junto com o ranking
+ * Usar no CronJob para resetar TUDO junto
  */
 
-header('Content-Type: application/json');
+error_reporting(0);
+ini_set('display_errors', '0');
+
+header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
@@ -25,16 +26,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// Configurar timezone
+date_default_timezone_set('America/Sao_Paulo');
+
 require_once __DIR__ . '/../database.php';
 
 function sendSuccess($data = []) {
-    echo json_encode(['success' => true, 'data' => $data]);
+    echo json_encode(['success' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 function sendError($message, $code = 400) {
     http_response_code($code);
-    echo json_encode(['success' => false, 'error' => $message]);
+    echo json_encode(['success' => false, 'error' => $message], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -44,24 +48,34 @@ try {
     // Iniciar transação
     $conn->begin_transaction();
     
+    $current_date = date('Y-m-d');
+    $current_time = date('H:i:s');
+    $current_datetime = date('Y-m-d H:i:s');
+    
     $results = [
-        'deleted_events' => 0,
-        'users_reset' => 0,
-        'new_required_impressions' => 0,
-        'timestamp' => date('Y-m-d H:i:s')
+        'message' => 'Reset completo realizado com sucesso!',
+        'monetag' => [
+            'deleted_events' => 0,
+            'users_reset' => 0,
+            'new_required_impressions' => 0
+        ],
+        'roulette' => [
+            'spins_deleted' => 0
+        ],
+        'timestamp' => $current_datetime,
+        'timezone' => 'America/Sao_Paulo (GMT-3)'
     ];
     
     // ========================================
     // 1. DELETAR TODOS OS EVENTOS DE MONETAG
     // ========================================
     $delete_events = $conn->query("DELETE FROM monetag_events");
-    $results['deleted_events'] = $conn->affected_rows;
-    error_log("Reset Postback: Deletados {$results['deleted_events']} eventos de monetag_events");
+    $results['monetag']['deleted_events'] = $conn->affected_rows;
+    error_log("Reset Completo: Deletados {$results['monetag']['deleted_events']} eventos de monetag_events");
     
     // ========================================
     // 2. RESETAR CONTADORES DOS USUÁRIOS
     // ========================================
-    // Verificar se as colunas existem na tabela users
     $columns_result = $conn->query("DESCRIBE users");
     $columns = [];
     while ($row = $columns_result->fetch_assoc()) {
@@ -79,17 +93,16 @@ try {
     if (!empty($updates)) {
         $update_query = 'UPDATE users SET ' . implode(', ', $updates);
         $conn->query($update_query);
-        $results['users_reset'] = $conn->affected_rows;
-        error_log("Reset Postback: Resetados contadores de {$results['users_reset']} usuários");
+        $results['monetag']['users_reset'] = $conn->affected_rows;
+        error_log("Reset Completo: Resetados contadores de {$results['monetag']['users_reset']} usuários");
     }
     
     // ========================================
     // 3. RANDOMIZAR IMPRESSÕES NECESSÁRIAS (5 a 30)
     // ========================================
     $random_impressions = rand(5, 30);
-    $results['new_required_impressions'] = $random_impressions;
+    $results['monetag']['new_required_impressions'] = $random_impressions;
     
-    // Verificar se a configuração já existe
     $check_stmt = $conn->prepare("
         SELECT id FROM roulette_settings 
         WHERE setting_key = 'monetag_required_impressions'
@@ -98,7 +111,6 @@ try {
     $check_result = $check_stmt->get_result();
     
     if ($check_result->num_rows > 0) {
-        // Atualizar valor existente
         $stmt = $conn->prepare("
             UPDATE roulette_settings 
             SET setting_value = ?, updated_at = NOW()
@@ -108,7 +120,6 @@ try {
         $stmt->execute();
         $stmt->close();
     } else {
-        // Inserir novo valor
         $stmt = $conn->prepare("
             INSERT INTO roulette_settings (setting_key, setting_value, description)
             VALUES ('monetag_required_impressions', ?, 'Número de impressões necessárias para desbloquear roleta')
@@ -119,20 +130,40 @@ try {
     }
     $check_stmt->close();
     
-    error_log("Reset Postback: Impressões randomizadas para: $random_impressions");
+    error_log("Reset Completo: Impressões randomizadas para: $random_impressions");
+    
+    // ========================================
+    // 4. RESETAR ROLETA (DELETAR SPIN_HISTORY)
+    // ========================================
+    // Contar quantos spins serão deletados
+    $count_result = $conn->query("SELECT COUNT(*) as total FROM spin_history WHERE DATE(created_at) < '$current_date'");
+    $count_row = $count_result->fetch_assoc();
+    $spins_to_delete = $count_row['total'] ?? 0;
+    
+    // Deletar registros de spin anteriores a hoje
+    $conn->query("DELETE FROM spin_history WHERE DATE(created_at) < '$current_date'");
+    $results['roulette']['spins_deleted'] = $conn->affected_rows;
+    
+    error_log("Reset Completo: Deletados {$results['roulette']['spins_deleted']} spins da roleta");
+    
+    // Registrar log do reset (se a tabela existir)
+    $log_stmt = $conn->prepare("
+        INSERT INTO spin_reset_logs 
+        (spins_deleted, reset_datetime) 
+        VALUES (?, NOW())
+    ");
+    if ($log_stmt) {
+        $log_stmt->bind_param("i", $results['roulette']['spins_deleted']);
+        $log_stmt->execute();
+        $log_stmt->close();
+    }
     
     // Commit da transação
     $conn->commit();
     $conn->close();
     
     // Retornar sucesso
-    sendSuccess([
-        'message' => 'Reset do postback MoneyTag realizado com sucesso!',
-        'deleted_events' => $results['deleted_events'],
-        'users_reset' => $results['users_reset'],
-        'new_required_impressions' => $results['new_required_impressions'],
-        'timestamp' => $results['timestamp']
-    ]);
+    sendSuccess($results);
     
 } catch (Exception $e) {
     // Rollback em caso de erro
@@ -141,7 +172,7 @@ try {
         $conn->close();
     }
     
-    error_log("Reset Postback Error: " . $e->getMessage());
-    sendError('Erro ao resetar postback: ' . $e->getMessage(), 500);
+    error_log("Reset Completo Error: " . $e->getMessage());
+    sendError('Erro ao executar reset completo: ' . $e->getMessage(), 500);
 }
 ?>
