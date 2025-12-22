@@ -15,6 +15,8 @@ $publicEndpoints = [
     '/api/v1/invite/validate.php',
     '/api/v1/config.php',
     '/api/v1/config-simple.php',
+    '/api/v1/device/check.php',
+    '/api/v1/device/bind.php',
     '/admin/',
     '/api/v1/cron/',
     '/health',
