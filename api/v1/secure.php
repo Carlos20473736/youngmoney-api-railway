@@ -220,6 +220,10 @@ $endpointMap = [
     '/user/pix/save.php' => __DIR__ . '/../../user/pix/save.php',
     '/user/pix/get.php' => __DIR__ . '/../../user/pix/get.php',
     '/user/pix.php' => __DIR__ . '/../../user/pix.php',
+    
+    // Device Binding
+    '/api/v1/device/check.php' => __DIR__ . '/device/check.php',
+    '/api/v1/device/bind.php' => __DIR__ . '/device/bind.php',
 ];
 
 // Encontrar arquivo do endpoint
