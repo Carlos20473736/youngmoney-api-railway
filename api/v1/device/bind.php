@@ -64,8 +64,11 @@ try {
     
     $user_id = $user['id'];
     
-    // Ler body da requisição
-    $input = json_decode(file_get_contents('php://input'), true);
+    // Ler body da requisição (suporta túnel criptografado)
+    $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
+    $input = json_decode($rawBody, true);
+    
+    error_log("[DEVICE_BIND] Raw body: " . substr($rawBody, 0, 200));
     
     if (!$input || !isset($input['device_id'])) {
         http_response_code(400);
