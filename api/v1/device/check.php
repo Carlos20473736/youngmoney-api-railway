@@ -1,0 +1,134 @@
+<?php
+/**
+ * API: Verificar Vinculação de Dispositivo
+ * 
+ * Endpoint: POST /api/v1/device/check.php
+ * 
+ * Verifica se um dispositivo já está vinculado a uma conta existente.
+ * Deve ser chamado ANTES do login para impedir múltiplas contas por dispositivo.
+ * 
+ * NÃO REQUER AUTENTICAÇÃO
+ * 
+ * Request Body:
+ * {
+ *   "device_id": "hash_unico_do_dispositivo",
+ *   "device_info": "{json_com_informacoes_do_dispositivo}",
+ *   "action": "check"
+ * }
+ * 
+ * Response:
+ * {
+ *   "success": true,
+ *   "blocked": false,           // true se dispositivo já vinculado a outra conta
+ *   "existing_email": "",       // email da conta existente (se bloqueado)
+ *   "message": "Dispositivo liberado"
+ * }
+ */
+
+// Suprimir warnings e notices do PHP
+error_reporting(0);
+ini_set('display_errors', '0');
+
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Handle preflight
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+// Apenas POST
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Método não permitido']);
+    exit;
+}
+
+// Carregar configuração do banco
+require_once __DIR__ . '/../../../database.php';
+
+try {
+    // Ler body da requisição
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (!$input || !isset($input['device_id'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'device_id é obrigatório']);
+        exit;
+    }
+    
+    $device_id = trim($input['device_id']);
+    $device_info = isset($input['device_info']) ? $input['device_info'] : '{}';
+    
+    // Validar device_id (deve ser um hash SHA-256 de 64 caracteres)
+    if (strlen($device_id) < 32) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'device_id inválido']);
+        exit;
+    }
+    
+    // Conectar ao banco
+    $conn = getDbConnection();
+    
+    // Verificar se dispositivo já está vinculado
+    $stmt = $conn->prepare("
+        SELECT 
+            db.id,
+            db.user_id,
+            db.device_id,
+            db.created_at,
+            u.email,
+            u.name
+        FROM device_bindings db
+        INNER JOIN users u ON db.user_id = u.id
+        WHERE db.device_id = ?
+        AND db.is_active = 1
+        LIMIT 1
+    ");
+    
+    $stmt->bind_param("s", $device_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $existing = $result->fetch_assoc();
+    $stmt->close();
+    
+    if ($existing) {
+        // Dispositivo já vinculado a uma conta
+        // Registrar tentativa de acesso
+        $logStmt = $conn->prepare("
+            INSERT INTO device_access_logs 
+            (device_id, user_id, action, device_info, ip_address, created_at)
+            VALUES (?, ?, 'check_blocked', ?, ?, NOW())
+        ");
+        
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $logStmt->bind_param("siss", $device_id, $existing['user_id'], $device_info, $ip);
+        $logStmt->execute();
+        $logStmt->close();
+        
+        echo json_encode([
+            'success' => true,
+            'blocked' => true,
+            'existing_email' => $existing['email'],
+            'message' => 'Este dispositivo já está vinculado a outra conta'
+        ]);
+    } else {
+        // Dispositivo livre
+        echo json_encode([
+            'success' => true,
+            'blocked' => false,
+            'existing_email' => '',
+            'message' => 'Dispositivo liberado'
+        ]);
+    }
+    
+    $conn->close();
+    
+} catch (Exception $e) {
+    error_log("Device check error: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Erro ao verificar dispositivo']);
+}
