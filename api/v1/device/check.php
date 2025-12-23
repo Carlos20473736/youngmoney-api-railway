@@ -112,10 +112,26 @@ try {
         $logStmt->execute();
         $logStmt->close();
         
+        // Mascarar e-mail: mostrar tudo exceto os 3 últimos caracteres antes do @
+        // Exemplo: "carlos123@gmail.com" -> "carlos***@gmail.com"
+        $email = $existing['email'];
+        $maskedEmail = $email;
+        $atPos = strpos($email, '@');
+        if ($atPos !== false && $atPos >= 3) {
+            $localPart = substr($email, 0, $atPos);
+            $domain = substr($email, $atPos);
+            $visiblePart = substr($localPart, 0, -3);
+            $maskedEmail = $visiblePart . '***' . $domain;
+        } elseif ($atPos !== false) {
+            // Se a parte local tem menos de 3 caracteres, mascarar tudo
+            $domain = substr($email, $atPos);
+            $maskedEmail = '***' . $domain;
+        }
+        
         echo json_encode([
             'success' => true,
             'blocked' => true,
-            'existing_email' => $existing['email'],
+            'existing_email' => $maskedEmail,
             'message' => 'Este dispositivo já está vinculado a outra conta'
         ]);
     } else {
