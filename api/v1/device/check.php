@@ -55,7 +55,11 @@ try {
     $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
     $input = json_decode($rawBody, true);
     
+    error_log("[DEVICE_CHECK] ========== NOVA REQUISIÇÃO ==========");
     error_log("[DEVICE_CHECK] Raw body: " . substr($rawBody, 0, 200));
+    error_log("[DEVICE_CHECK] Method: " . $_SERVER['REQUEST_METHOD']);
+    error_log("[DEVICE_CHECK] Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
+    error_log("[DEVICE_CHECK] User-Agent: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'not set'));
     
     if (!$input || !isset($input['device_id'])) {
         http_response_code(400);
@@ -98,8 +102,13 @@ try {
     $existing = $result->fetch_assoc();
     $stmt->close();
     
+    error_log("[DEVICE_CHECK] Device ID recebido: " . substr($device_id, 0, 16) . "...");
+    error_log("[DEVICE_CHECK] Query executada com sucesso");
+    error_log("[DEVICE_CHECK] Resultado: " . ($existing ? "BLOQUEADO" : "LIBERADO"));
+    
     if ($existing) {
         // Dispositivo já vinculado a uma conta
+        error_log("[DEVICE_CHECK] Dispositivo vinculado ao usuário: " . $existing['email']);
         // Registrar tentativa de acesso
         $logStmt = $conn->prepare("
             INSERT INTO device_access_logs 
@@ -121,6 +130,7 @@ try {
         ]);
     } else {
         // Dispositivo livre
+        error_log("[DEVICE_CHECK] Dispositivo livre - permitindo login");
         echo json_encode([
             'success' => true,
             'blocked' => false,
