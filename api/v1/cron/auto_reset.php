@@ -82,42 +82,13 @@ try {
     $last_reset = $result->fetch_assoc();
     $last_reset_time = $last_reset ? $last_reset['setting_value'] : null;
     
-    // Verificar se deve resetar
-    $should_reset = false;
-    $reason = '';
-    
-    // Converter horários para minutos totais do dia
-    $current_minutes_total = ($current_hour * 60) + $current_minute;
-    $reset_minutes_total = ($reset_hour * 60) + $reset_minute;
-    
-    // Condição: Horário atual >= horário configurado E ainda não resetou neste horário
-    $time_reached = ($current_minutes_total >= $reset_minutes_total);
-    $not_reset_at_this_time = ($last_reset_time !== $reset_time);
-    
-    if ($time_reached && $not_reset_at_this_time) {
-        $should_reset = true;
-        $reason = 'Horário de reset atingido';
-    } elseif (!$time_reached) {
-        $reason = "Horário atual ($current_time) ainda não atingiu o horário configurado ($reset_time)";
-    } elseif (!$not_reset_at_this_time) {
-        $reason = "Já resetou no horário configurado ($reset_time)";
-    }
-    
-    // Se não deve resetar, retornar informações
-    if (!$should_reset) {
-        echo json_encode([
-            'success' => true,
-            'reset_executed' => false,
-            'reason' => $reason,
-            'current_time' => $current_time,
-            'configured_reset_time' => $reset_time,
-            'last_reset_time' => $last_reset_time,
-            'current_date' => $current_date,
-            'timezone' => 'America/Sao_Paulo (GMT-3)',
-            'timestamp' => time()
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+    // ============================================
+    // MODIFICADO: RESET A QUALQUER MOMENTO
+    // ============================================
+    // O reset agora pode ser executado a qualquer hora
+    // Sem restrição de horário
+    $should_reset = true;
+    $reason = 'Reset executado a qualquer momento (sem restrição de horário)';
     
     // ============================================
     // RESETAR TUDO
@@ -226,8 +197,7 @@ try {
     // 2. SPIN - Deletar registros de HOJE
     $spinsDeleted = $mysqli->query("DELETE FROM spin_history WHERE DATE(created_at) = '$current_date'");
     $spinsDeletedCount = $mysqli->affected_rows;
-    
-    // 3. CHECK-IN - Atualizar last_reset_datetime (histórico preservado)
+        // 3. CHECK-IN - Atualizar last_reset_datetime (histórico preservado)
     $stmt = $mysqli->prepare("
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
         VALUES ('last_reset_datetime', ?, NOW())
@@ -238,7 +208,7 @@ try {
     $stmt->bind_param("ss", $current_datetime, $current_datetime);
     $stmt->execute();
     
-    // 4. Atualizar último horário de reset
+    // 4. Atualizar último horário de reset (com timestamp completo para rastrear resets a qualquer hora)
     $stmt = $mysqli->prepare("
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
         VALUES ('last_reset_time', ?, NOW())
@@ -246,7 +216,7 @@ try {
             setting_value = ?,
             updated_at = NOW()
     ");
-    $stmt->bind_param("ss", $reset_time, $reset_time);
+     $stmt->bind_param("ss", $current_datetime, $current_datetime);
     $stmt->execute();
     
     // 5. MONETAG - Randomizar número de impressões necessárias (5 a 30)
