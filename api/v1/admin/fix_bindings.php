@@ -30,101 +30,90 @@ try {
     $conn = getDbConnection();
     $result['steps'][] = 'Conectado ao banco de dados';
     
-    // 1. Verificar estado atual
-    $res = $conn->query("SELECT COUNT(*) as total FROM device_bindings");
-    $row = $res->fetch_assoc();
-    $result['before'] = ['total' => (int)$row['total']];
-    
-    $res = $conn->query("SELECT COUNT(*) as active FROM device_bindings WHERE is_active = 1");
-    $row = $res->fetch_assoc();
-    $result['before']['active'] = (int)$row['active'];
-    
-    $res = $conn->query("SELECT COUNT(*) as inactive FROM device_bindings WHERE is_active = 0");
-    $row = $res->fetch_assoc();
-    $result['before']['inactive'] = (int)$row['inactive'];
-    
-    $result['steps'][] = 'Estado atual verificado';
-    
-    // 2. Encontrar o registro mais antigo de cada device_id (SEM depender da tabela users)
-    $query = "
-        SELECT 
-            db1.id,
-            db1.device_id,
-            db1.user_id,
-            db1.created_at
-        FROM device_bindings db1
-        WHERE db1.id = (
-            SELECT MIN(db2.id) 
-            FROM device_bindings db2 
-            WHERE db2.device_id = db1.device_id
-        )
-    ";
-    
-    $res = $conn->query($query);
-    $firstBindings = [];
-    
+    // 1. Listar todos os registros atuais
+    $res = $conn->query("SELECT id, device_id, user_id, is_active, created_at FROM device_bindings ORDER BY id");
+    $allBindings = [];
     while ($row = $res->fetch_assoc()) {
-        $firstBindings[] = $row;
+        $allBindings[] = $row;
     }
+    $result['all_bindings_before'] = $allBindings;
+    $result['steps'][] = 'Listados ' . count($allBindings) . ' registros';
     
-    $result['unique_devices'] = count($firstBindings);
-    $result['steps'][] = 'Identificados ' . count($firstBindings) . ' dispositivos únicos';
+    // 2. Encontrar device_ids únicos
+    $res = $conn->query("SELECT DISTINCT device_id FROM device_bindings");
+    $uniqueDevices = [];
+    while ($row = $res->fetch_assoc()) {
+        $uniqueDevices[] = $row['device_id'];
+    }
+    $result['unique_device_ids'] = count($uniqueDevices);
+    $result['steps'][] = 'Encontrados ' . count($uniqueDevices) . ' device_ids únicos';
     
-    // 3. Desativar todos os registros
-    $conn->query("UPDATE device_bindings SET is_active = 0");
-    $result['steps'][] = 'Todos os registros desativados';
-    
-    // 4. Reativar apenas o primeiro registro de cada device_id
+    // 3. Para cada device_id único, encontrar o registro mais antigo e reativá-lo
     $reactivated = 0;
     $reactivatedList = [];
     
-    foreach ($firstBindings as $binding) {
-        $stmt = $conn->prepare("UPDATE device_bindings SET is_active = 1 WHERE id = ?");
-        $stmt->bind_param("i", $binding['id']);
+    foreach ($uniqueDevices as $deviceId) {
+        // Primeiro, desativar todos os registros deste device_id
+        $stmt = $conn->prepare("UPDATE device_bindings SET is_active = 0 WHERE device_id = ?");
+        $stmt->bind_param("s", $deviceId);
         $stmt->execute();
         $stmt->close();
-        $reactivated++;
-        $reactivatedList[] = [
-            'id' => $binding['id'],
-            'user_id' => $binding['user_id'],
-            'device_id_prefix' => substr($binding['device_id'], 0, 16) . '...',
-            'created_at' => $binding['created_at']
-        ];
+        
+        // Depois, encontrar o registro mais antigo (menor ID) e reativá-lo
+        $stmt = $conn->prepare("SELECT id, user_id FROM device_bindings WHERE device_id = ? ORDER BY id ASC LIMIT 1");
+        $stmt->bind_param("s", $deviceId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $oldest = $res->fetch_assoc();
+        $stmt->close();
+        
+        if ($oldest) {
+            // Reativar o registro mais antigo
+            $stmt = $conn->prepare("UPDATE device_bindings SET is_active = 1 WHERE id = ?");
+            $stmt->bind_param("i", $oldest['id']);
+            $stmt->execute();
+            $stmt->close();
+            
+            $reactivated++;
+            $reactivatedList[] = [
+                'id' => $oldest['id'],
+                'user_id' => $oldest['user_id'],
+                'device_id_prefix' => substr($deviceId, 0, 20) . '...'
+            ];
+        }
     }
     
     $result['reactivated'] = $reactivated;
     $result['reactivated_list'] = $reactivatedList;
-    $result['steps'][] = 'Reativados ' . $reactivated . ' registros';
+    $result['steps'][] = 'Reativados ' . $reactivated . ' registros (um por device_id)';
     
-    // 5. Verificar resultado final
-    $res = $conn->query("SELECT COUNT(*) as active FROM device_bindings WHERE is_active = 1");
-    $row = $res->fetch_assoc();
-    $result['after']['active'] = (int)$row['active'];
-    
-    $res = $conn->query("SELECT COUNT(*) as inactive FROM device_bindings WHERE is_active = 0");
-    $row = $res->fetch_assoc();
-    $result['after']['inactive'] = (int)$row['inactive'];
-    
-    $result['steps'][] = 'Verificação final concluída';
-    
-    // 6. Listar todos os registros para debug
+    // 4. Listar resultado final
     $res = $conn->query("SELECT id, device_id, user_id, is_active, created_at FROM device_bindings ORDER BY id");
-    $allBindings = [];
+    $allBindingsAfter = [];
     while ($row = $res->fetch_assoc()) {
-        $allBindings[] = [
+        $allBindingsAfter[] = [
             'id' => $row['id'],
-            'device_id_prefix' => substr($row['device_id'], 0, 16) . '...',
+            'device_id_prefix' => substr($row['device_id'], 0, 20) . '...',
             'user_id' => $row['user_id'],
             'is_active' => $row['is_active'],
             'created_at' => $row['created_at']
         ];
     }
-    $result['all_bindings'] = $allBindings;
+    $result['all_bindings_after'] = $allBindingsAfter;
+    
+    // Contar ativos e inativos
+    $res = $conn->query("SELECT COUNT(*) as active FROM device_bindings WHERE is_active = 1");
+    $row = $res->fetch_assoc();
+    $result['final_active'] = (int)$row['active'];
+    
+    $res = $conn->query("SELECT COUNT(*) as inactive FROM device_bindings WHERE is_active = 0");
+    $row = $res->fetch_assoc();
+    $result['final_inactive'] = (int)$row['inactive'];
     
     $conn->close();
     
     $result['success'] = true;
-    $result['message'] = 'Correção concluída com sucesso! Agora o sistema irá bloquear login de outras contas em dispositivos já vinculados.';
+    $result['message'] = 'Correção concluída! Dispositivos agora estão vinculados à primeira conta que os usou.';
     
 } catch (Exception $e) {
     $result['error'] = $e->getMessage();
