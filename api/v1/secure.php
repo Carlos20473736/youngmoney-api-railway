@@ -224,6 +224,7 @@ $endpointMap = [
     // Device Binding
     '/api/v1/device/check.php' => __DIR__ . '/device/check.php',
     '/api/v1/device/bind.php' => __DIR__ . '/device/bind.php',
+    '/api/v1/device/reset.php' => __DIR__ . '/device/reset.php',
 ];
 
 // Encontrar arquivo do endpoint
