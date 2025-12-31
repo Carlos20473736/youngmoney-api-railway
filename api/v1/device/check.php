@@ -81,15 +81,16 @@ try {
     $conn = getDbConnection();
     
     // Verificar se dispositivo já está vinculado
-    // IMPORTANTE: Usar LEFT JOIN para funcionar mesmo se o usuário não existir na tabela users
+    // Prioridade: 1) email da tabela device_bindings, 2) email da tabela users, 3) fallback user_id
     $stmt = $conn->prepare("
         SELECT 
             db.id,
             db.user_id,
             db.device_id,
+            db.email as binding_email,
             db.created_at,
-            COALESCE(u.email, CONCAT('user_', db.user_id)) as email,
-            COALESCE(u.name, '') as name
+            u.email as user_email,
+            u.name
         FROM device_bindings db
         LEFT JOIN users u ON db.user_id = u.id
         WHERE db.device_id = ?
@@ -109,7 +110,14 @@ try {
     
     if ($existing) {
         // Dispositivo já vinculado a uma conta
-        error_log("[DEVICE_CHECK] Dispositivo vinculado ao usuário: " . $existing['email']);
+        // Determinar o email a ser exibido (prioridade: binding_email > user_email > fallback)
+        $displayEmail = $existing['binding_email'] 
+            ?? $existing['user_email'] 
+            ?? 'user_' . $existing['user_id'];
+        
+        error_log("[DEVICE_CHECK] Dispositivo vinculado ao usuário: " . $displayEmail);
+        error_log("[DEVICE_CHECK] binding_email: " . ($existing['binding_email'] ?? 'NULL'));
+        error_log("[DEVICE_CHECK] user_email: " . ($existing['user_email'] ?? 'NULL'));
         
         // Registrar tentativa de acesso (ignorar erros se a tabela não existir)
         try {
@@ -131,7 +139,7 @@ try {
         echo json_encode([
             'success' => true,
             'blocked' => true,
-            'existing_email' => $existing['email'],
+            'existing_email' => $displayEmail,
             'message' => 'Este dispositivo já está vinculado a outra conta'
         ]);
     } else {

@@ -13,6 +13,7 @@
  * {
  *   "device_id": "hash_unico_do_dispositivo",
  *   "device_info": "{json_com_informacoes_do_dispositivo}",
+ *   "email": "email@exemplo.com",
  *   "action": "bind"
  * }
  * 
@@ -78,6 +79,7 @@ try {
     
     $device_id = trim($input['device_id']);
     $device_info = isset($input['device_info']) ? $input['device_info'] : '{}';
+    $email = isset($input['email']) ? trim($input['email']) : null;
     
     // Validar device_id
     if (strlen($device_id) < 32) {
@@ -95,9 +97,11 @@ try {
     $fingerprint = $device_data['fingerprint'] ?? null;
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     
+    error_log("[DEVICE_BIND] Email recebido: " . ($email ?? 'NULL'));
+    
     // Verificar se dispositivo já está vinculado a OUTRA conta
     $checkStmt = $conn->prepare("
-        SELECT user_id, id FROM device_bindings 
+        SELECT user_id, id, email FROM device_bindings 
         WHERE device_id = ? 
         AND is_active = 1
         LIMIT 1
@@ -111,6 +115,7 @@ try {
     if ($existing) {
         if ($existing['user_id'] == $user_id) {
             // Já vinculado à mesma conta - apenas atualizar info
+            // Também atualizar o email se fornecido
             $updateStmt = $conn->prepare("
                 UPDATE device_bindings 
                 SET device_info = ?,
@@ -120,13 +125,14 @@ try {
                     android_version = ?,
                     fingerprint = ?,
                     last_seen = NOW(),
-                    ip_address = ?
+                    ip_address = ?,
+                    email = COALESCE(?, email)
                 WHERE id = ?
             ");
             
-            $updateStmt->bind_param("sssssssi", 
+            $updateStmt->bind_param("ssssssssi", 
                 $device_info, $android_id, $model, $manufacturer, 
-                $android_version, $fingerprint, $ip, $existing['id']
+                $android_version, $fingerprint, $ip, $email, $existing['id']
             );
             $updateStmt->execute();
             $updateStmt->close();
@@ -147,17 +153,17 @@ try {
             ]);
         }
     } else {
-        // Novo dispositivo - vincular
+        // Novo dispositivo - vincular com email
         $insertStmt = $conn->prepare("
             INSERT INTO device_bindings 
-            (user_id, device_id, device_info, android_id, model, manufacturer, 
+            (user_id, email, device_id, device_info, android_id, model, manufacturer, 
              android_version, fingerprint, ip_address, is_active, created_at, last_seen)
             VALUES 
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
         ");
         
-        $insertStmt->bind_param("issssssss", 
-            $user_id, $device_id, $device_info, $android_id, $model, 
+        $insertStmt->bind_param("isssssssss", 
+            $user_id, $email, $device_id, $device_info, $android_id, $model, 
             $manufacturer, $android_version, $fingerprint, $ip
         );
         $insertStmt->execute();
