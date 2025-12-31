@@ -139,43 +139,11 @@ try {
                 'message' => 'Dispositivo atualizado'
             ]);
         } else {
-            // Vinculado a outra conta - TRANSFERIR vinculação para nova conta
-            // Desativar vinculação anterior
-            $deactivateStmt = $conn->prepare("
-                UPDATE device_bindings 
-                SET is_active = 0, 
-                    deactivated_at = NOW(),
-                    deactivated_reason = 'transferred_to_new_user'
-                WHERE id = ?
-            ");
-            $deactivateStmt->bind_param("i", $existing['id']);
-            $deactivateStmt->execute();
-            $deactivateStmt->close();
-            
-            error_log("[DEVICE_BIND] Vinculação anterior desativada, user_id anterior: " . $existing['user_id']);
-            
-            // Criar nova vinculação para o usuário atual
-            $insertStmt = $conn->prepare("
-                INSERT INTO device_bindings 
-                (user_id, device_id, device_info, android_id, model, manufacturer, 
-                 android_version, fingerprint, ip_address, is_active, created_at, last_seen)
-                VALUES 
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
-            ");
-            
-            $insertStmt->bind_param("issssssss", 
-                $user_id, $device_id, $device_info, $android_id, $model, 
-                $manufacturer, $android_version, $fingerprint, $ip
-            );
-            $insertStmt->execute();
-            $insertStmt->close();
-            
-            // Registrar acesso
-            logDeviceAccess($conn, $device_id, $user_id, 'bind_transfer', $device_info, $ip);
-            
+            // Vinculado a outra conta - BLOQUEAR
+            http_response_code(403);
             echo json_encode([
-                'success' => true,
-                'message' => 'Dispositivo transferido para nova conta'
+                'success' => false,
+                'error' => 'Dispositivo já vinculado a outra conta'
             ]);
         }
     } else {
