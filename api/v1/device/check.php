@@ -110,10 +110,11 @@ try {
     
     if ($existing) {
         // Dispositivo já vinculado a uma conta
-        // Determinar o email a ser exibido (prioridade: binding_email > user_email > fallback)
+        // Determinar o email a ser exibido (prioridade: binding_email > user_email)
+        // Se não tiver email, mostrar mensagem genérica ao invés de user_id
         $displayEmail = $existing['binding_email'] 
             ?? $existing['user_email'] 
-            ?? 'user_' . $existing['user_id'];
+            ?? 'Conta já cadastrada';
         
         error_log("[DEVICE_CHECK] Dispositivo vinculado ao usuário: " . $displayEmail);
         error_log("[DEVICE_CHECK] binding_email: " . ($existing['binding_email'] ?? 'NULL'));
