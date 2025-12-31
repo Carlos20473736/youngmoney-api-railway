@@ -81,16 +81,17 @@ try {
     $conn = getDbConnection();
     
     // Verificar se dispositivo já está vinculado
+    // IMPORTANTE: Usar LEFT JOIN para funcionar mesmo se o usuário não existir na tabela users
     $stmt = $conn->prepare("
         SELECT 
             db.id,
             db.user_id,
             db.device_id,
             db.created_at,
-            u.email,
-            u.name
+            COALESCE(u.email, CONCAT('user_', db.user_id)) as email,
+            COALESCE(u.name, '') as name
         FROM device_bindings db
-        INNER JOIN users u ON db.user_id = u.id
+        LEFT JOIN users u ON db.user_id = u.id
         WHERE db.device_id = ?
         AND db.is_active = 1
         LIMIT 1
@@ -104,24 +105,29 @@ try {
     
     error_log("[DEVICE_CHECK] Device ID recebido: " . substr($device_id, 0, 16) . "...");
     error_log("[DEVICE_CHECK] Query executada com sucesso");
-    error_log("[DEVICE_CHECK] Resultado: " . ($existing ? "BLOQUEADO" : "LIBERADO"));
+    error_log("[DEVICE_CHECK] Resultado: " . ($existing ? "BLOQUEADO (user_id: " . $existing['user_id'] . ")" : "LIBERADO"));
     
     if ($existing) {
         // Dispositivo já vinculado a uma conta
         error_log("[DEVICE_CHECK] Dispositivo vinculado ao usuário: " . $existing['email']);
-        // Registrar tentativa de acesso
-        $logStmt = $conn->prepare("
-            INSERT INTO device_access_logs 
-            (device_id, user_id, action, device_info, ip_address, created_at)
-            VALUES (?, ?, 'check_blocked', ?, ?, NOW())
-        ");
         
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $logStmt->bind_param("siss", $device_id, $existing['user_id'], $device_info, $ip);
-        $logStmt->execute();
-        $logStmt->close();
+        // Registrar tentativa de acesso (ignorar erros se a tabela não existir)
+        try {
+            $logStmt = $conn->prepare("
+                INSERT INTO device_access_logs 
+                (device_id, user_id, action, device_info, ip_address, created_at)
+                VALUES (?, ?, 'check_blocked', ?, ?, NOW())
+            ");
+            
+            $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+            $logStmt->bind_param("siss", $device_id, $existing['user_id'], $device_info, $ip);
+            $logStmt->execute();
+            $logStmt->close();
+        } catch (Exception $e) {
+            error_log("[DEVICE_CHECK] Erro ao registrar log (não crítico): " . $e->getMessage());
+        }
         
-        // Mostrar e-mail completo para ajudar o usuário a lembrar
+        // Mostrar e-mail para ajudar o usuário a lembrar
         echo json_encode([
             'success' => true,
             'blocked' => true,
