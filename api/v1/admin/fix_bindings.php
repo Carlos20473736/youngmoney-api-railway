@@ -45,15 +45,14 @@ try {
     
     $result['steps'][] = 'Estado atual verificado';
     
-    // 2. Encontrar o registro mais antigo de cada device_id
+    // 2. Encontrar o registro mais antigo de cada device_id (SEM depender da tabela users)
     $query = "
         SELECT 
             db1.id,
             db1.device_id,
             db1.user_id,
-            u.email
+            db1.created_at
         FROM device_bindings db1
-        INNER JOIN users u ON db1.user_id = u.id
         WHERE db1.id = (
             SELECT MIN(db2.id) 
             FROM device_bindings db2 
@@ -87,8 +86,9 @@ try {
         $reactivated++;
         $reactivatedList[] = [
             'id' => $binding['id'],
-            'email' => $binding['email'],
-            'device_id_prefix' => substr($binding['device_id'], 0, 16) . '...'
+            'user_id' => $binding['user_id'],
+            'device_id_prefix' => substr($binding['device_id'], 0, 16) . '...',
+            'created_at' => $binding['created_at']
         ];
     }
     
@@ -106,6 +106,20 @@ try {
     $result['after']['inactive'] = (int)$row['inactive'];
     
     $result['steps'][] = 'Verificação final concluída';
+    
+    // 6. Listar todos os registros para debug
+    $res = $conn->query("SELECT id, device_id, user_id, is_active, created_at FROM device_bindings ORDER BY id");
+    $allBindings = [];
+    while ($row = $res->fetch_assoc()) {
+        $allBindings[] = [
+            'id' => $row['id'],
+            'device_id_prefix' => substr($row['device_id'], 0, 16) . '...',
+            'user_id' => $row['user_id'],
+            'is_active' => $row['is_active'],
+            'created_at' => $row['created_at']
+        ];
+    }
+    $result['all_bindings'] = $allBindings;
     
     $conn->close();
     
