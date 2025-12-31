@@ -67,7 +67,7 @@ try {
     // Inclui receipt_url se existir na tabela
     $stmt = $conn->prepare("
         SELECT w.id, w.amount, w.created_at, w.updated_at, w.receipt_url,
-               u.email, u.profile_picture, u.photo_url
+               u.email, u.profile_picture, u.photo_url, u.username
         FROM withdrawals w
         INNER JOIN users u ON w.user_id = u.id
         WHERE w.status IN ('approved', 'completed')
@@ -91,7 +91,7 @@ try {
             'amount' => (float)$row['amount'],
             'email' => maskEmail($row['email']),
             'photo_url' => $photoUrl,
-            'receipt_url' => $row['receipt_url'] ?? null,
+            'receipt_url' => $row['receipt_url'] ?? null,            'username' => $row['username'] ?? null,
             'created_at' => $paymentDate
         ];
     }
