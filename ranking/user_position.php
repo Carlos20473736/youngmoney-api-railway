@@ -26,6 +26,22 @@ try {
     date_default_timezone_set('America/Sao_Paulo');
     $now = date('Y-m-d H:i:s');
     
+    // Criar tabela de cooldowns se não existir
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS ranking_cooldowns (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            position INT NOT NULL,
+            prize_amount DECIMAL(10,2) NOT NULL,
+            cooldown_days INT NOT NULL,
+            cooldown_until DATETIME NOT NULL,
+            reset_date DATE NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_cooldown (user_id, cooldown_until),
+            INDEX idx_cooldown_until (cooldown_until)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    
     // ============================================
     // VERIFICAR SE USUÁRIO ESTÁ EM COOLDOWN
     // ============================================
