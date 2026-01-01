@@ -3,6 +3,7 @@
  * Ranking List Endpoint
  * GET - Retorna lista do ranking de usuários por pontos
  * IMPORTANTE: Só mostra usuários que têm chave PIX cadastrada
+ * IMPORTANTE: Exclui usuários em período de cooldown
  */
 
 header('Content-Type: application/json');
@@ -28,20 +29,27 @@ try {
         sendUnauthorizedError();
     }
     
+    // Configurar timezone
+    date_default_timezone_set('America/Sao_Paulo');
+    $now = date('Y-m-d H:i:s');
+    
     // Obter limite (padrão: 100)
     $limit = isset($_GET['limit']) ? min((int)$_GET['limit'], 100) : 100;
     
     // Buscar ranking (pontos diários) - APENAS usuários com chave PIX cadastrada
+    // EXCLUI usuários em período de cooldown
     $stmt = $conn->prepare("
-        SELECT id, name, profile_picture, daily_points as points
-        FROM users 
-        WHERE daily_points > 0 
-          AND pix_key IS NOT NULL 
-          AND pix_key != ''
-        ORDER BY daily_points DESC, created_at ASC
+        SELECT u.id, u.name, u.profile_picture, u.daily_points as points
+        FROM users u
+        LEFT JOIN ranking_cooldowns rc ON u.id = rc.user_id AND rc.cooldown_until > ?
+        WHERE u.daily_points > 0 
+          AND u.pix_key IS NOT NULL 
+          AND u.pix_key != ''
+          AND rc.id IS NULL
+        ORDER BY u.daily_points DESC, u.created_at ASC
         LIMIT ?
     ");
-    $stmt->bind_param("i", $limit);
+    $stmt->bind_param("si", $now, $limit);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -62,7 +70,6 @@ try {
     $conn->close();
     
     // Determinar saudação baseada no horário (GMT-3)
-    date_default_timezone_set('America/Sao_Paulo');
     $hour = (int)date('H');
     
     if ($hour >= 5 && $hour < 12) {

@@ -8,6 +8,10 @@
  * 1. Ranking (daily_points = 0)
  * 2. Spin (DELETE registros de HOJE)
  * 3. Check-in (Atualiza last_reset_datetime - histórico preservado)
+ * 
+ * NOVO: Sistema de Cooldown para vencedores do ranking
+ * - Top 1, 2, 3: 2 dias de cooldown
+ * - Top 4 a 10: 1 dia de cooldown
  */
 
 header('Content-Type: application/json');
@@ -98,6 +102,24 @@ try {
     $mysqli->begin_transaction();
     
     // ============================================
+    // CRIAR TABELA DE COOLDOWNS SE NÃO EXISTIR
+    // ============================================
+    $mysqli->query("
+        CREATE TABLE IF NOT EXISTS ranking_cooldowns (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            position INT NOT NULL COMMENT 'Posição no ranking quando ganhou',
+            prize_amount DECIMAL(10,2) NOT NULL COMMENT 'Valor do prêmio recebido',
+            cooldown_days INT NOT NULL COMMENT 'Dias de cooldown (1 ou 2)',
+            cooldown_until DATETIME NOT NULL COMMENT 'Data/hora até quando está bloqueado',
+            reset_date DATE NOT NULL COMMENT 'Data do reset que gerou o cooldown',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_user_cooldown (user_id, cooldown_until),
+            INDEX idx_cooldown_until (cooldown_until)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+    
+    // ============================================
     // 0. PAGAR PRÊMIOS DO RANKING (Top 10)
     // ============================================
     
@@ -115,6 +137,21 @@ try {
         10 => 1.00   // 10º lugar: R$ 1,00
     ];
     
+    // Dias de cooldown por posição
+    // Top 1-3: 2 dias | Top 4-10: 1 dia
+    $cooldownDays = [
+        1 => 2,
+        2 => 2,
+        3 => 2,
+        4 => 1,
+        5 => 1,
+        6 => 1,
+        7 => 1,
+        8 => 1,
+        9 => 1,
+        10 => 1
+    ];
+    
     // Buscar Top 10 do ranking (apenas usuários com pontos > 0)
     $topRankingResult = $mysqli->query("
         SELECT id, name, email, daily_points, pix_key, pix_key_type 
@@ -125,10 +162,12 @@ try {
     ");
     
     $prizesAwarded = [];
+    $cooldownsCreated = [];
     $position = 1;
     
     while ($user = $topRankingResult->fetch_assoc()) {
         $prizeAmount = $rankingPrizes[$position] ?? 0;
+        $userCooldownDays = $cooldownDays[$position] ?? 1;
         
         if ($prizeAmount > 0) {
             // Verificar se usuário tem PIX cadastrado
@@ -155,7 +194,8 @@ try {
                     'points' => $user['daily_points'],
                     'prize' => $prizeAmount,
                     'status' => 'withdrawal_created',
-                    'pix_key' => substr($user['pix_key'], 0, 4) . '****' // Mascarar PIX
+                    'pix_key' => substr($user['pix_key'], 0, 4) . '****', // Mascarar PIX
+                    'cooldown_days' => $userCooldownDays
                 ];
             } else {
                 // Usuário sem PIX - converter prêmio em pontos (R$ 1,00 = 10.000 pontos)
@@ -181,9 +221,38 @@ try {
                     'points' => $user['daily_points'],
                     'prize' => $prizeAmount,
                     'status' => 'converted_to_points',
-                    'points_bonus' => $pointsBonus
+                    'points_bonus' => $pointsBonus,
+                    'cooldown_days' => $userCooldownDays
                 ];
             }
+            
+            // ============================================
+            // REGISTRAR COOLDOWN PARA O VENCEDOR
+            // ============================================
+            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownDays} days"));
+            
+            $stmt = $mysqli->prepare("
+                INSERT INTO ranking_cooldowns 
+                (user_id, position, prize_amount, cooldown_days, cooldown_until, reset_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->bind_param("iidiss", 
+                $user['id'], 
+                $position, 
+                $prizeAmount, 
+                $userCooldownDays, 
+                $cooldownUntil, 
+                $current_date
+            );
+            $stmt->execute();
+            
+            $cooldownsCreated[] = [
+                'user_id' => $user['id'],
+                'name' => $user['name'],
+                'position' => $position,
+                'cooldown_days' => $userCooldownDays,
+                'cooldown_until' => $cooldownUntil
+            ];
         }
         
         $position++;
@@ -197,7 +266,8 @@ try {
     // 2. SPIN - Deletar registros de HOJE
     $spinsDeleted = $mysqli->query("DELETE FROM spin_history WHERE DATE(created_at) = '$current_date'");
     $spinsDeletedCount = $mysqli->affected_rows;
-        // 3. CHECK-IN - Atualizar last_reset_datetime (histórico preservado)
+    
+    // 3. CHECK-IN - Atualizar last_reset_datetime (histórico preservado)
     $stmt = $mysqli->prepare("
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
         VALUES ('last_reset_datetime', ?, NOW())
@@ -280,6 +350,11 @@ try {
                 'total_awarded' => count($prizesAwarded),
                 'details' => $prizesAwarded,
                 'description' => 'Prêmios do ranking pagos antes do reset'
+            ],
+            'cooldowns' => [
+                'total_created' => count($cooldownsCreated),
+                'details' => $cooldownsCreated,
+                'description' => 'Cooldowns aplicados: Top 1-3 = 2 dias, Top 4-10 = 1 dia'
             ],
             'ranking' => [
                 'users_affected' => $usersAffected,
