@@ -7,10 +7,15 @@
  * 
  * Endpoint: GET /api/v1/security/allowed-installers.php
  * 
+ * Comportamento:
+ * - Se allow_any_installer = true: retorna ["*"] (qualquer instalador é permitido)
+ * - Se allow_any_installer = false: retorna apenas ["com.android.vending"] (Play Store)
+ * 
  * Resposta:
  * {
  *   "success": true,
- *   "installers": ["com.android.vending", "com.android.shell", "adb"],
+ *   "installers": ["com.android.vending"] ou ["*"],
+ *   "allow_any": true/false,
  *   "timestamp": 1234567890
  * }
  */
@@ -44,39 +49,56 @@ try {
     // Conectar ao banco de dados
     $pdo = getPDOConnection();
     
-    // Buscar instaladores ativos da tabela allowed_installers
-    $stmt = $pdo->prepare("
-        SELECT package_name 
-        FROM allowed_installers 
-        WHERE is_active = 1 OR is_active = TRUE
-        ORDER BY id ASC
-    ");
-    $stmt->execute();
+    // Verificar se a configuração allow_any_installer existe na tabela system_settings
+    $allowAny = false;
     
-    $installers = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $installers[] = $row['package_name'];
+    try {
+        $stmt = $pdo->prepare("
+            SELECT setting_value 
+            FROM system_settings 
+            WHERE setting_key = 'allow_any_installer'
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result) {
+            // Converter para boolean (aceita '1', 'true', 'yes', 'on')
+            $value = strtolower(trim($result['setting_value']));
+            $allowAny = in_array($value, ['1', 'true', 'yes', 'on']);
+        }
+    } catch (PDOException $e) {
+        // Se a tabela não existir ou der erro, usar valor padrão (false)
+        error_log("Erro ao buscar allow_any_installer: " . $e->getMessage());
     }
     
-    // Se não houver instaladores no banco, retornar lista padrão
-    if (empty($installers)) {
-        $installers = ['com.android.vending']; // Google Play Store como padrão
+    // Se permitir qualquer instalador, retornar "*"
+    if ($allowAny) {
+        echo json_encode([
+            'success' => true,
+            'installers' => ['*'],
+            'allow_any' => true,
+            'timestamp' => time() * 1000
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
     }
     
-    // Retornar resposta de sucesso
+    // Caso contrário, retornar apenas Play Store
     echo json_encode([
         'success' => true,
-        'installers' => $installers,
-        'timestamp' => time() * 1000 // Timestamp em milissegundos
+        'installers' => ['com.android.vending'],
+        'allow_any' => false,
+        'timestamp' => time() * 1000
     ], JSON_UNESCAPED_UNICODE);
     
 } catch (PDOException $e) {
     error_log("Erro ao buscar instaladores: " . $e->getMessage());
     
-    // Em caso de erro no banco, retornar lista padrão
+    // Em caso de erro no banco, retornar apenas Play Store (modo seguro)
     echo json_encode([
         'success' => true,
-        'installers' => ['com.android.vending', 'com.android.shell', 'adb'],
+        'installers' => ['com.android.vending'],
+        'allow_any' => false,
         'timestamp' => time() * 1000,
         'fallback' => true
     ], JSON_UNESCAPED_UNICODE);
@@ -88,7 +110,8 @@ try {
     echo json_encode([
         'success' => false,
         'error' => 'Erro interno do servidor',
-        'installers' => ['com.android.vending'], // Fallback mínimo
+        'installers' => ['com.android.vending'],
+        'allow_any' => false,
         'timestamp' => time() * 1000
     ], JSON_UNESCAPED_UNICODE);
 }
