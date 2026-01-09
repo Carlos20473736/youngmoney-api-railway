@@ -206,8 +206,13 @@ switch ($method) {
             $hasUsedInviteCode = ($referralCheck['count'] > 0);
         }
         
-        // Calcular pontos ganhos
-        $pointsEarned = $stats['total'] * $POINTS_INVITER;
+        // Verificar se o código do usuário é especial e obter pontos correspondentes
+        $userCodePoints = getSpecialCodePoints($inviteCode, $SPECIAL_CODES, $POINTS_INVITER, $POINTS_INVITED);
+        $pointsPerInviteForUser = $userCodePoints['inviter'];
+        $pointsForFriendForUser = $userCodePoints['invited'];
+        
+        // Calcular pontos ganhos baseado no tipo de código (especial ou normal)
+        $pointsEarned = $stats['total'] * $pointsPerInviteForUser;
         
         echo json_encode([
             'success' => true,
@@ -215,8 +220,8 @@ switch ($method) {
                 'invite_code' => $inviteCode,
                 'friends_invited' => intval($stats['total']),
                 'points_earned' => $pointsEarned,
-                'points_per_invite' => $POINTS_INVITER,
-                'points_for_friend' => $POINTS_INVITED,
+                'points_per_invite' => $pointsPerInviteForUser,
+                'points_for_friend' => $pointsForFriendForUser,
                 'has_used_invite_code' => $hasUsedInviteCode
             ]
         ]);
