@@ -5,10 +5,11 @@
  * Endpoint: GET /monetag/reset_postback.php
  * 
  * O que faz (TUDO DE UMA VEZ):
- * 1. Deleta todos os eventos de monetag_events (todos os usuários) - RESETA IMPRESSÕES E CLIQUES
- * 2. Reseta contadores de impressões/cliques dos usuários na tabela users
- * 3. Randomiza o número de impressões necessárias (5 a 30)
- * 4. Reseta os giros da roleta (deleta spin_history)
+ * 1. Reseta os dados no servidor monetag-postback-server (impressões e cliques reais)
+ * 2. Deleta todos os eventos de monetag_events (todos os usuários) - RESETA IMPRESSÕES E CLIQUES locais
+ * 3. Reseta contadores de impressões/cliques dos usuários na tabela users
+ * 4. Randomiza o número de impressões necessárias (5 a 30)
+ * 5. Reseta os giros da roleta (deleta spin_history)
  * 
  * Usar no CronJob para resetar TUDO junto
  */
@@ -42,6 +43,58 @@ function sendError($message, $code = 400) {
     exit;
 }
 
+/**
+ * Função para chamar o reset do servidor monetag-postback-server
+ * Este servidor armazena os dados reais de impressões e cliques
+ */
+function resetMonetagPostbackServer() {
+    $url = 'https://monetag-postback-server-production.up.railway.app/api/reset';
+    $token = 'ym_reset_monetag_scheduled_2024_secure';
+    
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url . '?token=' . $token,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ]
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($error) {
+        error_log("Reset Monetag Server Error: " . $error);
+        return [
+            'success' => false,
+            'error' => $error,
+            'http_code' => $httpCode
+        ];
+    }
+    
+    $data = json_decode($response, true);
+    
+    if ($httpCode === 200 && isset($data['success']) && $data['success']) {
+        error_log("Reset Monetag Server: Sucesso - " . json_encode($data));
+        return [
+            'success' => true,
+            'data' => $data['data'] ?? [],
+            'http_code' => $httpCode
+        ];
+    }
+    
+    error_log("Reset Monetag Server Failed: HTTP $httpCode - " . $response);
+    return [
+        'success' => false,
+        'error' => $data['error'] ?? 'Erro desconhecido',
+        'http_code' => $httpCode
+    ];
+}
+
 try {
     $conn = getDbConnection();
     
@@ -54,7 +107,14 @@ try {
     
     $results = [
         'message' => 'Reset completo realizado com sucesso!',
-        'monetag' => [
+        'monetag_server' => [
+            'success' => false,
+            'events_deleted' => 0,
+            'impressions_deleted' => 0,
+            'clicks_deleted' => 0,
+            'users_affected' => 0
+        ],
+        'monetag_local' => [
             'deleted_events' => 0,
             'deleted_impressions' => 0,
             'deleted_clicks' => 0,
@@ -69,7 +129,31 @@ try {
     ];
     
     // ========================================
-    // 1. CONTAR E DELETAR TODOS OS EVENTOS DE MONETAG (IMPRESSÕES E CLIQUES)
+    // 1. RESETAR SERVIDOR MONETAG-POSTBACK-SERVER (DADOS REAIS DE IMPRESSÕES E CLIQUES)
+    // ========================================
+    error_log("Reset Completo: Iniciando reset do servidor monetag-postback-server...");
+    
+    $monetagServerResult = resetMonetagPostbackServer();
+    
+    if ($monetagServerResult['success']) {
+        $serverData = $monetagServerResult['data'];
+        $results['monetag_server'] = [
+            'success' => true,
+            'events_deleted' => $serverData['events_deleted'] ?? 0,
+            'impressions_deleted' => $serverData['impressions_deleted'] ?? 0,
+            'clicks_deleted' => $serverData['clicks_deleted'] ?? 0,
+            'users_affected' => $serverData['users_affected'] ?? 0
+        ];
+        error_log("Reset Completo: Servidor monetag-postback-server resetado com sucesso!");
+        error_log("Reset Completo: Impressões deletadas (servidor): " . ($serverData['impressions_deleted'] ?? 0));
+        error_log("Reset Completo: Cliques deletados (servidor): " . ($serverData['clicks_deleted'] ?? 0));
+    } else {
+        $results['monetag_server']['error'] = $monetagServerResult['error'] ?? 'Erro ao conectar';
+        error_log("Reset Completo: AVISO - Falha ao resetar servidor monetag-postback-server: " . ($monetagServerResult['error'] ?? 'Erro desconhecido'));
+    }
+    
+    // ========================================
+    // 2. CONTAR E DELETAR TODOS OS EVENTOS DE MONETAG LOCAIS (IMPRESSÕES E CLIQUES)
     // ========================================
     
     // Primeiro, contar impressões e cliques separadamente para o log
@@ -78,24 +162,24 @@ try {
     
     if ($count_impressions) {
         $row = $count_impressions->fetch_assoc();
-        $results['monetag']['deleted_impressions'] = (int)($row['total'] ?? 0);
+        $results['monetag_local']['deleted_impressions'] = (int)($row['total'] ?? 0);
     }
     
     if ($count_clicks) {
         $row = $count_clicks->fetch_assoc();
-        $results['monetag']['deleted_clicks'] = (int)($row['total'] ?? 0);
+        $results['monetag_local']['deleted_clicks'] = (int)($row['total'] ?? 0);
     }
     
     // Deletar TODOS os eventos (impressões e cliques)
     $delete_events = $conn->query("DELETE FROM monetag_events");
-    $results['monetag']['deleted_events'] = $conn->affected_rows;
+    $results['monetag_local']['deleted_events'] = $conn->affected_rows;
     
-    error_log("Reset Completo: Deletados {$results['monetag']['deleted_events']} eventos de monetag_events");
-    error_log("Reset Completo: Impressões deletadas: {$results['monetag']['deleted_impressions']}");
-    error_log("Reset Completo: Cliques deletados: {$results['monetag']['deleted_clicks']}");
+    error_log("Reset Completo: Deletados {$results['monetag_local']['deleted_events']} eventos de monetag_events (local)");
+    error_log("Reset Completo: Impressões deletadas (local): {$results['monetag_local']['deleted_impressions']}");
+    error_log("Reset Completo: Cliques deletados (local): {$results['monetag_local']['deleted_clicks']}");
     
     // ========================================
-    // 2. RESETAR CONTADORES DOS USUÁRIOS NA TABELA USERS
+    // 3. RESETAR CONTADORES DOS USUÁRIOS NA TABELA USERS
     // ========================================
     $columns_result = $conn->query("DESCRIBE users");
     $columns = [];
@@ -114,15 +198,15 @@ try {
     if (!empty($updates)) {
         $update_query = 'UPDATE users SET ' . implode(', ', $updates);
         $conn->query($update_query);
-        $results['monetag']['users_reset'] = $conn->affected_rows;
-        error_log("Reset Completo: Resetados contadores de {$results['monetag']['users_reset']} usuários (impressões e cliques zerados)");
+        $results['monetag_local']['users_reset'] = $conn->affected_rows;
+        error_log("Reset Completo: Resetados contadores de {$results['monetag_local']['users_reset']} usuários (impressões e cliques zerados)");
     }
     
     // ========================================
-    // 3. RANDOMIZAR IMPRESSÕES NECESSÁRIAS (5 a 30)
+    // 4. RANDOMIZAR IMPRESSÕES NECESSÁRIAS (5 a 30)
     // ========================================
     $random_impressions = rand(5, 30);
-    $results['monetag']['new_required_impressions'] = $random_impressions;
+    $results['monetag_local']['new_required_impressions'] = $random_impressions;
     
     $check_stmt = $conn->prepare("
         SELECT id FROM roulette_settings 
@@ -154,7 +238,7 @@ try {
     error_log("Reset Completo: Impressões randomizadas para: $random_impressions");
     
     // ========================================
-    // 4. RESETAR ROLETA (DELETAR TODOS OS SPINS)
+    // 5. RESETAR ROLETA (DELETAR TODOS OS SPINS)
     // ========================================
     // Contar quantos spins serão deletados
     $count_result = $conn->query("SELECT COUNT(*) as total FROM spin_history");
