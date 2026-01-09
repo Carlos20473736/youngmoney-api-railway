@@ -141,6 +141,21 @@ $invitePoints = getInvitePoints($conn);
 $POINTS_INVITER = $invitePoints['inviter'];
 $POINTS_INVITED = $invitePoints['invited'];
 
+// Códigos especiais com recompensas diferenciadas
+$SPECIAL_CODES = [
+    'YMFFE928' => ['inviter' => 5000, 'invited' => 3000],
+    'YM4224FE' => ['inviter' => 5000, 'invited' => 3000]
+];
+
+// Função para verificar se é código especial e retornar pontos
+function getSpecialCodePoints($code, $specialCodes, $defaultInviter, $defaultInvited) {
+    $codeUpper = strtoupper(trim($code));
+    if (isset($specialCodes[$codeUpper])) {
+        return $specialCodes[$codeUpper];
+    }
+    return ['inviter' => $defaultInviter, 'invited' => $defaultInvited];
+}
+
 switch ($method) {
     case 'GET':
         // GET /api/v1/invite.php - Obter código de convite e estatísticas do usuário autenticado
@@ -260,6 +275,13 @@ switch ($method) {
             exit;
         }
         
+        // Verificar se é código especial e obter pontos correspondentes
+        $codePoints = getSpecialCodePoints($inviteCode, $SPECIAL_CODES, $POINTS_INVITER, $POINTS_INVITED);
+        $pointsForInviter = $codePoints['inviter'];
+        $pointsForInvited = $codePoints['invited'];
+        
+        error_log("[INVITE] Code: $inviteCode - Inviter gets: $pointsForInviter, Invited gets: $pointsForInvited");
+        
         // Iniciar transação
         $conn->begin_transaction();
         
@@ -272,45 +294,45 @@ switch ($method) {
             
             // Dar pontos para quem convidou
             $stmt = $conn->prepare("UPDATE users SET points = points + ?, daily_points = daily_points + ? WHERE id = ?");
-            $stmt->bind_param("iii", $POINTS_INVITER, $POINTS_INVITER, $inviter['id']);
+            $stmt->bind_param("iii", $pointsForInviter, $pointsForInviter, $inviter['id']);
             $stmt->execute();
             $stmt->close();
             
             // Dar pontos para quem foi convidado e marcar que já usou código
             $stmt = $conn->prepare("UPDATE users SET points = points + ?, daily_points = daily_points + ?, has_used_invite_code = 1 WHERE id = ?");
-            $stmt->bind_param("iii", $POINTS_INVITED, $POINTS_INVITED, $userId);
+            $stmt->bind_param("iii", $pointsForInvited, $pointsForInvited, $userId);
             $stmt->execute();
             $stmt->close();
             
             // Registrar no histórico de pontos - quem foi convidado
-            $descriptionInvited = "Convite - Ganhou {$POINTS_INVITED} pontos";
+            $descriptionInvited = "Convite - Ganhou {$pointsForInvited} pontos";
             $stmt = $conn->prepare("
                 INSERT INTO points_history (user_id, points, description, created_at)
                 VALUES (?, ?, ?, NOW())
             ");
-            $stmt->bind_param("iis", $userId, $POINTS_INVITED, $descriptionInvited);
+            $stmt->bind_param("iis", $userId, $pointsForInvited, $descriptionInvited);
             $stmt->execute();
             $stmt->close();
             
             // Registrar no histórico de pontos - quem convidou
-            $descriptionInviter = "Convite - Ganhou {$POINTS_INVITER} pontos";
+            $descriptionInviter = "Convite - Ganhou {$pointsForInviter} pontos";
             $stmt = $conn->prepare("
                 INSERT INTO points_history (user_id, points, description, created_at)
                 VALUES (?, ?, ?, NOW())
             ");
-            $stmt->bind_param("iis", $inviter['id'], $POINTS_INVITER, $descriptionInviter);
+            $stmt->bind_param("iis", $inviter['id'], $pointsForInviter, $descriptionInviter);
             $stmt->execute();
             $stmt->close();
             
             $conn->commit();
             
-            error_log("[INVITE] Success! User $userId used code from user " . $inviter['id']);
+            error_log("[INVITE] Success! User $userId used code from user " . $inviter['id'] . " - Special code: " . (isset($SPECIAL_CODES[strtoupper($inviteCode)]) ? 'YES' : 'NO'));
             
             echo json_encode([
                 'success' => true,
                 'message' => 'Código validado com sucesso!',
                 'data' => [
-                    'points_earned' => $POINTS_INVITED,
+                    'points_earned' => $pointsForInvited,
                     'inviter_name' => $inviter['name']
                 ]
             ]);
