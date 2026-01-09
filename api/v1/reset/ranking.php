@@ -104,6 +104,7 @@ try {
         ];
         
         // Buscar top 10 do ranking com suas chaves PIX (agora na tabela users)
+        // IMPORTANTE: Apenas usuários com PIX cadastrado participam do ranking
         $stmt = $conn->prepare("
             SELECT 
                 id as user_id,
@@ -114,6 +115,8 @@ try {
                 pix_key
             FROM users
             WHERE daily_points > 0
+              AND pix_key IS NOT NULL 
+              AND pix_key != ''
             ORDER BY daily_points DESC, created_at ASC
             LIMIT 10
         ");
