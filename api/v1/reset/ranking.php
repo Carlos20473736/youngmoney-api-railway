@@ -180,38 +180,33 @@ try {
         
         $stmt->close();
         
-        // PASSO 3: Contar quantos usuários têm daily_points > 0
-        $stmt = $conn->prepare("
-            SELECT COUNT(*) as total 
-            FROM users 
-            WHERE daily_points > 0
-        ");
+        // PASSO 3: Coletar IDs do top 10 para resetar apenas eles
+        $top_10_ids = array_column($top_10_users, 'user_id');
+        $usersAffected = count($top_10_ids);
         
-        if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
+        // PASSO 4: Resetar daily_points para 0 APENAS para o top 10
+        if (!empty($top_10_ids)) {
+            $placeholders = implode(',', array_fill(0, count($top_10_ids), '?'));
+            $stmt = $conn->prepare("
+                UPDATE users 
+                SET daily_points = 0
+                WHERE id IN ($placeholders)
+            ");
+            
+            if (!$stmt) {
+                throw new Exception("Prepare failed: " . $conn->error);
+            }
+            
+            // Bind dos IDs dinamicamente
+            $types = str_repeat('i', count($top_10_ids));
+            $stmt->bind_param($types, ...$top_10_ids);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Execute failed: " . $stmt->error);
+            }
+            
+            $stmt->close();
         }
-        
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $usersAffected = $row['total'] ?? 0;
-        $stmt->close();
-        
-        // PASSO 4: Resetar daily_points para 0 para todos os usuários
-        $stmt = $conn->prepare("
-            UPDATE users 
-            SET daily_points = 0
-        ");
-        
-        if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
-        }
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Execute failed: " . $stmt->error);
-        }
-        
-        $stmt->close();
         
         // Commit da transação
         $conn->commit();
@@ -222,7 +217,7 @@ try {
             'message' => 'Ranking resetado com sucesso! Pagamentos pendentes criados.',
             'data' => [
                 'reset_type' => 'ranking',
-                'description' => 'Todos os usuários tiveram daily_points zerado. Pagamentos pendentes criados para o top 10.',
+                'description' => 'Apenas o top 10 teve daily_points zerado. Demais usuários mantiveram seus pontos. Pagamentos pendentes criados para o top 10.',
                 'users_affected' => $usersAffected,
                 'daily_points_reset_to' => 0,
                 'reset_date' => $current_date,
