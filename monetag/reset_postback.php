@@ -5,8 +5,8 @@
  * Endpoint: GET /monetag/reset_postback.php
  * 
  * O que faz (TUDO DE UMA VEZ):
- * 1. Deleta todos os eventos de monetag_events (todos os usuários)
- * 2. Reseta contadores de impressões/cliques dos usuários
+ * 1. Deleta todos os eventos de monetag_events (todos os usuários) - RESETA IMPRESSÕES E CLIQUES
+ * 2. Reseta contadores de impressões/cliques dos usuários na tabela users
  * 3. Randomiza o número de impressões necessárias (5 a 30)
  * 4. Reseta os giros da roleta (deleta spin_history)
  * 
@@ -56,6 +56,8 @@ try {
         'message' => 'Reset completo realizado com sucesso!',
         'monetag' => [
             'deleted_events' => 0,
+            'deleted_impressions' => 0,
+            'deleted_clicks' => 0,
             'users_reset' => 0,
             'new_required_impressions' => 0
         ],
@@ -67,14 +69,33 @@ try {
     ];
     
     // ========================================
-    // 1. DELETAR TODOS OS EVENTOS DE MONETAG
+    // 1. CONTAR E DELETAR TODOS OS EVENTOS DE MONETAG (IMPRESSÕES E CLIQUES)
     // ========================================
+    
+    // Primeiro, contar impressões e cliques separadamente para o log
+    $count_impressions = $conn->query("SELECT COUNT(*) as total FROM monetag_events WHERE event_type = 'impression'");
+    $count_clicks = $conn->query("SELECT COUNT(*) as total FROM monetag_events WHERE event_type = 'click'");
+    
+    if ($count_impressions) {
+        $row = $count_impressions->fetch_assoc();
+        $results['monetag']['deleted_impressions'] = (int)($row['total'] ?? 0);
+    }
+    
+    if ($count_clicks) {
+        $row = $count_clicks->fetch_assoc();
+        $results['monetag']['deleted_clicks'] = (int)($row['total'] ?? 0);
+    }
+    
+    // Deletar TODOS os eventos (impressões e cliques)
     $delete_events = $conn->query("DELETE FROM monetag_events");
     $results['monetag']['deleted_events'] = $conn->affected_rows;
+    
     error_log("Reset Completo: Deletados {$results['monetag']['deleted_events']} eventos de monetag_events");
+    error_log("Reset Completo: Impressões deletadas: {$results['monetag']['deleted_impressions']}");
+    error_log("Reset Completo: Cliques deletados: {$results['monetag']['deleted_clicks']}");
     
     // ========================================
-    // 2. RESETAR CONTADORES DOS USUÁRIOS
+    // 2. RESETAR CONTADORES DOS USUÁRIOS NA TABELA USERS
     // ========================================
     $columns_result = $conn->query("DESCRIBE users");
     $columns = [];
@@ -94,7 +115,7 @@ try {
         $update_query = 'UPDATE users SET ' . implode(', ', $updates);
         $conn->query($update_query);
         $results['monetag']['users_reset'] = $conn->affected_rows;
-        error_log("Reset Completo: Resetados contadores de {$results['monetag']['users_reset']} usuários");
+        error_log("Reset Completo: Resetados contadores de {$results['monetag']['users_reset']} usuários (impressões e cliques zerados)");
     }
     
     // ========================================
