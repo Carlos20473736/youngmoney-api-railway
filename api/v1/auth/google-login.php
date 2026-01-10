@@ -8,6 +8,7 @@
  * - Cache de dados do usuário
  * - UPDATE condicional
  * - Suporte para requisições criptografadas e JSON puro
+ * - VERIFICAÇÃO DE MODO DE MANUTENÇÃO
  */
 
 header('Content-Type: application/json');
@@ -26,6 +27,49 @@ require_once __DIR__ . '/../../../includes/SecureKeyManager.php';
 require_once __DIR__ . '/../../../includes/DecryptMiddleware.php';
 
 try {
+    // ========================================
+    // VERIFICAR MODO DE MANUTENÇÃO PRIMEIRO
+    // ========================================
+    $conn = getDbConnection();
+    
+    try {
+        $maintenanceStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
+        $maintenanceStmt->execute();
+        $maintenanceResult = $maintenanceStmt->get_result();
+        $maintenanceRow = $maintenanceResult->fetch_assoc();
+        $maintenanceStmt->close();
+        
+        $isMaintenanceMode = ($maintenanceRow && $maintenanceRow['setting_value'] === '1');
+        
+        if ($isMaintenanceMode) {
+            // Buscar mensagem de manutenção personalizada
+            $msgStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_message'");
+            $msgStmt->execute();
+            $msgResult = $msgStmt->get_result();
+            $msgRow = $msgResult->fetch_assoc();
+            $msgStmt->close();
+            
+            $maintenanceMessage = $msgRow ? $msgRow['setting_value'] : 'Servidor em manutenção. Tente novamente mais tarde.';
+            
+            error_log("[GOOGLE-LOGIN] MODO DE MANUTENÇÃO ATIVO - Bloqueando login");
+            
+            http_response_code(503);
+            echo json_encode([
+                'status' => 'error',
+                'maintenance' => true,
+                'maintenance_message' => $maintenanceMessage,
+                'message' => $maintenanceMessage
+            ]);
+            
+            $conn->close();
+            exit;
+        }
+    } catch (Exception $e) {
+        // Se falhar a verificação de manutenção, continuar normalmente
+        error_log("[GOOGLE-LOGIN] Erro ao verificar manutenção (não crítico): " . $e->getMessage());
+    }
+    // ========================================
+
     // 1. PROCESSAR REQUISIÇÃO - ACEITA TÚNEL SEGURO OU JSON PURO
     $data = null;
     
@@ -75,9 +119,6 @@ try {
         echo json_encode(['status' => 'error', 'message' => 'Não foi possível extrair dados do token do Google']);
         exit;
     }
-    
-    // 4. CONECTAR AO BANCO (conexão única)
-    $conn = getDbConnection();
     
     // 5. GERAR DADOS CRIPTOGRÁFICOS (antes do banco para paralelizar)
     $masterSeed = SecureKeyManager::generateMasterSeed();
