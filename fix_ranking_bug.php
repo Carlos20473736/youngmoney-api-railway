@@ -5,6 +5,7 @@
  * Usuários a corrigir:
  * - marcosfernandes1058@gmail.com -> 302.040 pontos
  * - palmeirinhas12@gmail.com -> 117.998 pontos
+ * - ajesmare@gmail.com -> 190.000 pontos
  * 
  * Executar via: GET /fix_ranking_bug.php?token=fix_ranking_bug_2026
  */
@@ -31,7 +32,8 @@ if (!$conn) {
 // Lista de usuários a corrigir
 $usersToFix = [
     ['email' => 'marcosfernandes1058@gmail.com', 'new_points' => 302040],
-    ['email' => 'palmeirinhas12@gmail.com', 'new_points' => 117998]
+    ['email' => 'palmeirinhas12@gmail.com', 'new_points' => 117998],
+    ['email' => 'ajesmare@gmail.com', 'new_points' => 190000]
 ];
 
 $results = [];
