@@ -13,9 +13,22 @@
  * - Progress bar começa zerado em cada level
  */
 
-// Incluir configurações do banco de dados
-require_once __DIR__ . '/../../../db_config.php';
-require_once __DIR__ . '/../../../includes/auth_helper.php';
+// Tratamento de erros
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => "PHP Error: $errstr in $errfile:$errline"]);
+    exit;
+});
+
+try {
+    // Incluir configurações do banco de dados
+    require_once __DIR__ . '/../../../db_config.php';
+    require_once __DIR__ . '/../../../includes/auth_helper.php';
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Include error: ' . $e->getMessage()]);
+    exit;
+}
 
 // Headers CORS
 header('Content-Type: application/json');
@@ -29,10 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Conectar ao banco de dados
-$conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-
-if ($conn->connect_error) {
+// Conectar ao banco de dados usando a função helper correta
+$conn = getMySQLiConnection();
+if (!$conn) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Database connection failed']);
     exit;
@@ -47,8 +59,7 @@ $createTableSQL = "CREATE TABLE IF NOT EXISTS game_levels (
     last_level_score INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_user_id (user_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
 $conn->query($createTableSQL);
@@ -129,6 +140,7 @@ if ($method === 'GET') {
     $result = $stmt->get_result();
     
     $pointsAdded = 0;
+    $newHighest = $newLevel;
     
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
@@ -152,7 +164,7 @@ if ($method === 'GET') {
     }
     
     // ========================================
-    // NOVA LÓGICA: ADICIONAR PONTOS À CONTA DO USUÁRIO
+    // ADICIONAR PONTOS À CONTA DO USUÁRIO
     // ========================================
     if ($lastLevelScore > 0) {
         $pointsAdded = $lastLevelScore;
@@ -190,7 +202,7 @@ if ($method === 'GET') {
         'data' => [
             'user_id' => $userId,
             'level' => $newLevel,
-            'highest_level' => $newHighest ?? $newLevel,
+            'highest_level' => $newHighest,
             'last_level_score' => $lastLevelScore,
             'points_added' => $pointsAdded,
             'daily_points' => $dailyPoints,
