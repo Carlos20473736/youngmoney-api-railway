@@ -12,6 +12,7 @@
  * - Ao iniciar um novo level, mostra os pontos do level anterior
  * - Progress bar começa zerado em cada level
  * - CORREÇÃO: Agora credita os pontos ao usuário quando o level termina
+ * - CORREÇÃO: Lê o body corretamente quando passa pelo secure.php
  */
 
 // Incluir configurações do banco de dados
@@ -109,17 +110,25 @@ if ($method === 'GET') {
     $stmt->close();
     
 } elseif ($method === 'POST') {
-    // Atualizar level e pontos do usuário
-    $input = json_decode(file_get_contents('php://input'), true);
+    // CORREÇÃO: Ler body da variável global (quando passa pelo secure.php) ou do php://input
+    $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
+    $input = json_decode($rawBody, true);
+    
+    // Log para debug
+    error_log("[LEVEL.PHP] Raw body: " . $rawBody);
+    error_log("[LEVEL.PHP] Input parsed: " . json_encode($input));
     
     if (!isset($input['level']) || !is_numeric($input['level'])) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Level is required and must be a number']);
+        echo json_encode(['success' => false, 'error' => 'Level is required and must be a number', 'debug_raw_body' => $rawBody]);
         exit;
     }
     
     $newLevel = (int)$input['level'];
     $lastLevelScore = isset($input['last_level_score']) ? (int)$input['last_level_score'] : 0;
+    
+    // Log para debug
+    error_log("[LEVEL.PHP] New level: $newLevel, Last level score: $lastLevelScore");
     
     if ($newLevel < 1) {
         http_response_code(400);
@@ -164,6 +173,8 @@ if ($method === 'GET') {
                 $stmtHistory->bind_param("iis", $userId, $pointsAdded, $description);
                 $stmtHistory->execute();
                 $stmtHistory->close();
+                
+                error_log("[LEVEL.PHP] Points added to user $userId: $pointsAdded");
             }
             
             // Buscar pontos atualizados do usuário
@@ -220,6 +231,8 @@ if ($method === 'GET') {
                 $stmtHistory->bind_param("iis", $userId, $pointsAdded, $description);
                 $stmtHistory->execute();
                 $stmtHistory->close();
+                
+                error_log("[LEVEL.PHP] Points added to new user $userId: $pointsAdded");
             }
             
             // Buscar pontos atualizados do usuário
