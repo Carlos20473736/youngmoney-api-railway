@@ -61,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Lista de emails de administradores que podem logar durante manutenção
 $ADMIN_EMAILS = [
     'soltacartatigri@gmail.com'
+    'muriel25herrera@gmail.com'
 ];
 
 // Carregar configuração do banco
