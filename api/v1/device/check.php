@@ -7,6 +7,8 @@
  * Verifica se um dispositivo já está vinculado a uma conta existente.
  * Deve ser chamado ANTES do login para impedir múltiplas contas por dispositivo.
  * 
+ * TAMBÉM VERIFICA MODO DE MANUTENÇÃO
+ * 
  * NÃO REQUER AUTENTICAÇÃO
  * 
  * Request Body:
@@ -16,12 +18,20 @@
  *   "action": "check"
  * }
  * 
- * Response:
+ * Response (normal):
  * {
  *   "success": true,
  *   "blocked": false,           // true se dispositivo já vinculado a outra conta
  *   "existing_email": "",       // email da conta existente (se bloqueado)
  *   "message": "Dispositivo liberado"
+ * }
+ * 
+ * Response (manutenção):
+ * {
+ *   "success": false,
+ *   "maintenance": true,
+ *   "maintenance_message": "Servidor em manutenção...",
+ *   "message": "Servidor em manutenção"
  * }
  */
 
@@ -51,6 +61,59 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../../../database.php';
 
 try {
+    // Conectar ao banco
+    $conn = getDbConnection();
+    
+    // ========================================
+    // VERIFICAR MODO DE MANUTENÇÃO
+    // ========================================
+    try {
+        // Criar tabela de configurações do sistema se não existir
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS system_settings (
+                setting_key VARCHAR(100) PRIMARY KEY,
+                setting_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        
+        // Verificar se está em modo de manutenção
+        $maintenanceStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
+        $maintenanceStmt->execute();
+        $maintenanceResult = $maintenanceStmt->get_result();
+        $maintenanceRow = $maintenanceResult->fetch_assoc();
+        $maintenanceStmt->close();
+        
+        $isMaintenanceMode = ($maintenanceRow && $maintenanceRow['setting_value'] === '1');
+        
+        if ($isMaintenanceMode) {
+            // Buscar mensagem de manutenção personalizada
+            $msgStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_message'");
+            $msgStmt->execute();
+            $msgResult = $msgStmt->get_result();
+            $msgRow = $msgResult->fetch_assoc();
+            $msgStmt->close();
+            
+            $maintenanceMessage = $msgRow ? $msgRow['setting_value'] : 'Servidor em manutenção. Tente novamente mais tarde.';
+            
+            error_log("[DEVICE_CHECK] MODO DE MANUTENÇÃO ATIVO - Bloqueando acesso");
+            
+            echo json_encode([
+                'success' => false,
+                'maintenance' => true,
+                'maintenance_message' => $maintenanceMessage,
+                'message' => 'Servidor em manutenção'
+            ]);
+            
+            $conn->close();
+            exit;
+        }
+    } catch (Exception $e) {
+        // Se falhar a verificação de manutenção, continuar normalmente
+        error_log("[DEVICE_CHECK] Erro ao verificar manutenção (não crítico): " . $e->getMessage());
+    }
+    // ========================================
+    
     // Ler body da requisição (suporta túnel criptografado)
     $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
     $input = json_decode($rawBody, true);
@@ -76,9 +139,6 @@ try {
         echo json_encode(['success' => false, 'error' => 'device_id inválido']);
         exit;
     }
-    
-    // Conectar ao banco
-    $conn = getDbConnection();
     
     // Verificar se dispositivo já está vinculado
     // Prioridade: 1) email da tabela device_bindings, 2) email da tabela users, 3) fallback user_id
