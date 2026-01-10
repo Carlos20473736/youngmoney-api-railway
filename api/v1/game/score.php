@@ -16,6 +16,7 @@
 
 // Tratamento de erros
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("[SCORE.PHP] PHP Error: $errstr in $errfile:$errline");
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => "PHP Error: $errstr in $errfile:$errline"]);
     exit;
@@ -62,6 +63,8 @@ if (!$user) {
 $userId = $user['id'];
 $method = $_SERVER['REQUEST_METHOD'];
 
+error_log("[SCORE.PHP] User ID: $userId, Method: $method");
+
 if ($method !== 'POST') {
     http_response_code(405);
     echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
@@ -73,13 +76,18 @@ if ($method !== 'POST') {
 $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
 $input = json_decode($rawBody, true);
 
+error_log("[SCORE.PHP] Raw body: $rawBody");
+error_log("[SCORE.PHP] Input: " . json_encode($input));
+
 if (!isset($input['score']) || !is_numeric($input['score'])) {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Score is required and must be a number']);
+    echo json_encode(['status' => 'error', 'message' => 'Score is required and must be a number', 'debug_raw_body' => $rawBody]);
     exit;
 }
 
 $newScore = intval($input['score']);
+
+error_log("[SCORE.PHP] New score received: $newScore");
 
 // Criar tabela de histórico de scores do Candy se não existir
 $createTableSQL = "CREATE TABLE IF NOT EXISTS candy_scores (
@@ -113,6 +121,8 @@ try {
     }
     $stmt->close();
     
+    error_log("[SCORE.PHP] Previous best score: $previousBest, New score: $newScore");
+    
     // Registrar o score no histórico (sempre)
     $stmt = $conn->prepare("INSERT INTO candy_scores (user_id, score) VALUES (?, ?)");
     $stmt->bind_param("ii", $userId, $newScore);
@@ -121,6 +131,8 @@ try {
     
     // Verificar se o novo score é maior que o anterior
     if ($newScore > $previousBest) {
+        error_log("[SCORE.PHP] New score is GREATER than previous best! Adding points...");
+        
         // Atualizar ou inserir o melhor score
         $stmt = $conn->prepare("INSERT INTO candy_best_scores (user_id, best_score) VALUES (?, ?) 
                                 ON DUPLICATE KEY UPDATE best_score = ?");
@@ -131,29 +143,41 @@ try {
         // Calcular pontos a adicionar (diferença entre novo e anterior)
         $pointsToAdd = $newScore - $previousBest;
         
+        error_log("[SCORE.PHP] Points to add: $pointsToAdd");
+        
         // Adicionar pontos ao ranking do usuário (daily_points para o ranking diário)
         $stmt = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
         $stmt->bind_param("iii", $pointsToAdd, $pointsToAdd, $userId);
         $stmt->execute();
+        $affectedRows = $stmt->affected_rows;
         $stmt->close();
+        
+        error_log("[SCORE.PHP] UPDATE users affected rows: $affectedRows");
         
         // Registrar no histórico de pontos
         $description = "Candy Crush - Novo recorde: " . $newScore . " (anterior: " . $previousBest . ")";
         $stmt = $conn->prepare("INSERT INTO points_history (user_id, points, description, created_at) VALUES (?, ?, ?, NOW())");
         $stmt->bind_param("iis", $userId, $pointsToAdd, $description);
         $stmt->execute();
+        $historyInserted = $stmt->affected_rows;
         $stmt->close();
         
+        error_log("[SCORE.PHP] INSERT points_history affected rows: $historyInserted");
+        
         // Buscar pontos atualizados do usuário
-        $stmt = $conn->prepare("SELECT points FROM users WHERE id = ?");
+        $stmt = $conn->prepare("SELECT points, daily_points FROM users WHERE id = ?");
         $stmt->bind_param("i", $userId);
         $stmt->execute();
         $result = $stmt->get_result();
         $userPoints = 0;
+        $dailyPoints = 0;
         if ($row = $result->fetch_assoc()) {
             $userPoints = intval($row['points']);
+            $dailyPoints = intval($row['daily_points']);
         }
         $stmt->close();
+        
+        error_log("[SCORE.PHP] Final - Total points: $userPoints, Daily points: $dailyPoints");
         
         echo json_encode([
             'status' => 'success',
@@ -163,11 +187,14 @@ try {
                 'previous_best' => $previousBest,
                 'points_added' => $pointsToAdd,
                 'total_points' => $userPoints,
+                'daily_points' => $dailyPoints,
                 'message' => 'Novo recorde! Pontuação adicionada ao ranking.'
             ]
         ]);
         
     } else {
+        error_log("[SCORE.PHP] New score ($newScore) is NOT greater than previous best ($previousBest). No points added.");
+        
         // Score menor ou igual ao anterior - não adiciona pontos
         echo json_encode([
             'status' => 'success',
@@ -182,6 +209,7 @@ try {
     }
     
 } catch (Exception $e) {
+    error_log("[SCORE.PHP] Exception: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
