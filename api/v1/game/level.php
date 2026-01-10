@@ -5,11 +5,11 @@
  * Gerencia os levels e pontos dos usuários no jogo Candy
  * 
  * GET: Busca o level atual e pontos do level anterior (last_level_score)
- * POST: Atualiza o level e salva os pontos do level que passou
+ * POST: Atualiza o level, salva os pontos do level que passou E ADICIONA OS PONTOS À CONTA DO USUÁRIO
  * 
  * NOVA LÓGICA:
  * - last_level_score = pontos que o usuário fez no ÚLTIMO level completado
- * - Ao iniciar um novo level, mostra os pontos do level anterior
+ * - Ao passar de level, os pontos são AUTOMATICAMENTE adicionados à conta do usuário
  * - Progress bar começa zerado em cada level
  */
 
@@ -103,7 +103,9 @@ if ($method === 'GET') {
     
 } elseif ($method === 'POST') {
     // Atualizar level e pontos do usuário
-    $input = json_decode(file_get_contents('php://input'), true);
+    // Ler body da variável global (quando passa pelo secure.php) ou do php://input
+    $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
+    $input = json_decode($rawBody, true);
     
     if (!isset($input['level']) || !is_numeric($input['level'])) {
         http_response_code(400);
@@ -126,6 +128,8 @@ if ($method === 'GET') {
     $stmt->execute();
     $result = $stmt->get_result();
     
+    $pointsAdded = 0;
+    
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         $currentHighest = (int)$row['highest_level'];
@@ -135,45 +139,64 @@ if ($method === 'GET') {
         $stmt->close();
         $stmt = $conn->prepare("UPDATE game_levels SET level = ?, highest_level = ?, last_level_score = ? WHERE user_id = ?");
         $stmt->bind_param("iiii", $newLevel, $newHighest, $lastLevelScore, $userId);
+        $stmt->execute();
+        $stmt->close();
         
-        if ($stmt->execute()) {
-            echo json_encode([
-                'success' => true,
-                'message' => 'Level updated successfully',
-                'data' => [
-                    'user_id' => $userId,
-                    'level' => $newLevel,
-                    'highest_level' => $newHighest,
-                    'last_level_score' => $lastLevelScore
-                ]
-            ]);
-        } else {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to update level']);
-        }
     } else {
         // Inserir novo registro
         $stmt->close();
         $stmt = $conn->prepare("INSERT INTO game_levels (user_id, level, highest_level, last_level_score) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("iiii", $userId, $newLevel, $newLevel, $lastLevelScore);
+        $stmt->execute();
+        $stmt->close();
+    }
+    
+    // ========================================
+    // NOVA LÓGICA: ADICIONAR PONTOS À CONTA DO USUÁRIO
+    // ========================================
+    if ($lastLevelScore > 0) {
+        $pointsAdded = $lastLevelScore;
         
-        if ($stmt->execute()) {
-            echo json_encode([
-                'success' => true,
-                'message' => 'Level created successfully',
-                'data' => [
-                    'user_id' => $userId,
-                    'level' => $newLevel,
-                    'highest_level' => $newLevel,
-                    'last_level_score' => $lastLevelScore
-                ]
-            ]);
-        } else {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'Failed to create level record']);
-        }
+        // Adicionar pontos ao ranking do usuário (daily_points para o ranking diário)
+        $stmt = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
+        $stmt->bind_param("iii", $pointsAdded, $pointsAdded, $userId);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Registrar no histórico de pontos
+        $description = "Candy Crush - Level " . ($newLevel - 1) . " completado: " . $pointsAdded . " pontos";
+        $stmt = $conn->prepare("INSERT INTO points_history (user_id, points, description, created_at) VALUES (?, ?, ?, NOW())");
+        $stmt->bind_param("iis", $userId, $pointsAdded, $description);
+        $stmt->execute();
+        $stmt->close();
+    }
+    
+    // Buscar pontos atualizados do usuário
+    $stmt = $conn->prepare("SELECT points, daily_points FROM users WHERE id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $userPoints = 0;
+    $dailyPoints = 0;
+    if ($row = $result->fetch_assoc()) {
+        $userPoints = intval($row['points']);
+        $dailyPoints = intval($row['daily_points']);
     }
     $stmt->close();
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Level updated successfully',
+        'data' => [
+            'user_id' => $userId,
+            'level' => $newLevel,
+            'highest_level' => $newHighest ?? $newLevel,
+            'last_level_score' => $lastLevelScore,
+            'points_added' => $pointsAdded,
+            'daily_points' => $dailyPoints,
+            'total_points' => $userPoints
+        ]
+    ]);
     
 } else {
     http_response_code(405);
