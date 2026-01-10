@@ -2,14 +2,30 @@
 /**
  * Endpoint para pontuação do Candy Crush
  * 
- * NOVA LÓGICA: A pontuação de cada partida é SEMPRE adicionada ao ranking.
- * A pontuação zera a cada level, mas os pontos ganhos vão para o ranking.
+ * LÓGICA ATUALIZADA:
+ * - A pontuação de cada partida é SEMPRE adicionada ao ranking
+ * - Cada level tem uma meta de pontuação (target_score)
+ * - O jogador acumula pontos até atingir a meta do level
+ * - Quando atinge a meta, pode passar de level
+ * - Os pontos vão para o ranking independente de passar ou não
  * 
  * POST /api/v1/game/score.php
- * Body: { "score": 200 }
+ * Body: { "score": 200, "level": 1 }
  * 
- * Resposta sucesso:
- * { "status": "success", "data": { "added": true, "score": 200, "points_added": 200, "daily_points": 350, "total_points": 1000 } }
+ * Resposta:
+ * { 
+ *   "status": "success", 
+ *   "data": { 
+ *     "added": true, 
+ *     "score": 200, 
+ *     "points_added": 200,
+ *     "level_progress": 1200,
+ *     "target_score": 1000,
+ *     "can_advance": true,
+ *     "daily_points": 350, 
+ *     "total_points": 1000 
+ *   } 
+ * }
  */
 
 // Tratamento de erros
@@ -70,7 +86,6 @@ if ($method !== 'POST') {
 }
 
 // Obter dados do body
-// Ler body da variável global (quando passa pelo secure.php) ou do php://input
 $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
 $input = json_decode($rawBody, true);
 
@@ -84,13 +99,39 @@ if (!isset($input['score']) || !is_numeric($input['score'])) {
 }
 
 $newScore = intval($input['score']);
+$currentLevel = isset($input['level']) ? intval($input['level']) : 1;
 
-error_log("[SCORE.PHP] New score received: $newScore");
+error_log("[SCORE.PHP] New score received: $newScore, Level: $currentLevel");
+
+/**
+ * Função para calcular a meta de pontuação do level
+ * (mesma lógica do difficulty.php)
+ */
+function getTargetScoreForLevel($level) {
+    $baseTargetScore = 1000; // 1000 pontos para passar no level 1
+    
+    // Meta de pontos aumenta 500 a cada level
+    $targetScore = $baseTargetScore + (($level - 1) * 500);
+    
+    // A cada 10 levels, aumenta mais rápido
+    if ($level > 10) {
+        $targetScore += (($level - 10) * 300);
+    }
+    if ($level > 20) {
+        $targetScore += (($level - 20) * 500);
+    }
+    if ($level > 50) {
+        $targetScore += (($level - 50) * 1000);
+    }
+    
+    return $targetScore;
+}
 
 // Criar tabela de histórico de scores do Candy se não existir
 $createTableSQL = "CREATE TABLE IF NOT EXISTS candy_scores (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    level INT NOT NULL DEFAULT 1,
     score INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id),
@@ -98,21 +139,66 @@ $createTableSQL = "CREATE TABLE IF NOT EXISTS candy_scores (
 )";
 $conn->query($createTableSQL);
 
+// Criar tabela de progresso do level se não existir
+$createProgressSQL = "CREATE TABLE IF NOT EXISTS candy_level_progress (
+    user_id INT PRIMARY KEY,
+    current_level INT NOT NULL DEFAULT 1,
+    level_score INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)";
+$conn->query($createProgressSQL);
+
 try {
+    // Buscar progresso atual do level
+    $stmt = $conn->prepare("SELECT current_level, level_score FROM candy_level_progress WHERE user_id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $levelProgress = 0;
+    $savedLevel = 1;
+    
+    if ($row = $result->fetch_assoc()) {
+        $savedLevel = intval($row['current_level']);
+        $levelProgress = intval($row['level_score']);
+    }
+    $stmt->close();
+    
+    // Se o level enviado é diferente do salvo, resetar o progresso do level
+    if ($currentLevel != $savedLevel) {
+        $levelProgress = 0;
+    }
+    
+    // Calcular meta do level atual
+    $targetScore = getTargetScoreForLevel($currentLevel);
+    
+    // Acumular pontos do level
+    $newLevelProgress = $levelProgress + $newScore;
+    
+    // Verificar se pode avançar de level
+    $canAdvance = ($newLevelProgress >= $targetScore);
+    
+    error_log("[SCORE.PHP] Level progress: $levelProgress + $newScore = $newLevelProgress, Target: $targetScore, Can advance: " . ($canAdvance ? 'YES' : 'NO'));
+    
     // Registrar o score no histórico (sempre)
-    $stmt = $conn->prepare("INSERT INTO candy_scores (user_id, score) VALUES (?, ?)");
-    $stmt->bind_param("ii", $userId, $newScore);
+    $stmt = $conn->prepare("INSERT INTO candy_scores (user_id, level, score) VALUES (?, ?, ?)");
+    $stmt->bind_param("iii", $userId, $currentLevel, $newScore);
     $stmt->execute();
     $stmt->close();
     
-    error_log("[SCORE.PHP] Score registered in history: $newScore");
+    // Atualizar progresso do level
+    $stmt = $conn->prepare("INSERT INTO candy_level_progress (user_id, current_level, level_score) 
+                            VALUES (?, ?, ?) 
+                            ON DUPLICATE KEY UPDATE current_level = ?, level_score = ?");
+    $stmt->bind_param("iiiii", $userId, $currentLevel, $newLevelProgress, $currentLevel, $newLevelProgress);
+    $stmt->execute();
+    $stmt->close();
     
-    // NOVA LÓGICA: Sempre adicionar os pontos ao ranking
-    // A pontuação de cada partida é acumulada, não sobreposta
-    if ($newScore > 0) {
-        $pointsToAdd = $newScore;
-        
-        error_log("[SCORE.PHP] Points to add: $pointsToAdd");
+    // SEMPRE adicionar os pontos ao ranking
+    $pointsToAdd = $newScore;
+    
+    if ($pointsToAdd > 0) {
+        error_log("[SCORE.PHP] Points to add to ranking: $pointsToAdd");
         
         // Adicionar pontos ao ranking do usuário (daily_points para o ranking diário)
         $stmt = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
@@ -124,54 +210,52 @@ try {
         error_log("[SCORE.PHP] UPDATE users affected rows: $affectedRows");
         
         // Registrar no histórico de pontos
-        $description = "Candy Crush - Partida: " . $newScore . " pontos";
+        $description = "Candy Crush - Level $currentLevel: $newScore pontos";
         $stmt = $conn->prepare("INSERT INTO points_history (user_id, points, description, created_at) VALUES (?, ?, ?, NOW())");
         $stmt->bind_param("iis", $userId, $pointsToAdd, $description);
         $stmt->execute();
-        $historyInserted = $stmt->affected_rows;
         $stmt->close();
-        
-        error_log("[SCORE.PHP] INSERT points_history affected rows: $historyInserted");
-        
-        // Buscar pontos atualizados do usuário
-        $stmt = $conn->prepare("SELECT points, daily_points FROM users WHERE id = ?");
-        $stmt->bind_param("i", $userId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $userPoints = 0;
-        $dailyPoints = 0;
-        if ($row = $result->fetch_assoc()) {
-            $userPoints = intval($row['points']);
-            $dailyPoints = intval($row['daily_points']);
-        }
-        $stmt->close();
-        
-        error_log("[SCORE.PHP] Final - Total points: $userPoints, Daily points: $dailyPoints");
-        
-        echo json_encode([
-            'status' => 'success',
-            'data' => [
-                'added' => true,
-                'score' => $newScore,
-                'points_added' => $pointsToAdd,
-                'total_points' => $userPoints,
-                'daily_points' => $dailyPoints,
-                'message' => 'Pontuação adicionada ao ranking!'
-            ]
-        ]);
-        
-    } else {
-        // Score zero - não adiciona pontos mas registra
-        echo json_encode([
-            'status' => 'success',
-            'data' => [
-                'added' => false,
-                'score' => $newScore,
-                'points_added' => 0,
-                'message' => 'Pontuação zero registrada.'
-            ]
-        ]);
     }
+    
+    // Buscar pontos atualizados do usuário
+    $stmt = $conn->prepare("SELECT points, daily_points FROM users WHERE id = ?");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $userPoints = 0;
+    $dailyPoints = 0;
+    if ($row = $result->fetch_assoc()) {
+        $userPoints = intval($row['points']);
+        $dailyPoints = intval($row['daily_points']);
+    }
+    $stmt->close();
+    
+    error_log("[SCORE.PHP] Final - Total points: $userPoints, Daily points: $dailyPoints");
+    
+    // Mensagem baseada no progresso
+    $message = "Pontuação adicionada ao ranking!";
+    if ($canAdvance) {
+        $message = "Parabéns! Você atingiu a meta e pode avançar para o próximo level!";
+    } else {
+        $remaining = $targetScore - $newLevelProgress;
+        $message = "Faltam $remaining pontos para passar de level. Continue jogando!";
+    }
+    
+    echo json_encode([
+        'status' => 'success',
+        'data' => [
+            'added' => true,
+            'score' => $newScore,
+            'points_added' => $pointsToAdd,
+            'level' => $currentLevel,
+            'level_progress' => $newLevelProgress,
+            'target_score' => $targetScore,
+            'can_advance' => $canAdvance,
+            'total_points' => $userPoints,
+            'daily_points' => $dailyPoints,
+            'message' => $message
+        ]
+    ]);
     
 } catch (Exception $e) {
     error_log("[SCORE.PHP] Exception: " . $e->getMessage());
