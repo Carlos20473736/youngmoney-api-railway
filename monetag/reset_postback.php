@@ -203,9 +203,9 @@ try {
     }
     
     // ========================================
-    // 4. RANDOMIZAR IMPRESSÕES NECESSÁRIAS (5 a 10)
+    // 4. RANDOMIZAR IMPRESSÕES NECESSÁRIAS (5 a 30)
     // ========================================
-    $random_impressions = rand(5, 10);
+    $random_impressions = rand(5, 30);
     $results['monetag_local']['new_required_impressions'] = $random_impressions;
     
     $check_stmt = $conn->prepare("

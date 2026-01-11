@@ -309,7 +309,7 @@ try {
     $stmt->execute();
     
     // 5. MONETAG - Randomizar número de impressões necessárias (5 a 30)
-    $random_impressions = rand(5, 10);
+    $random_impressions = rand(5, 30);
     
     // Verificar se a configuração já existe
     $check_stmt = $mysqli->prepare("
