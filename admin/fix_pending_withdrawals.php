@@ -102,8 +102,8 @@ try {
         // 2. Criar novos saques pendentes com valores corretos
         $created = [];
         $stmt = $conn->prepare("
-            INSERT INTO withdrawals (user_id, amount, pix_key, status, created_at)
-            VALUES (?, ?, ?, 'pending', NOW())
+            INSERT INTO withdrawals (user_id, amount, pix_type, pix_key, status, created_at)
+            VALUES (?, ?, 'email', ?, 'pending', NOW())
         ");
         
         foreach ($usersData as $userData) {
