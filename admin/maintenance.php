@@ -7,6 +7,9 @@
  * GET: Retorna status atual do modo de manutenção
  * POST: Ativa/desativa modo de manutenção
  * 
+ * IMPORTANTE: Quando ativado, TODAS as APIs POST e GET são bloqueadas
+ * pelo middleware de segurança (security_middleware_v3.php)
+ * 
  * Request Body (POST):
  * {
  *   "enabled": true/false,
@@ -19,6 +22,8 @@
  *   "maintenance_mode": true/false,
  *   "maintenance_message": "Mensagem atual"
  * }
+ * 
+ * @version 2.0.0 - Integrado com middleware global
  */
 
 header('Content-Type: application/json');
@@ -71,7 +76,8 @@ try {
         echo json_encode([
             'success' => true,
             'maintenance_mode' => $isEnabled,
-            'maintenance_message' => $message
+            'maintenance_message' => $message,
+            'info' => 'Quando ativado, TODAS as APIs POST e GET são bloqueadas automaticamente pelo middleware'
         ]);
         
     } elseif ($method === 'POST') {
@@ -110,7 +116,12 @@ try {
             'success' => true,
             'maintenance_mode' => $isEnabled,
             'maintenance_message' => $message,
-            'message' => $isEnabled ? 'Modo de manutenção ATIVADO' : 'Modo de manutenção DESATIVADO'
+            'message' => $isEnabled 
+                ? 'Modo de manutenção ATIVADO - Todas as APIs estão bloqueadas' 
+                : 'Modo de manutenção DESATIVADO - APIs funcionando normalmente',
+            'affected' => $isEnabled 
+                ? 'Todas as requisições POST e GET serão bloqueadas (exceto admin)' 
+                : 'Todas as APIs estão operacionais'
         ]);
         
     } else {
