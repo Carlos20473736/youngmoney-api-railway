@@ -203,39 +203,53 @@ try {
     }
     
     // ========================================
-    // 4. RANDOMIZAR IMPRESSÕES NECESSÁRIAS (5 a 30)
+    // 4. RANDOMIZAR IMPRESSÕES NECESSÁRIAS POR USUÁRIO (5 a 10)
     // ========================================
-    $random_impressions = rand(5, 30);
-    $results['monetag_local']['new_required_impressions'] = $random_impressions;
     
-    $check_stmt = $conn->prepare("
-        SELECT id FROM roulette_settings 
-        WHERE setting_key = 'monetag_required_impressions'
+    // Criar tabela user_required_impressions se não existir
+    $conn->query("
+        CREATE TABLE IF NOT EXISTS user_required_impressions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL UNIQUE,
+            required_impressions INT DEFAULT 5,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id)
+        )
     ");
-    $check_stmt->execute();
-    $check_result = $check_stmt->get_result();
     
-    if ($check_result->num_rows > 0) {
+    // Buscar todos os usuários
+    $users_result = $conn->query("SELECT id FROM users");
+    $users_randomized = 0;
+    $randomized_details = [];
+    
+    while ($user = $users_result->fetch_assoc()) {
+        $user_id = $user['id'];
+        $random_impressions = rand(5, 10); // Aleatório entre 5 e 10 para cada usuário
+        
+        // Inserir ou atualizar impressões necessárias do usuário
         $stmt = $conn->prepare("
-            UPDATE roulette_settings 
-            SET setting_value = ?, updated_at = NOW()
-            WHERE setting_key = 'monetag_required_impressions'
+            INSERT INTO user_required_impressions (user_id, required_impressions, updated_at)
+            VALUES (?, ?, NOW())
+            ON DUPLICATE KEY UPDATE 
+                required_impressions = VALUES(required_impressions),
+                updated_at = NOW()
         ");
-        $stmt->bind_param("s", $random_impressions);
+        $stmt->bind_param("ii", $user_id, $random_impressions);
         $stmt->execute();
         $stmt->close();
-    } else {
-        $stmt = $conn->prepare("
-            INSERT INTO roulette_settings (setting_key, setting_value, description)
-            VALUES ('monetag_required_impressions', ?, 'Número de impressões necessárias para desbloquear roleta')
-        ");
-        $stmt->bind_param("s", $random_impressions);
-        $stmt->execute();
-        $stmt->close();
+        
+        $users_randomized++;
+        if ($users_randomized <= 20) { // Mostrar apenas os primeiros 20 no log
+            $randomized_details[] = ['user_id' => $user_id, 'required' => $random_impressions];
+        }
     }
-    $check_stmt->close();
     
-    error_log("Reset Completo: Impressões randomizadas para: $random_impressions");
+    $results['monetag_local']['users_randomized'] = $users_randomized;
+    $results['monetag_local']['randomized_range'] = '5-10';
+    $results['monetag_local']['randomized_sample'] = $randomized_details;
+    
+    error_log("Reset Completo: Impressões randomizadas (5-10) para $users_randomized usuários");
     
     // ========================================
     // 5. RESETAR ROLETA (DELETAR TODOS OS SPINS)
