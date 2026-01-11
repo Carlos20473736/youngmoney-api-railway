@@ -14,7 +14,7 @@
  * - X-Request-Signature
  * - X-App-Hash
  * 
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 // =====================================================
@@ -30,18 +30,36 @@ if ($requestMethod === 'OPTIONS') {
     exit;
 }
 
-// ÚNICO endpoint isento de manutenção
-$isMaintenanceEndpoint = (strpos($requestUri, '/admin/maintenance.php') !== false);
+// Lista de emails de administradores (GLOBAL para uso em todo o middleware)
+$ADMIN_EMAILS = [
+    'soltacartatigri@gmail.com',
+    'muriel25herrera@gmail.com',
+    'gustavopramos97@gmail.com'
+];
 
-// Se NÃO for o endpoint de manutenção, verificar modo de manutenção
-if (!$isMaintenanceEndpoint) {
-    
-    // Lista de emails de administradores
-    $ADMIN_EMAILS = [
-        'soltacartatigri@gmail.com',
-        'muriel25herrera@gmail.com',
-        'gustavopramos97@gmail.com'
-    ];
+// Endpoints isentos de verificação de manutenção (admins podem acessar mesmo sem token)
+$maintenanceExemptEndpoints = [
+    '/admin/maintenance.php',
+    '/api/v1/device/check.php',
+    '/api/v1/device/bind.php',
+    '/api/v1/device/register.php',
+    '/api/v1/auth/google-login.php',
+    '/api/v1/auth/device-login.php',
+    '/api/v1/tunnel.php',
+    '/api/v1/secure.php'
+];
+
+// Verificar se é endpoint isento de manutenção
+$isMaintenanceExempt = false;
+foreach ($maintenanceExemptEndpoints as $exemptEndpoint) {
+    if (strpos($requestUri, $exemptEndpoint) !== false) {
+        $isMaintenanceExempt = true;
+        break;
+    }
+}
+
+// Se NÃO for endpoint isento, verificar modo de manutenção
+if (!$isMaintenanceExempt) {
     
     try {
         // Carregar configuração do banco
@@ -68,9 +86,10 @@ if (!$isMaintenanceEndpoint) {
             $message = $msgRow ? $msgRow['setting_value'] : 'Servidor em manutenção. Tente novamente mais tarde.';
             
             // Verificar se é um admin tentando acessar
-            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
             $isAdmin = false;
             
+            // MÉTODO 1: Verificar pelo token de autenticação (Bearer)
+            $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
             if (preg_match('/Bearer\s+(\S+)/', $authHeader, $matches)) {
                 $token = $matches[1];
                 
@@ -85,6 +104,75 @@ if (!$isMaintenanceEndpoint) {
                 if ($userRow) {
                     $userEmail = strtolower($userRow['email']);
                     $isAdmin = in_array($userEmail, array_map('strtolower', $ADMIN_EMAILS));
+                    if ($isAdmin) {
+                        error_log("[MAINTENANCE] Admin identificado por token: $userEmail");
+                    }
+                }
+            }
+            
+            // MÉTODO 2: Verificar pelo email no body da requisição (para endpoints de login/device)
+            if (!$isAdmin) {
+                $rawBody = file_get_contents('php://input');
+                $bodyData = json_decode($rawBody, true);
+                
+                if ($bodyData && isset($bodyData['email'])) {
+                    $bodyEmail = strtolower(trim($bodyData['email']));
+                    $isAdmin = in_array($bodyEmail, array_map('strtolower', $ADMIN_EMAILS));
+                    if ($isAdmin) {
+                        error_log("[MAINTENANCE] Admin identificado por email no body: $bodyEmail");
+                    }
+                }
+            }
+            
+            // MÉTODO 3: Verificar pelo google_token (decodificar JWT para extrair email)
+            if (!$isAdmin) {
+                $rawBody = $rawBody ?? file_get_contents('php://input');
+                $bodyData = $bodyData ?? json_decode($rawBody, true);
+                
+                if ($bodyData && isset($bodyData['google_token'])) {
+                    $googleToken = $bodyData['google_token'];
+                    $tokenParts = explode('.', $googleToken);
+                    if (count($tokenParts) === 3) {
+                        $payload = json_decode(base64_decode($tokenParts[1]), true);
+                        if ($payload && isset($payload['email'])) {
+                            $googleEmail = strtolower($payload['email']);
+                            $isAdmin = in_array($googleEmail, array_map('strtolower', $ADMIN_EMAILS));
+                            if ($isAdmin) {
+                                error_log("[MAINTENANCE] Admin identificado por google_token: $googleEmail");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // MÉTODO 4: Verificar pelo device_id (buscar usuário vinculado ao dispositivo)
+            if (!$isAdmin) {
+                $rawBody = $rawBody ?? file_get_contents('php://input');
+                $bodyData = $bodyData ?? json_decode($rawBody, true);
+                
+                if ($bodyData && isset($bodyData['device_id'])) {
+                    $deviceId = $bodyData['device_id'];
+                    
+                    // Buscar usuário vinculado ao dispositivo
+                    $stmt = $conn->prepare("
+                        SELECT u.email 
+                        FROM device_bindings db 
+                        JOIN users u ON db.user_id = u.id 
+                        WHERE db.device_id = ? AND db.is_active = 1
+                    ");
+                    $stmt->bind_param("s", $deviceId);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $deviceUser = $result->fetch_assoc();
+                    $stmt->close();
+                    
+                    if ($deviceUser) {
+                        $deviceEmail = strtolower($deviceUser['email']);
+                        $isAdmin = in_array($deviceEmail, array_map('strtolower', $ADMIN_EMAILS));
+                        if ($isAdmin) {
+                            error_log("[MAINTENANCE] Admin identificado por device_id: $deviceEmail");
+                        }
+                    }
                 }
             }
             
@@ -134,6 +222,9 @@ $publicEndpoints = [
     '/api/v1/debug/check-token.php',
     '/api/v1/device/check.php',
     '/api/v1/device/bind.php',
+    '/api/v1/device/register.php',
+    '/api/v1/tunnel.php',
+    '/api/v1/secure.php',
     '/admin/',
     '/health',
     '/health.php'

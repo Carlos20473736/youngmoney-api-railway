@@ -73,20 +73,90 @@ try {
     $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');
     $input = json_decode($rawBody, true);
     
-    // Verificar se é admin (email pode vir no body)
-    $requestEmail = isset($input['email']) ? strtolower(trim($input['email'])) : '';
-    $isAdmin = in_array($requestEmail, array_map('strtolower', $ADMIN_EMAILS));
-    
     // Conectar ao banco
     $conn = getDbConnection();
+    
+    // ========================================
+    // VERIFICAR SE É ADMIN (múltiplos métodos)
+    // ========================================
+    $isAdmin = false;
+    $adminEmail = '';
+    
+    // MÉTODO 1: Verificar pelo email no body
+    if (!$isAdmin && isset($input['email'])) {
+        $requestEmail = strtolower(trim($input['email']));
+        $isAdmin = in_array($requestEmail, array_map('strtolower', $ADMIN_EMAILS));
+        if ($isAdmin) {
+            $adminEmail = $requestEmail;
+            error_log("[DEVICE_CHECK] Admin identificado por email no body: $adminEmail");
+        }
+    }
+    
+    // MÉTODO 2: Verificar pelo device_id (buscar usuário vinculado)
+    if (!$isAdmin && isset($input['device_id'])) {
+        $deviceId = $input['device_id'];
+        $stmt = $conn->prepare("
+            SELECT u.email 
+            FROM device_bindings db 
+            JOIN users u ON db.user_id = u.id 
+            WHERE db.device_id = ? AND db.is_active = 1
+        ");
+        $stmt->bind_param("s", $deviceId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $deviceUser = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($deviceUser) {
+            $deviceEmail = strtolower($deviceUser['email']);
+            $isAdmin = in_array($deviceEmail, array_map('strtolower', $ADMIN_EMAILS));
+            if ($isAdmin) {
+                $adminEmail = $deviceEmail;
+                error_log("[DEVICE_CHECK] Admin identificado por device_id: $adminEmail");
+            }
+        }
+    }
     
     // ========================================
     // VERIFICAR MODO DE MANUTENÇÃO
     // (Admins podem passar mesmo em manutenção)
     // ========================================
-    // MANUTENÇÃO DESATIVADA - Todos os usuários podem acessar
-    // Código de verificação de manutenção removido em 2026-01-10
-    error_log("[DEVICE_CHECK] Modo de manutenção DESATIVADO - Acesso permitido");
+    $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    
+    $isMaintenanceActive = ($row && $row['setting_value'] === '1');
+    
+    if ($isMaintenanceActive && !$isAdmin) {
+        // Buscar mensagem de manutenção
+        $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_message'");
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $msgRow = $result->fetch_assoc();
+        $stmt->close();
+        
+        $message = $msgRow ? $msgRow['setting_value'] : 'Servidor em manutenção. Tente novamente mais tarde.';
+        
+        error_log("[DEVICE_CHECK] Requisição BLOQUEADA - Modo de manutenção ativo");
+        
+        http_response_code(503);
+        echo json_encode([
+            'success' => false,
+            'maintenance' => true,
+            'maintenance_mode' => true,
+            'maintenance_message' => $message,
+            'message' => $message,
+            'code' => 'MAINTENANCE_MODE'
+        ]);
+        $conn->close();
+        exit;
+    }
+    
+    if ($isMaintenanceActive && $isAdmin) {
+        error_log("[DEVICE_CHECK] Admin autorizado durante manutenção: $adminEmail");
+    }
     // ========================================
     
     error_log("[DEVICE_CHECK] ========== NOVA REQUISIÇÃO ==========");
@@ -94,6 +164,7 @@ try {
     error_log("[DEVICE_CHECK] Method: " . $_SERVER['REQUEST_METHOD']);
     error_log("[DEVICE_CHECK] Content-Type: " . ($_SERVER['CONTENT_TYPE'] ?? 'not set'));
     error_log("[DEVICE_CHECK] User-Agent: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'not set'));
+    error_log("[DEVICE_CHECK] Is Admin: " . ($isAdmin ? 'SIM' : 'NAO'));
     
     if (!$input || !isset($input['device_id'])) {
         http_response_code(400);

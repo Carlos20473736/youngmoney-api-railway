@@ -93,9 +93,44 @@ try {
     // ========================================
     $isAdmin = in_array(strtolower($email), array_map('strtolower', $ADMIN_EMAILS));
     
-    // MANUTENÇÃO DESATIVADA - Todos os usuários podem logar
-    // Código de verificação de manutenção removido em 2026-01-10
-    error_log("[GOOGLE-LOGIN] Modo de manutenção DESATIVADO - Login permitido para: $email");
+    // Verificar status do modo de manutenção
+    $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    
+    $isMaintenanceActive = ($row && $row['setting_value'] === '1');
+    
+    if ($isMaintenanceActive && !$isAdmin) {
+        // Buscar mensagem de manutenção
+        $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_message'");
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $msgRow = $result->fetch_assoc();
+        $stmt->close();
+        
+        $message = $msgRow ? $msgRow['setting_value'] : 'Servidor em manutenção. Tente novamente mais tarde.';
+        
+        error_log("[GOOGLE-LOGIN] Requisição BLOQUEADA - Modo de manutenção ativo para: $email");
+        
+        http_response_code(503);
+        echo json_encode([
+            'status' => 'error',
+            'maintenance' => true,
+            'maintenance_mode' => true,
+            'message' => $message,
+            'code' => 'MAINTENANCE_MODE'
+        ]);
+        $conn->close();
+        exit;
+    }
+    
+    if ($isMaintenanceActive && $isAdmin) {
+        error_log("[GOOGLE-LOGIN] Admin autorizado durante manutenção: $email");
+    } else {
+        error_log("[GOOGLE-LOGIN] Login permitido para: $email (Admin: " . ($isAdmin ? 'SIM' : 'NAO') . ")");
+    }
     // ========================================
     
     // 5. GERAR DADOS CRIPTOGRÁFICOS (antes do banco para paralelizar)
