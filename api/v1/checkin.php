@@ -1,4 +1,15 @@
 <?php
+/**
+ * API de Check-in Diário
+ * 
+ * CORRIGIDO: Problema de timezone que bloqueava check-in no dia seguinte
+ * 
+ * Lógica:
+ * - Usa timezone America/Sao_Paulo para todas as comparações de data
+ * - Verifica se o último check-in foi feito no dia atual (baseado no timezone correto)
+ * - Permite check-in se o último foi em um dia diferente
+ */
+
 error_reporting(0);
 
 require_once __DIR__ . "/../../database.php";
@@ -14,8 +25,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+// IMPORTANTE: Configurar timezone para Brasil
+date_default_timezone_set('America/Sao_Paulo');
+
 try {
     $conn = getDbConnection();
+    
+    // Configurar timezone no MySQL também
+    $conn->query("SET time_zone = '-03:00'");
     
     // Autenticar usuário via token Bearer
     $user = getAuthenticatedUser($conn);
@@ -70,11 +87,14 @@ try {
     $lastResetRow = $result ? $result->fetch_assoc() : null;
     $lastResetDatetime = $lastResetRow ? $lastResetRow['setting_value'] : '1970-01-01 00:00:00';
     
+    // Data de HOJE no timezone correto (Brasil)
+    $todayDate = date('Y-m-d');
+    
     // GET - Verificar status do check-in
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // Buscar último check-in do usuário
         $stmt = $conn->prepare("
-            SELECT created_at 
+            SELECT created_at, checkin_date 
             FROM daily_checkin 
             WHERE user_id = ? 
             ORDER BY created_at DESC 
@@ -96,26 +116,75 @@ try {
         $stmt->close();
         
         // Verificar se pode fazer check-in
-        // Pode se: não tem check-in HOJE (CURDATE())
+        // CORRIGIDO: Usar checkin_date diretamente (é uma coluna DATE)
         $canCheckin = true;
         $lastCheckinDate = null;
         
         if ($lastCheckin) {
-            $lastCheckinDate = date('Y-m-d', strtotime($lastCheckin['created_at']));
-            $today = date('Y-m-d');
+            // Usar a coluna checkin_date que é do tipo DATE
+            $lastCheckinDate = $lastCheckin['checkin_date'];
             
-            // Se o último check-in foi HOJE, não pode fazer check-in
-            if ($lastCheckinDate === $today) {
+            // Se não tiver checkin_date, usar created_at como fallback
+            if (!$lastCheckinDate) {
+                $lastCheckinDate = date('Y-m-d', strtotime($lastCheckin['created_at']));
+            }
+            
+            // COMPARAÇÃO CORRIGIDA: Verificar se o último check-in foi HOJE
+            if ($lastCheckinDate === $todayDate) {
                 $canCheckin = false;
             }
         }
+        
+        // Calcular sequência de dias consecutivos
+        $stmt = $conn->prepare("
+            SELECT checkin_date 
+            FROM daily_checkin 
+            WHERE user_id = ? 
+            ORDER BY checkin_date DESC 
+            LIMIT 30
+        ");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        $streak = 0;
+        $previousDate = null;
+        
+        while ($row = $result->fetch_assoc()) {
+            $checkinDate = $row['checkin_date'];
+            
+            if ($previousDate === null) {
+                // Primeiro registro - verificar se é hoje ou ontem
+                $daysDiff = (strtotime($todayDate) - strtotime($checkinDate)) / 86400;
+                if ($daysDiff <= 1) {
+                    $streak = 1;
+                    $previousDate = $checkinDate;
+                } else {
+                    break; // Sequência quebrada
+                }
+            } else {
+                // Verificar se é o dia anterior
+                $expectedPrevious = date('Y-m-d', strtotime($previousDate . ' -1 day'));
+                if ($checkinDate === $expectedPrevious) {
+                    $streak++;
+                    $previousDate = $checkinDate;
+                } else {
+                    break; // Sequência quebrada
+                }
+            }
+        }
+        $stmt->close();
         
         echo json_encode([
             'status' => 'success',
             'can_checkin' => $canCheckin,
             'last_checkin' => $lastCheckinDate,
             'total_checkins' => $totalCheckins,
+            'streak' => $streak,
             'last_reset_datetime' => $lastResetDatetime,
+            'server_date' => $todayDate,
+            'server_time' => date('H:i:s'),
+            'timezone' => 'America/Sao_Paulo',
             'message' => $canCheckin ? 'Você pode fazer check-in!' : 'Você já fez check-in hoje!'
         ]);
         exit;
@@ -123,15 +192,15 @@ try {
     
     // POST - Fazer check-in
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Verificar se já fez check-in HOJE
+        // VERIFICAÇÃO CORRIGIDA: Usar a coluna checkin_date diretamente
         $stmt = $conn->prepare("
             SELECT id 
             FROM daily_checkin 
             WHERE user_id = ? 
-            AND DATE(created_at) = CURDATE()
+            AND checkin_date = ?
             LIMIT 1
         ");
-        $stmt->bind_param("i", $userId);
+        $stmt->bind_param("is", $userId, $todayDate);
         $stmt->execute();
         $result = $stmt->get_result();
         $recentCheckin = $result->fetch_assoc();
@@ -140,7 +209,9 @@ try {
         if ($recentCheckin) {
             echo json_encode([
                 'status' => 'error',
-                'message' => 'Você já fez check-in hoje! Volte amanhã.'
+                'message' => 'Você já fez check-in hoje! Volte amanhã.',
+                'server_date' => $todayDate,
+                'server_time' => date('H:i:s')
             ]);
             exit;
         }
@@ -149,14 +220,15 @@ try {
         $pointsEarned = rand(500, 5000); // Pontos aleatórios entre 500 e 5000
         
         // Inserir registro de check-in
+        // CORRIGIDO: Usar a data de hoje explicitamente
         $stmt = $conn->prepare("
             INSERT INTO daily_checkin (user_id, points_reward, checkin_date, created_at) 
-            VALUES (?, ?, CURDATE(), NOW())
+            VALUES (?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE 
                 points_reward = VALUES(points_reward),
                 created_at = NOW()
         ");
-        $stmt->bind_param("ii", $userId, $pointsEarned);
+        $stmt->bind_param("iis", $userId, $pointsEarned, $todayDate);
         $stmt->execute();
         $stmt->close();
         
@@ -189,7 +261,9 @@ try {
             'status' => 'success',
             'message' => 'Check-in realizado com sucesso!',
             'points_earned' => $pointsEarned,
-            'total_checkins' => $totalCheckins
+            'total_checkins' => $totalCheckins,
+            'checkin_date' => $todayDate,
+            'server_time' => date('H:i:s')
         ]);
         exit;
     }
