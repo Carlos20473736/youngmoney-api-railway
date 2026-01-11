@@ -69,8 +69,11 @@ $createTableSQL = "CREATE TABLE IF NOT EXISTS game_levels (
 
 $conn->query($createTableSQL);
 
-// Adicionar coluna total_score se não existir
-$conn->query("ALTER TABLE game_levels ADD COLUMN IF NOT EXISTS total_score INT NOT NULL DEFAULT 0");
+// Adicionar coluna total_score se não existir (verificar antes para evitar erro)
+$checkColumn = $conn->query("SHOW COLUMNS FROM game_levels LIKE 'total_score'");
+if ($checkColumn && $checkColumn->num_rows == 0) {
+    $conn->query("ALTER TABLE game_levels ADD COLUMN total_score INT NOT NULL DEFAULT 0");
+}
 
 // Obter usuário autenticado
 $user = getAuthenticatedUser($conn);
