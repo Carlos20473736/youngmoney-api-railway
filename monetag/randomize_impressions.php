@@ -35,7 +35,7 @@ try {
     $conn = getDbConnection();
     
     // Gerar número aleatório entre 5 e 30
-    $random_impressions = rand(5, 30);
+    $random_impressions = rand(5, 10);
     
     // Verificar se a configuração já existe
     $check_stmt = $conn->prepare("
