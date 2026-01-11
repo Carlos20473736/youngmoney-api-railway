@@ -15,9 +15,23 @@
  * - CORREÇÃO: Lê o body corretamente quando passa pelo secure.php
  */
 
-// Incluir configurações do banco de dados
-require_once __DIR__ . '/../../../db_config.php';
-require_once __DIR__ . '/../../../includes/auth_helper.php';
+// Tratamento de erros
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("[LEVEL.PHP] PHP Error: $errstr in $errfile:$errline");
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => "PHP Error: $errstr in $errfile:$errline"]);
+    exit;
+});
+
+try {
+    // Incluir configurações do banco de dados
+    require_once __DIR__ . '/../../../db_config.php';
+    require_once __DIR__ . '/../../../includes/auth_helper.php';
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Include error: ' . $e->getMessage()]);
+    exit;
+}
 
 // Headers CORS
 header('Content-Type: application/json');
@@ -31,10 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Conectar ao banco de dados
-$conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+// Obter conexão usando a função do db_config
+$conn = getMySQLiConnection();
 
-if ($conn->connect_error) {
+if (!$conn) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Database connection failed']);
     exit;
@@ -50,8 +64,7 @@ $createTableSQL = "CREATE TABLE IF NOT EXISTS game_levels (
     total_score INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_user_id (user_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    INDEX idx_user_id (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
 $conn->query($createTableSQL);
@@ -69,6 +82,8 @@ if (!$user) {
 }
 
 $userId = $user['id'];
+
+error_log("[LEVEL.PHP] User ID: $userId, Method: " . $_SERVER['REQUEST_METHOD']);
 
 // Processar requisição
 $method = $_SERVER['REQUEST_METHOD'];
