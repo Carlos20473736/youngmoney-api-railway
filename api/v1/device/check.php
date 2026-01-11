@@ -83,55 +83,9 @@ try {
     // VERIFICAR MODO DE MANUTENÇÃO
     // (Admins podem passar mesmo em manutenção)
     // ========================================
-    if (!$isAdmin) {
-        try {
-            // Criar tabela de configurações do sistema se não existir
-            $conn->query("
-                CREATE TABLE IF NOT EXISTS system_settings (
-                    setting_key VARCHAR(100) PRIMARY KEY,
-                    setting_value TEXT,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            ");
-            
-            // Verificar se está em modo de manutenção
-            $maintenanceStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
-            $maintenanceStmt->execute();
-            $maintenanceResult = $maintenanceStmt->get_result();
-            $maintenanceRow = $maintenanceResult->fetch_assoc();
-            $maintenanceStmt->close();
-            
-            $isMaintenanceMode = ($maintenanceRow && $maintenanceRow['setting_value'] === '1');
-            
-            if ($isMaintenanceMode) {
-                // Buscar mensagem de manutenção personalizada
-                $msgStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_message'");
-                $msgStmt->execute();
-                $msgResult = $msgStmt->get_result();
-                $msgRow = $msgResult->fetch_assoc();
-                $msgStmt->close();
-                
-                $maintenanceMessage = $msgRow ? $msgRow['setting_value'] : 'Servidor em manutenção. Tente novamente mais tarde.';
-                
-                error_log("[DEVICE_CHECK] MODO DE MANUTENÇÃO ATIVO - Bloqueando acesso");
-                
-                echo json_encode([
-                    'success' => false,
-                    'maintenance' => true,
-                    'maintenance_message' => $maintenanceMessage,
-                    'message' => 'Servidor em manutenção'
-                ]);
-                
-                $conn->close();
-                exit;
-            }
-        } catch (Exception $e) {
-            // Se falhar a verificação de manutenção, continuar normalmente
-            error_log("[DEVICE_CHECK] Erro ao verificar manutenção (não crítico): " . $e->getMessage());
-        }
-    } else {
-        error_log("[DEVICE_CHECK] Admin detectado ($requestEmail) - Bypass de manutenção");
-    }
+    // MANUTENÇÃO DESATIVADA - Todos os usuários podem acessar
+    // Código de verificação de manutenção removido em 2026-01-10
+    error_log("[DEVICE_CHECK] Modo de manutenção DESATIVADO - Acesso permitido");
     // ========================================
     
     error_log("[DEVICE_CHECK] ========== NOVA REQUISIÇÃO ==========");

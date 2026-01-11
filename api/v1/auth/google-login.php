@@ -92,46 +92,9 @@ try {
     // ========================================
     $isAdmin = in_array(strtolower($email), array_map('strtolower', $ADMIN_EMAILS));
     
-    if (!$isAdmin) {
-        try {
-            $maintenanceStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_mode'");
-            $maintenanceStmt->execute();
-            $maintenanceResult = $maintenanceStmt->get_result();
-            $maintenanceRow = $maintenanceResult->fetch_assoc();
-            $maintenanceStmt->close();
-            
-            $isMaintenanceMode = ($maintenanceRow && $maintenanceRow['setting_value'] === '1');
-            
-            if ($isMaintenanceMode) {
-                // Buscar mensagem de manutenção personalizada
-                $msgStmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'maintenance_message'");
-                $msgStmt->execute();
-                $msgResult = $msgStmt->get_result();
-                $msgRow = $msgResult->fetch_assoc();
-                $msgStmt->close();
-                
-                $maintenanceMessage = $msgRow ? $msgRow['setting_value'] : 'Servidor em manutenção. Tente novamente mais tarde.';
-                
-                error_log("[GOOGLE-LOGIN] MODO DE MANUTENÇÃO ATIVO - Bloqueando login para: $email");
-                
-                http_response_code(503);
-                echo json_encode([
-                    'status' => 'error',
-                    'maintenance' => true,
-                    'maintenance_message' => $maintenanceMessage,
-                    'message' => $maintenanceMessage
-                ]);
-                
-                $conn->close();
-                exit;
-            }
-        } catch (Exception $e) {
-            // Se falhar a verificação de manutenção, continuar normalmente
-            error_log("[GOOGLE-LOGIN] Erro ao verificar manutenção (não crítico): " . $e->getMessage());
-        }
-    } else {
-        error_log("[GOOGLE-LOGIN] Admin detectado ($email) - Bypass de manutenção");
-    }
+    // MANUTENÇÃO DESATIVADA - Todos os usuários podem logar
+    // Código de verificação de manutenção removido em 2026-01-10
+    error_log("[GOOGLE-LOGIN] Modo de manutenção DESATIVADO - Login permitido para: $email");
     // ========================================
     
     // 5. GERAR DADOS CRIPTOGRÁFICOS (antes do banco para paralelizar)
