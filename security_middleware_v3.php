@@ -40,7 +40,9 @@ $maintenanceExemptEndpoints = [
     '/api/v1/auth/google-login.php',
     '/api/v1/auth/device-login.php',
     '/api/v1/tunnel.php',
-    '/api/v1/secure.php'
+    '/api/v1/secure.php',
+    '/api/v1/app/check-update.php',  // Verificação de atualização do app
+    '/api/v1/app/version.php'         // Versão do app
 ];
 
 // Verificar se é endpoint isento de manutenção
