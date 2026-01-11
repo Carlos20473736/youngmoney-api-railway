@@ -8,7 +8,7 @@
  * INCLUI: Verificação de Modo de Manutenção
  * Quando ativado, TODAS as APIs POST e GET são bloqueadas
  * 
- * @version 3.1.0
+ * @version 3.2.0
  */
 
 // =====================================================
@@ -40,13 +40,9 @@ $basicAuthEndpoints = [
     '/api/v1/ranking/list.php'
 ];
 
-// Endpoints ISENTOS do modo de manutenção (sempre funcionam)
+// Endpoints ISENTOS do modo de manutenção (APENAS estes funcionam durante manutenção)
 $maintenanceExemptEndpoints = [
-    '/admin/maintenance.php',  // Endpoint para controlar manutenção
-    '/admin/',                  // Todo painel admin
-    '/health',
-    '/ping',
-    '/index.php'
+    '/admin/maintenance.php'  // APENAS endpoint para controlar manutenção
 ];
 
 // Lista de emails de administradores que podem acessar durante manutenção
@@ -86,7 +82,7 @@ foreach ($basicAuthEndpoints as $endpoint) {
     }
 }
 
-// Verificar endpoints isentos de manutenção
+// Verificar endpoints isentos de manutenção (APENAS maintenance.php)
 foreach ($maintenanceExemptEndpoints as $endpoint) {
     if (strpos($requestUri, $endpoint) !== false) {
         $isMaintenanceExempt = true;
@@ -107,12 +103,12 @@ if ($requestMethod === 'OPTIONS') {
 /**
  * Verifica se o modo de manutenção está ativo
  * Bloqueia TODAS as requisições POST e GET quando ativado
- * Exceto endpoints administrativos e admins autenticados
+ * APENAS o endpoint /admin/maintenance.php é isento
  */
 function checkMaintenanceMode() {
     global $maintenanceExemptEndpoints, $ADMIN_EMAILS, $requestUri;
     
-    // Verificar se endpoint é isento
+    // Verificar se endpoint é isento (APENAS maintenance.php)
     foreach ($maintenanceExemptEndpoints as $endpoint) {
         if (strpos($requestUri, $endpoint) !== false) {
             return ['active' => false];
