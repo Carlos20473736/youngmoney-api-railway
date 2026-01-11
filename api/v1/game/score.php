@@ -2,30 +2,13 @@
 /**
  * Endpoint para pontuação do Candy Crush
  * 
- * LÓGICA ATUALIZADA:
- * - A pontuação de cada partida é SEMPRE adicionada ao ranking
- * - Cada level tem uma meta de pontuação (target_score)
- * - O jogador acumula pontos até atingir a meta do level
- * - Quando atinge a meta, pode passar de level
- * - Os pontos vão para o ranking independente de passar ou não
+ * LÓGICA CORRIGIDA:
+ * - Este endpoint APENAS registra o score da partida
+ * - NÃO adiciona pontos ao ranking (isso é feito no level.php quando passa de level)
+ * - Evita duplicação de pontos
  * 
  * POST /api/v1/game/score.php
  * Body: { "score": 200, "level": 1 }
- * 
- * Resposta:
- * { 
- *   "status": "success", 
- *   "data": { 
- *     "added": true, 
- *     "score": 200, 
- *     "points_added": 200,
- *     "level_progress": 1200,
- *     "target_score": 1000,
- *     "can_advance": true,
- *     "daily_points": 350, 
- *     "total_points": 1000 
- *   } 
- * }
  */
 
 // Tratamento de erros
@@ -101,19 +84,29 @@ if (!isset($input['score']) || !is_numeric($input['score'])) {
 $newScore = intval($input['score']);
 $currentLevel = isset($input['level']) ? intval($input['level']) : 1;
 
+// Validar score - não pode ser negativo ou absurdamente alto
+if ($newScore < 0) {
+    http_response_code(400);
+    echo json_encode(['status' => 'error', 'message' => 'Score cannot be negative']);
+    exit;
+}
+
+// Limite máximo de pontos por jogada (anti-cheat)
+$maxScorePerMove = 5000; // Máximo razoável por uma única jogada
+if ($newScore > $maxScorePerMove) {
+    error_log("[SCORE.PHP] WARNING: Score too high ($newScore), capping to $maxScorePerMove");
+    $newScore = $maxScorePerMove;
+}
+
 error_log("[SCORE.PHP] New score received: $newScore, Level: $currentLevel");
 
 /**
  * Função para calcular a meta de pontuação do level
- * (mesma lógica do difficulty.php)
  */
 function getTargetScoreForLevel($level) {
-    $baseTargetScore = 1000; // 1000 pontos para passar no level 1
-    
-    // Meta de pontos aumenta 500 a cada level
+    $baseTargetScore = 1000;
     $targetScore = $baseTargetScore + (($level - 1) * 500);
     
-    // A cada 10 levels, aumenta mais rápido
     if ($level > 10) {
         $targetScore += (($level - 10) * 300);
     }
@@ -194,30 +187,11 @@ try {
     $stmt->execute();
     $stmt->close();
     
-    // SEMPRE adicionar os pontos ao ranking
-    $pointsToAdd = $newScore;
+    // NÃO adicionar pontos ao ranking aqui!
+    // Os pontos são adicionados APENAS quando o usuário passa de level (no level.php)
+    // Isso evita duplicação de pontos
     
-    if ($pointsToAdd > 0) {
-        error_log("[SCORE.PHP] Points to add to ranking: $pointsToAdd");
-        
-        // Adicionar pontos ao ranking do usuário (daily_points para o ranking diário)
-        $stmt = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
-        $stmt->bind_param("iii", $pointsToAdd, $pointsToAdd, $userId);
-        $stmt->execute();
-        $affectedRows = $stmt->affected_rows;
-        $stmt->close();
-        
-        error_log("[SCORE.PHP] UPDATE users affected rows: $affectedRows");
-        
-        // Registrar no histórico de pontos
-        $description = "Candy Crush - Level $currentLevel: $newScore pontos";
-        $stmt = $conn->prepare("INSERT INTO points_history (user_id, points, description, created_at) VALUES (?, ?, ?, NOW())");
-        $stmt->bind_param("iis", $userId, $pointsToAdd, $description);
-        $stmt->execute();
-        $stmt->close();
-    }
-    
-    // Buscar pontos atualizados do usuário
+    // Buscar pontos atuais do usuário (apenas para exibição)
     $stmt = $conn->prepare("SELECT points, daily_points FROM users WHERE id = ?");
     $stmt->bind_param("i", $userId);
     $stmt->execute();
@@ -230,10 +204,10 @@ try {
     }
     $stmt->close();
     
-    error_log("[SCORE.PHP] Final - Total points: $userPoints, Daily points: $dailyPoints");
+    error_log("[SCORE.PHP] Final - Total points: $userPoints, Daily points: $dailyPoints (no points added here)");
     
     // Mensagem baseada no progresso
-    $message = "Pontuação adicionada ao ranking!";
+    $message = "Score registrado!";
     if ($canAdvance) {
         $message = "Parabéns! Você atingiu a meta e pode avançar para o próximo level!";
     } else {
@@ -246,7 +220,7 @@ try {
         'data' => [
             'added' => true,
             'score' => $newScore,
-            'points_added' => $pointsToAdd,
+            'points_added' => 0, // Pontos são adicionados no level.php, não aqui
             'level' => $currentLevel,
             'level_progress' => $newLevelProgress,
             'target_score' => $targetScore,
