@@ -33,7 +33,8 @@ if (!$isMaintenanceEndpoint) {
     // Lista de emails de administradores
     $ADMIN_EMAILS = [
         'soltacartatigri@gmail.com',
-        'muriel25herrera@gmail.com'
+        'muriel25herrera@gmail.com',
+        'gustavopramos97@gmail.com'
     ];
     
     try {
