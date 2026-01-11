@@ -258,10 +258,29 @@ try {
         $position++;
     }
     
-    // 1. RANKING - Contar e resetar daily_points
+    // 1. RANKING - Contar e resetar daily_points APENAS DO TOP 10
+    // CORRIGIDO: Antes estava zerando TODOS os usuários, agora zera apenas o top 10
     $countResult = $mysqli->query("SELECT COUNT(*) as total FROM users WHERE daily_points > 0");
-    $usersAffected = $countResult->fetch_assoc()['total'];
-    $mysqli->query("UPDATE users SET daily_points = 0");
+    $totalUsersWithPoints = $countResult->fetch_assoc()['total'];
+    
+    // Coletar IDs do top 10 que já foram processados
+    $top10UserIds = array_column($prizesAwarded, 'user_id');
+    
+    // Resetar APENAS os usuários do top 10
+    $usersAffected = 0;
+    if (!empty($top10UserIds)) {
+        $placeholders = implode(',', array_fill(0, count($top10UserIds), '?'));
+        $types = str_repeat('i', count($top10UserIds));
+        
+        $stmt = $mysqli->prepare("UPDATE users SET daily_points = 0 WHERE id IN ($placeholders)");
+        $stmt->bind_param($types, ...$top10UserIds);
+        $stmt->execute();
+        $usersAffected = $stmt->affected_rows;
+        $stmt->close();
+    }
+    
+    // Log: Usuários do 11º em diante MANTÊM seus pontos
+    $usersKeptPoints = $totalUsersWithPoints - $usersAffected;
     
     // 2. SPIN - Deletar registros de HOJE
     $spinsDeleted = $mysqli->query("DELETE FROM spin_history WHERE DATE(created_at) = '$current_date'");
@@ -357,8 +376,11 @@ try {
                 'description' => 'Cooldowns aplicados: Top 1-3 = 2 dias, Top 4-10 = 1 dia'
             ],
             'ranking' => [
-                'users_affected' => $usersAffected,
-                'description' => 'daily_points resetado para 0'
+                'users_reset' => $usersAffected,
+                'users_kept_points' => $usersKeptPoints,
+                'total_users_with_points' => $totalUsersWithPoints,
+                'top10_ids' => $top10UserIds,
+                'description' => 'APENAS Top 10 teve daily_points resetado para 0. Demais usuários mantêm seus pontos.'
             ],
             'spin' => [
                 'records_deleted' => $spinsDeletedCount,
