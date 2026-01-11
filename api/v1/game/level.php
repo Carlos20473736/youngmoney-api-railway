@@ -175,6 +175,16 @@ if ($method === 'GET') {
         $stmt->bind_param("iiiii", $newLevel, $newHighest, $lastLevelScore, $newTotalScore, $userId);
         
         if ($stmt->execute()) {
+            // CORREÇÃO: Resetar o progresso do level na tabela candy_level_progress
+            // Isso evita o bug visual de pontos "voltando" ao passar de level
+            $stmtReset = $conn->prepare("INSERT INTO candy_level_progress (user_id, current_level, level_score) 
+                                         VALUES (?, ?, 0) 
+                                         ON DUPLICATE KEY UPDATE current_level = ?, level_score = 0");
+            $stmtReset->bind_param("iii", $userId, $newLevel, $newLevel);
+            $stmtReset->execute();
+            $stmtReset->close();
+            error_log("[LEVEL.PHP] Reset candy_level_progress for user $userId to level $newLevel");
+            
             // CORREÇÃO: Creditar os pontos ao usuário quando o level termina
             if ($lastLevelScore > 0) {
                 $pointsAdded = $lastLevelScore;
@@ -233,6 +243,15 @@ if ($method === 'GET') {
         $stmt->bind_param("iiiii", $userId, $newLevel, $newLevel, $lastLevelScore, $lastLevelScore);
         
         if ($stmt->execute()) {
+            // CORREÇÃO: Resetar o progresso do level na tabela candy_level_progress
+            $stmtReset = $conn->prepare("INSERT INTO candy_level_progress (user_id, current_level, level_score) 
+                                         VALUES (?, ?, 0) 
+                                         ON DUPLICATE KEY UPDATE current_level = ?, level_score = 0");
+            $stmtReset->bind_param("iii", $userId, $newLevel, $newLevel);
+            $stmtReset->execute();
+            $stmtReset->close();
+            error_log("[LEVEL.PHP] Reset candy_level_progress for new user $userId to level $newLevel");
+            
             // CORREÇÃO: Creditar os pontos ao usuário quando o level termina (primeiro level)
             if ($lastLevelScore > 0) {
                 $pointsAdded = $lastLevelScore;
