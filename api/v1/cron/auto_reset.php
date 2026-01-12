@@ -370,7 +370,21 @@ try {
     $monetagDeleted = $mysqli->query("DELETE FROM monetag_events");
     $monetagDeletedCount = $mysqli->affected_rows;
     
-    // 7. Registrar log do reset (opcional)
+    // 7. CANDY CRUSH - Resetar níveis do jogo (volta todos para level 1)
+    $candyLevelsReset = 0;
+    $candyResult = $mysqli->query("UPDATE game_levels SET level = 1, highest_level = 1, last_level_score = 0, total_score = 0");
+    if ($candyResult) {
+        $candyLevelsReset = $mysqli->affected_rows;
+    }
+    
+    // 8. CANDY CRUSH - Resetar progresso de level
+    $mysqli->query("DELETE FROM candy_level_progress");
+    $candyProgressDeleted = $mysqli->affected_rows;
+    
+    // 9. CANDY CRUSH - Resetar scores (se tabela existir)
+    @$mysqli->query("DELETE FROM candy_scores");
+    
+    // 10. Registrar log do reset (opcional)
     try {
         $stmt = $mysqli->prepare("
             INSERT INTO ranking_reset_logs 
@@ -421,6 +435,11 @@ try {
                 'events_deleted' => $monetagDeletedCount,
                 'new_required_impressions' => $random_impressions,
                 'description' => 'Eventos resetados e impressões randomizadas (5-30)'
+            ],
+            'candy_crush' => [
+                'levels_reset' => $candyLevelsReset,
+                'progress_deleted' => $candyProgressDeleted,
+                'description' => 'Todos os níveis do Candy foram resetados para 1'
             ],
             'reset_date' => $current_date,
             'reset_time' => $current_time,
