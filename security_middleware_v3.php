@@ -50,7 +50,7 @@ $maintenanceExemptEndpoints = [
     '/api/v1/secure.php',
     '/api/v1/app/check-update.php',  // Verificação de atualização do app
     '/api/v1/app/version.php',        // Versão do app
-    // REMOVIDO: /api/v1/security/allowed-installers.php - Agora verifica versão internamente
+    '/api/v1/security/allowed-installers.php'  // Verifica versão internamente, isento de manutenção
 ];
 
 // Endpoints isentos de verificação de versão (podem ser acessados por qualquer versão)
