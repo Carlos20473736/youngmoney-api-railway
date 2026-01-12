@@ -6,9 +6,10 @@
  * Implementa validação completa de segurança
  * 
  * INCLUI: Verificação de Modo de Manutenção
+ * INCLUI: Verificação de Versão Mínima do APK (GLOBAL)
  * Quando ativado, TODAS as APIs POST e GET são bloqueadas
  * 
- * @version 3.4.0
+ * @version 3.5.0
  */
 
 // =====================================================
@@ -31,6 +32,12 @@ $ADMIN_EMAILS = [
     'gustavopramos97@gmail.com'
 ];
 
+// =====================================================
+// VERSÃO MÍNIMA DO APK - CONFIGURAÇÃO GLOBAL
+// =====================================================
+// APKs com versão inferior a esta serão BLOQUEADOS
+$GLOBAL_MIN_APP_VERSION = '44.0';
+
 // Endpoints isentos de verificação de manutenção (admins podem acessar mesmo sem token)
 $maintenanceExemptEndpoints = [
     '/admin/maintenance.php',
@@ -46,6 +53,17 @@ $maintenanceExemptEndpoints = [
     '/api/v1/security/allowed-installers.php'  // Verificação de origem do app (Play Store vs fontes desconhecidas)
 ];
 
+// Endpoints isentos de verificação de versão (podem ser acessados por qualquer versão)
+// Isso permite que APKs antigos vejam a mensagem de atualização necessária
+$versionExemptEndpoints = [
+    '/api/v1/app/check-update.php',
+    '/api/v1/app/version.php',
+    '/admin/',
+    '/health',
+    '/ping',
+    '/index.php'
+];
+
 // Verificar se é endpoint isento de manutenção
 $isMaintenanceExempt = false;
 foreach ($maintenanceExemptEndpoints as $exemptEndpoint) {
@@ -53,6 +71,142 @@ foreach ($maintenanceExemptEndpoints as $exemptEndpoint) {
         $isMaintenanceExempt = true;
         break;
     }
+}
+
+// Verificar se é endpoint isento de verificação de versão
+$isVersionExempt = false;
+foreach ($versionExemptEndpoints as $exemptEndpoint) {
+    if (strpos($requestUri, $exemptEndpoint) !== false) {
+        $isVersionExempt = true;
+        break;
+    }
+}
+
+// =====================================================
+// FUNÇÃO: Comparar versões do app
+// =====================================================
+function compareAppVersionsGlobal($v1, $v2) {
+    // Remover prefixo 'v' ou 'V' se existir
+    $v1 = ltrim($v1, 'vV');
+    $v2 = ltrim($v2, 'vV');
+    
+    // Separar em partes
+    $parts1 = explode('.', $v1);
+    $parts2 = explode('.', $v2);
+    
+    // Garantir que ambas tenham 3 partes
+    while (count($parts1) < 3) $parts1[] = '0';
+    while (count($parts2) < 3) $parts2[] = '0';
+    
+    // Comparar cada parte
+    for ($i = 0; $i < 3; $i++) {
+        $num1 = intval($parts1[$i]);
+        $num2 = intval($parts2[$i]);
+        
+        if ($num1 < $num2) return -1;
+        if ($num1 > $num2) return 1;
+    }
+    
+    return 0;
+}
+
+// =====================================================
+// FUNÇÃO: Obter versão do app da requisição
+// =====================================================
+function getAppVersionFromRequestGlobal() {
+    // 1. Tentar obter do header X-App-Version
+    if (isset($_SERVER['HTTP_X_APP_VERSION']) && !empty($_SERVER['HTTP_X_APP_VERSION'])) {
+        return trim($_SERVER['HTTP_X_APP_VERSION']);
+    }
+    
+    // 2. Tentar obter do header X-APP-VERSION (case insensitive)
+    foreach ($_SERVER as $key => $value) {
+        if (strtolower($key) === 'http_x_app_version' && !empty($value)) {
+            return trim($value);
+        }
+    }
+    
+    // 3. Tentar obter do body da requisição
+    $rawBody = file_get_contents('php://input');
+    if ($rawBody) {
+        $data = json_decode($rawBody, true);
+        if (isset($data['app_version']) && !empty($data['app_version'])) {
+            return trim($data['app_version']);
+        }
+        if (isset($data['appVersion']) && !empty($data['appVersion'])) {
+            return trim($data['appVersion']);
+        }
+        if (isset($data['version']) && !empty($data['version'])) {
+            return trim($data['version']);
+        }
+    }
+    
+    // 4. Tentar obter do query string
+    if (isset($_GET['app_version']) && !empty($_GET['app_version'])) {
+        return trim($_GET['app_version']);
+    }
+    if (isset($_GET['appVersion']) && !empty($_GET['appVersion'])) {
+        return trim($_GET['appVersion']);
+    }
+    
+    // 5. Tentar obter do POST
+    if (isset($_POST['app_version']) && !empty($_POST['app_version'])) {
+        return trim($_POST['app_version']);
+    }
+    
+    return null;
+}
+
+// =====================================================
+// VERIFICAÇÃO GLOBAL DE VERSÃO DO APK - ANTES DE TUDO!
+// =====================================================
+if (!$isVersionExempt) {
+    $appVersion = getAppVersionFromRequestGlobal();
+    
+    // Se a versão não foi enviada OU é inferior à mínima, BLOQUEAR
+    if ($appVersion === null || $appVersion === '' || empty(trim($appVersion))) {
+        error_log("[VERSION_CHECK] Requisição BLOQUEADA - APK não enviou versão. Endpoint: $requestUri");
+        
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+        http_response_code(426); // Upgrade Required
+        
+        echo json_encode([
+            'success' => false,
+            'status' => 'error',
+            'update_required' => true,
+            'current_version' => null,
+            'min_version' => $GLOBAL_MIN_APP_VERSION,
+            'message' => 'Versão do app não identificada. Por favor, atualize o aplicativo para continuar.',
+            'code' => 'VERSION_NOT_PROVIDED',
+            'reason' => 'app_version_missing'
+        ]);
+        exit;
+    }
+    
+    // Verificar se a versão é inferior à mínima
+    if (compareAppVersionsGlobal($appVersion, $GLOBAL_MIN_APP_VERSION) < 0) {
+        error_log("[VERSION_CHECK] Requisição BLOQUEADA - Versão desatualizada: $appVersion (mínima: $GLOBAL_MIN_APP_VERSION). Endpoint: $requestUri");
+        
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+        http_response_code(426); // Upgrade Required
+        
+        echo json_encode([
+            'success' => false,
+            'status' => 'error',
+            'update_required' => true,
+            'current_version' => $appVersion,
+            'min_version' => $GLOBAL_MIN_APP_VERSION,
+            'message' => 'Sua versão do app está desatualizada. Por favor, atualize para a versão ' . $GLOBAL_MIN_APP_VERSION . ' ou superior para continuar usando o aplicativo.',
+            'code' => 'UPDATE_REQUIRED',
+            'reason' => 'version_outdated'
+        ]);
+        exit;
+    }
+    
+    // Log de versão aceita
+    error_log("[VERSION_CHECK] Versão aceita: $appVersion (mínima: $GLOBAL_MIN_APP_VERSION). Endpoint: $requestUri");
 }
 
 // Se NÃO for endpoint isento, verificar modo de manutenção
