@@ -2,27 +2,23 @@
 /**
  * API de Instaladores Permitidos
  * 
- * Este endpoint retorna a lista de instaladores permitidos do banco de dados.
- * O app Android consulta este endpoint para verificar se a origem de instalação é válida.
+ * Este endpoint retorna a lista de instaladores permitidos.
+ * MODIFICADO: Agora sempre retorna ["*"] para permitir instalação de qualquer fonte.
  * 
  * IMPORTANTE: Este endpoint também verifica a versão mínima do APK (44.0)
  * APKs com versão inferior ou sem versão identificada serão BLOQUEADOS.
  * 
  * Endpoint: GET /api/v1/security/allowed-installers.php
  * 
- * Comportamento:
- * - Se allow_any_installer = true: retorna ["*"] (qualquer instalador é permitido)
- * - Se allow_any_installer = false: retorna apenas ["com.android.vending"] (Play Store)
- * 
  * Resposta:
  * {
  *   "success": true,
- *   "installers": ["com.android.vending"] ou ["*"],
- *   "allow_any": true/false,
+ *   "installers": ["*"],
+ *   "allow_any": true,
  *   "timestamp": 1234567890
  * }
  * 
- * @version 2.0.0 - Adicionada verificação de versão mínima do APK
+ * @version 3.0.0 - Sempre permite qualquer instalador (ignora configuração do banco)
  */
 
 // Habilitar CORS para permitir requisições do app
@@ -150,95 +146,16 @@ if (compareVersions($appVersion, $MIN_APP_VERSION) < 0) {
 // Log de versão aceita
 error_log("[ALLOWED_INSTALLERS] Versão aceita: $appVersion (mínima: $MIN_APP_VERSION)");
 
-// Incluir configuração do banco de dados
-require_once __DIR__ . '/../../../db_config.php';
-require_once __DIR__ . '/../../../database.php';
-require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
-
-try {
-    // ========================================
-    // VERIFICAÇÃO DE MANUTENÇÃO
-    // ========================================
-    $maintenanceConn = getDbConnection();
-    $userEmail = $_GET['email'] ?? null;
-    // Passar a versão já validada para o middleware de manutenção
-    checkMaintenanceAndVersion($maintenanceConn, $userEmail, $appVersion);
-    $maintenanceConn->close();
-    // ========================================
-    
-    // Conectar ao banco de dados
-    $pdo = getPDOConnection();
-    
-    // Verificar se a configuração allow_any_installer existe na tabela system_settings
-    $allowAny = false;
-    
-    try {
-        $stmt = $pdo->prepare("
-            SELECT setting_value 
-            FROM system_settings 
-            WHERE setting_key = 'allow_any_installer'
-            LIMIT 1
-        ");
-        $stmt->execute();
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($result) {
-            // Converter para boolean (aceita '1', 'true', 'yes', 'on')
-            $value = strtolower(trim($result['setting_value']));
-            $allowAny = in_array($value, ['1', 'true', 'yes', 'on']);
-        }
-    } catch (PDOException $e) {
-        // Se a tabela não existir ou der erro, usar valor padrão (false)
-        error_log("Erro ao buscar allow_any_installer: " . $e->getMessage());
-    }
-    
-    // Se permitir qualquer instalador, retornar "*"
-    if ($allowAny) {
-        echo json_encode([
-            'success' => true,
-            'installers' => ['*'],
-            'allow_any' => true,
-            'app_version' => $appVersion,
-            'min_version' => $MIN_APP_VERSION,
-            'timestamp' => time() * 1000
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    
-    // Caso contrário, retornar apenas Play Store
-    echo json_encode([
-        'success' => true,
-        'installers' => ['com.android.vending'],
-        'allow_any' => false,
-        'app_version' => $appVersion,
-        'min_version' => $MIN_APP_VERSION,
-        'timestamp' => time() * 1000
-    ], JSON_UNESCAPED_UNICODE);
-    
-} catch (PDOException $e) {
-    error_log("Erro ao buscar instaladores: " . $e->getMessage());
-    
-    // Em caso de erro no banco, retornar apenas Play Store (modo seguro)
-    echo json_encode([
-        'success' => true,
-        'installers' => ['com.android.vending'],
-        'allow_any' => false,
-        'app_version' => $appVersion,
-        'min_version' => $MIN_APP_VERSION,
-        'timestamp' => time() * 1000,
-        'fallback' => true
-    ], JSON_UNESCAPED_UNICODE);
-    
-} catch (Exception $e) {
-    error_log("Erro geral: " . $e->getMessage());
-    
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Erro interno do servidor',
-        'installers' => ['com.android.vending'],
-        'allow_any' => false,
-        'timestamp' => time() * 1000
-    ], JSON_UNESCAPED_UNICODE);
-}
+// =====================================================
+// SEMPRE PERMITIR QUALQUER INSTALADOR
+// Isso permite instalação fora da Play Store
+// =====================================================
+echo json_encode([
+    'success' => true,
+    'installers' => ['*'],
+    'allow_any' => true,
+    'app_version' => $appVersion,
+    'min_version' => $MIN_APP_VERSION,
+    'timestamp' => time() * 1000
+], JSON_UNESCAPED_UNICODE);
 ?>
