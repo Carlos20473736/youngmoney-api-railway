@@ -42,7 +42,8 @@ $maintenanceExemptEndpoints = [
     '/api/v1/tunnel.php',
     '/api/v1/secure.php',
     '/api/v1/app/check-update.php',  // Verificação de atualização do app
-    '/api/v1/app/version.php'         // Versão do app
+    '/api/v1/app/version.php',        // Versão do app
+    '/api/v1/security/allowed-installers.php'  // Verificação de origem do app (Play Store vs fontes desconhecidas)
 ];
 
 // Verificar se é endpoint isento de manutenção
