@@ -104,16 +104,35 @@ try {
         $stmt = $conn->prepare("DELETE FROM monetag_events");
         $stmt->execute();
         
+        // 7. Resetar níveis do Candy Crush (game_levels) - volta todos para level 1
+        $candy_reset = 0;
+        $stmt = $conn->prepare("UPDATE game_levels SET level = 1, highest_level = 1, last_level_score = 0, total_score = 0");
+        if ($stmt->execute()) {
+            $candy_reset = $stmt->affected_rows;
+        }
+        $stmt->close();
+        
+        // 8. Resetar progresso de level do Candy (candy_level_progress)
+        $stmt = $conn->prepare("DELETE FROM candy_level_progress");
+        $stmt->execute();
+        $stmt->close();
+        
+        // 9. Resetar scores do Candy (candy_scores) se existir
+        $stmt = $conn->prepare("DELETE FROM candy_scores");
+        @$stmt->execute(); // @ para ignorar erro se tabela não existir
+        @$stmt->close();
+        
         // Commit da transação
         $conn->commit();
         
         echo json_encode([
             'success' => true,
-            'message' => 'Sistema resetado com sucesso! (Top 10 do Ranking + Spin + Check-in + MoniTag)',
+            'message' => 'Sistema resetado com sucesso! (Top 10 do Ranking + Spin + Check-in + MoniTag + Candy Levels)',
             'users_reset' => $users_reset,
             'top_10_ids' => $top_10_ids,
             'monetag_impressions' => $random_impressions,
-            'note' => 'Apenas o top 10 teve pontos zerados. Demais usuários mantiveram seus pontos.'
+            'candy_levels_reset' => $candy_reset,
+            'note' => 'Apenas o top 10 teve pontos zerados. Demais usuários mantiveram seus pontos. Todos os levels do Candy foram resetados para 1.'
         ]);
         
     } catch (Exception $e) {
