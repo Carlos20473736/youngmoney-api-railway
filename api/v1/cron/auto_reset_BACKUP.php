@@ -1,19 +1,17 @@
 <?php
 /**
- * Endpoint de Reset Automático Diário - CORRIGIDO
+ * Endpoint de Reset Automático Diário
  * 
  * Este endpoint é chamado pelo cron-job.org a cada minuto.
- * Reseta APENAS às 20:00 (8 da noite) horário de Brasília:
+ * Reseta TUDO quando o horário configurado no painel admin for atingido:
  * 
- * 1. Ranking (daily_points = 0) - APENAS TOP 10
+ * 1. Ranking (daily_points = 0)
  * 2. Spin (DELETE registros de HOJE)
  * 3. Check-in (Atualiza last_reset_datetime - histórico preservado)
  * 
  * NOVO: Sistema de Cooldown para vencedores do ranking
  * - Top 1, 2, 3: 2 dias de cooldown
  * - Top 4 a 10: 1 dia de cooldown
- * 
- * CORREÇÃO: Agora verifica se é exatamente 20:00 e se já não foi resetado hoje
  */
 
 header('Content-Type: application/json');
@@ -31,7 +29,7 @@ if ($token !== $expectedToken) {
     exit;
 }
 
-// Configurar timezone para Brasília
+// Configurar timezone
 date_default_timezone_set('America/Sao_Paulo');
 
 // Incluir arquivo de conexão
@@ -48,12 +46,33 @@ try {
     $current_hour = (int)date('H');
     $current_minute = (int)date('i');
     
-    // ============================================
-    // HORÁRIO FIXO: 20:00 (8 da noite)
-    // ============================================
-    $reset_hour = 20;  // 8 da noite
-    $reset_minute = 0; // em ponto
-    $reset_time = '20:00';
+    // Buscar horário configurado no painel admin
+    $stmt = $mysqli->prepare("
+        SELECT setting_value 
+        FROM system_settings 
+        WHERE setting_key = 'reset_time'
+        LIMIT 1
+    ");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $reset_time_config = $result->fetch_assoc();
+    
+    // Se não houver configuração, retornar erro
+    if (!$reset_time_config || empty($reset_time_config['setting_value'])) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Horário de reset não configurado no painel admin'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    
+    $reset_time = $reset_time_config['setting_value'];
+    
+    // Extrair hora e minuto do horário configurado
+    list($reset_hour, $reset_minute) = explode(':', $reset_time);
+    $reset_hour = (int)$reset_hour;
+    $reset_minute = (int)$reset_minute;
     
     // Buscar último horário de reset
     $stmt = $mysqli->prepare("
@@ -68,60 +87,15 @@ try {
     $last_reset_time = $last_reset ? $last_reset['setting_value'] : null;
     
     // ============================================
-    // VERIFICAÇÃO DE HORÁRIO - CORRIGIDO
+    // MODIFICADO: RESET A QUALQUER MOMENTO
     // ============================================
-    // Só executa o reset se:
-    // 1. For exatamente 20:00 (hora e minuto)
-    // 2. Não tiver sido executado hoje ainda
-    
-    $should_reset = false;
-    $reason = '';
-    
-    // Verificar se já foi feito reset hoje
-    $last_reset_date = null;
-    if ($last_reset_time) {
-        $last_reset_date = date('Y-m-d', strtotime($last_reset_time));
-    }
-    
-    $already_reset_today = ($last_reset_date === $current_date);
-    
-    // Verificar se é a hora certa (20:00)
-    $is_reset_time = ($current_hour === $reset_hour && $current_minute === $reset_minute);
-    
-    if ($already_reset_today) {
-        $should_reset = false;
-        $reason = 'Reset já foi executado hoje às ' . date('H:i:s', strtotime($last_reset_time));
-    } elseif (!$is_reset_time) {
-        $should_reset = false;
-        $reason = 'Ainda não é o horário de reset. Horário atual: ' . $current_time . '. Reset programado para: ' . $reset_time;
-    } else {
-        $should_reset = true;
-        $reason = 'Horário de reset atingido (20:00) e ainda não foi executado hoje';
-    }
+    // O reset agora pode ser executado a qualquer hora
+    // Sem restrição de horário
+    $should_reset = true;
+    $reason = 'Reset executado a qualquer momento (sem restrição de horário)';
     
     // ============================================
-    // SE NÃO FOR HORA DE RESETAR, RETORNAR
-    // ============================================
-    if (!$should_reset) {
-        echo json_encode([
-            'success' => true,
-            'reset_executed' => false,
-            'message' => $reason,
-            'data' => [
-                'current_time' => $current_time,
-                'current_date' => $current_date,
-                'configured_reset_time' => $reset_time,
-                'last_reset' => $last_reset_time,
-                'already_reset_today' => $already_reset_today,
-                'is_reset_time' => $is_reset_time,
-                'timezone' => 'America/Sao_Paulo (GMT-3)'
-            ]
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    
-    // ============================================
-    // RESETAR TUDO (apenas se passou nas verificações)
+    // RESETAR TUDO
     // ============================================
     
     // Iniciar transação
@@ -284,9 +258,8 @@ try {
         $position++;
     }
     
-    // ============================================
-    // 1. RANKING - Resetar daily_points APENAS DO TOP 10
-    // ============================================
+    // 1. RANKING - Contar e resetar daily_points APENAS DO TOP 10
+    // CORRIGIDO: Antes estava zerando TODOS os usuários, agora zera apenas o top 10
     $countResult = $mysqli->query("SELECT COUNT(*) as total FROM users WHERE daily_points > 0");
     $totalUsersWithPoints = $countResult->fetch_assoc()['total'];
     
@@ -324,7 +297,7 @@ try {
     $stmt->bind_param("ss", $current_datetime, $current_datetime);
     $stmt->execute();
     
-    // 4. Atualizar último horário de reset
+    // 4. Atualizar último horário de reset (com timestamp completo para rastrear resets a qualquer hora)
     $stmt = $mysqli->prepare("
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
         VALUES ('last_reset_time', ?, NOW())
@@ -332,7 +305,7 @@ try {
             setting_value = ?,
             updated_at = NOW()
     ");
-    $stmt->bind_param("ss", $current_datetime, $current_datetime);
+     $stmt->bind_param("ss", $current_datetime, $current_datetime);
     $stmt->execute();
     
     // 5. MONETAG - Randomizar número de impressões necessárias (5 a 30)
@@ -390,7 +363,7 @@ try {
     echo json_encode([
         'success' => true,
         'reset_executed' => true,
-        'message' => 'Reset diário executado com sucesso às 20:00!',
+        'message' => 'Reset diário executado com sucesso!',
         'data' => [
             'prizes' => [
                 'total_awarded' => count($prizesAwarded),
