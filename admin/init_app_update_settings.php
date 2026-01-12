@@ -22,8 +22,7 @@ try {
     $settings = [
         ['app_update_enabled', '0', 'Habilita verificação de atualização do app'],
         ['app_update_min_version', '1.0.0', 'Versão mínima requerida do app'],
-        ['app_update_download_url', '', 'URL para download da nova versão do app (Play Store)'],
-        ['app_update_secondary_url', '', 'URL secundária para download direto do APK'],
+        ['app_update_download_url', '', 'URL para download da nova versão do app'],
         ['app_update_force', '0', 'Força atualização (bloqueia uso do app)'],
         ['app_update_release_notes', '', 'Notas de lançamento da nova versão']
     ];

@@ -8,8 +8,7 @@
  * Configurações:
  * - app_update_enabled: '0' ou '1'
  * - app_update_min_version: versão mínima (ex: '44.0')
- * - app_update_download_url: URL da Play Store
- * - app_update_secondary_url: URL para download direto do APK
+ * - app_update_download_url: URL para download do APK
  * - app_update_force: '0' ou '1'
  * - app_update_release_notes: notas da versão
  */
@@ -46,7 +45,6 @@ try {
                 'app_update_enabled' => $settings['app_update_enabled'] ?? '0',
                 'app_update_min_version' => $settings['app_update_min_version'] ?? '1.0.0',
                 'app_update_download_url' => $settings['app_update_download_url'] ?? '',
-                'app_update_secondary_url' => $settings['app_update_secondary_url'] ?? '',
                 'app_update_force' => $settings['app_update_force'] ?? '0',
                 'app_update_release_notes' => $settings['app_update_release_notes'] ?? ''
             ]
@@ -71,7 +69,6 @@ try {
                 'app_update_enabled',
                 'app_update_min_version',
                 'app_update_download_url',
-                'app_update_secondary_url',
                 'app_update_force',
                 'app_update_release_notes'
             ];

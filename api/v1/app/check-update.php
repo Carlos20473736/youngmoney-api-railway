@@ -18,8 +18,7 @@
  *     "update_enabled": true,
  *     "current_version": "43.0",
  *     "min_version": "44.0",
- *     "download_url": "https://play.google.com/store/apps/details?id=...",
- *     "secondary_download_url": "https://exemplo.com/download/app.apk",
+ *     "download_url": "https://exemplo.com/download/app.apk",
  *     "force_update": true,
  *     "release_notes": "Nova versão disponível com melhorias",
  *     "open_in_browser": false,
@@ -132,7 +131,6 @@ try {
     $updateEnabled = ($settings['app_update_enabled'] ?? '0') === '1';
     $minVersion = $settings['app_update_min_version'] ?? '1.0.0';
     $downloadUrl = $settings['app_update_download_url'] ?? '';
-    $secondaryDownloadUrl = $settings['app_update_secondary_url'] ?? '';
     $forceUpdate = ($settings['app_update_force'] ?? '0') === '1';
     $releaseNotes = $settings['app_update_release_notes'] ?? '';
     
@@ -156,7 +154,6 @@ try {
             'current_version' => $appVersion,
             'min_version' => $minVersion,
             'download_url' => $downloadUrl,
-            'secondary_download_url' => $secondaryDownloadUrl,
             'force_update' => $forceUpdate && $updateRequired,
             'release_notes' => $releaseNotes,
             // Novos campos para indicar como abrir a URL
