@@ -229,14 +229,40 @@ if (!empty($requestData['body'])) {
 // Extrair email do usuário (pode vir do body ou headers)
 $userEmail = $bodyData['email'] ?? $requestData['headers']['email'] ?? null;
 
-// Extrair versão do app (pode vir do body, headers ou payload)
-$appVersion = $bodyData['app_version'] ?? $bodyData['version'] ?? $requestData['headers']['X-App-Version'] ?? $payload['app_version'] ?? null;
+// Extrair versão do app (pode vir de múltiplas fontes)
+// Ordem de prioridade:
+// 1. Body descriptografado (app_version)
+// 2. Body descriptografado (version)
+// 3. Headers da requisição interna (X-App-Version)
+// 4. Payload do túnel (app_version)
+// 5. RequestData descriptografado (app_version)
+// 6. Header HTTP direto (X-App-Version)
+$appVersion = $bodyData['app_version'] 
+    ?? $bodyData['version'] 
+    ?? $requestData['headers']['X-App-Version'] 
+    ?? $payload['app_version'] 
+    ?? $requestData['app_version']
+    ?? $_SERVER['HTTP_X_APP_VERSION']
+    ?? null;
+
+// Log para debug se versão não encontrada
+if ($appVersion === null) {
+    error_log("[TUNNEL] AVISO: Versão do app não encontrada");
+    error_log("[TUNNEL] bodyData keys: " . json_encode(array_keys($bodyData)));
+    error_log("[TUNNEL] requestData keys: " . json_encode(array_keys($requestData)));
+    error_log("[TUNNEL] payload keys: " . json_encode(array_keys($payload)));
+} else {
+    error_log("[TUNNEL] Versão do app: $appVersion");
+}
 
 // Verificar se é um endpoint que não precisa de verificação de versão
 $requestUrl = $requestData['url'] ?? '';
 $skipVersionCheck = (
     strpos($requestUrl, '/app/check-update') !== false ||
-    strpos($requestUrl, '/app/version') !== false
+    strpos($requestUrl, '/app/version') !== false ||
+    strpos($requestUrl, '/device/check') !== false ||
+    strpos($requestUrl, '/device/register') !== false ||
+    strpos($requestUrl, '/auth/google-login') !== false
 );
 
 // Executar verificação de manutenção e versão
