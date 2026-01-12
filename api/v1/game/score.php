@@ -23,6 +23,7 @@ try {
     // Includes necessários
     require_once __DIR__ . '/../../../db_config.php';
     require_once __DIR__ . '/../../../includes/auth_helper.php';
+    require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Include error: ' . $e->getMessage()]);
@@ -59,6 +60,15 @@ if (!$user) {
 
 $userId = $user['id'];
 $method = $_SERVER['REQUEST_METHOD'];
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$requestData = json_decode(file_get_contents('php://input'), true) ?? [];
+$userEmail = $user['email'] ?? $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 error_log("[SCORE.PHP] User ID: $userId, Method: $method");
 

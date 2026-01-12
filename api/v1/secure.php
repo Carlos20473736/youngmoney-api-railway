@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_once __DIR__ . '/../../database.php';
 require_once __DIR__ . '/../../includes/DeviceKeyValidator.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 try {
     $conn = getDbConnection();
@@ -32,6 +33,16 @@ try {
     echo json_encode(['error' => 'Database connection failed']);
     exit;
 }
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$rawBody = file_get_contents('php://input');
+$requestData = json_decode($rawBody, true) ?? [];
+$userEmail = $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Função para obter header de múltiplas fontes
 function getHeader($name) {

@@ -27,6 +27,7 @@ try {
     // Incluir configurações do banco de dados
     require_once __DIR__ . '/../../../db_config.php';
     require_once __DIR__ . '/../../../includes/auth_helper.php';
+    require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Include error: ' . $e->getMessage()]);
@@ -86,10 +87,19 @@ if (!$user) {
 
 $userId = $user['id'];
 
-error_log("[LEVEL.PHP] User ID: $userId, Method: " . $_SERVER['REQUEST_METHOD']);
-
-// Processar requisição
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
 $method = $_SERVER['REQUEST_METHOD'];
+$requestData = ($method === 'POST') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $user['email'] ?? $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
+
+error_log("[LEVEL.PHP] User ID: $userId, Method: " . $_SERVER['REQUEST_METHOD']);
 
 if ($method === 'GET') {
     // Buscar level e pontos do usuário

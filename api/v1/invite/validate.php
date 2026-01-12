@@ -16,8 +16,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once '../../../database.php';
 require_once __DIR__ . '/../../includes/HeadersValidator.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 $conn = getDbConnection();
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$requestData = json_decode(file_get_contents('php://input'), true) ?? [];
+$userEmail = $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Validar headers de segurança
 $validator = validateRequestHeaders($conn, true);

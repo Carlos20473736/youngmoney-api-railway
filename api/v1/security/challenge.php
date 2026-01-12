@@ -11,6 +11,7 @@
 header("Content-Type: application/json");
 require_once __DIR__ . '/../../../database.php';
 require_once __DIR__ . '/../../../includes/UltraSecuritySystem.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -31,6 +32,15 @@ try {
     }
     
     $deviceId = $input['device_id'];
+    
+    // ========================================
+    // VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+    // ========================================
+    $conn = getDbConnection();
+    $userEmail = $input['email'] ?? null;
+    $appVersion = $input['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+    // ========================================
     
     // Validar formato do device_id (UUID)
     if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $deviceId)) {

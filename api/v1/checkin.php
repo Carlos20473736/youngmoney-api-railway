@@ -14,6 +14,7 @@ error_reporting(0);
 
 require_once __DIR__ . "/../../database.php";
 require_once __DIR__ . "/../../includes/auth_helper.php";
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -31,6 +32,18 @@ date_default_timezone_set('America/Sao_Paulo');
 try {
     $conn = getDbConnection();
     
+    // ========================================
+    // VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+    // ========================================
+    $method = $_SERVER['REQUEST_METHOD'];
+    $requestData = ($method === 'POST') 
+        ? json_decode(file_get_contents('php://input'), true) ?? []
+        : $_GET;
+    $userEmail = $requestData['email'] ?? null;
+    $appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+    // ========================================
+    
     // Configurar timezone no MySQL também
     $conn->query("SET time_zone = '-03:00'");
     
@@ -46,7 +59,7 @@ try {
         if (isset($_GET['user_id']) && !empty($_GET['user_id'])) {
             $userId = (int)$_GET['user_id'];
         } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $input = json_decode(file_get_contents('php://input'), true);
+            $input = $requestData;
             if (!$input && !empty($GLOBALS['_SECURE_REQUEST_BODY'])) {
                 $input = json_decode($GLOBALS['_SECURE_REQUEST_BODY'], true);
             }

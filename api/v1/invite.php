@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Usar os mesmos includes que battery.php
 require_once __DIR__ . '/../../db_config.php';
 require_once __DIR__ . '/../../includes/auth_helper.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -45,6 +46,17 @@ if (!$user) {
 
 $userId = $user['id'];
 error_log("[INVITE] User ID: $userId");
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$requestData = ($method === 'POST') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $user['email'] ?? $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Verificar se tabela referrals existe e tem as colunas corretas
 $tableCheck = $conn->query("SHOW COLUMNS FROM referrals LIKE 'referred_user_id'");

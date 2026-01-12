@@ -7,6 +7,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../../cors.php';
 require_once __DIR__ . '/../../../database.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 // Verificar se é admin (via header ou token)
 $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -14,6 +15,14 @@ $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 
 try {
     $conn = getDbConnection();
+    
+    // ========================================
+    // VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+    // ========================================
+    $userEmail = $_GET['email'] ?? null;
+    $appVersion = $_GET['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+    // ========================================
     
     // Estatísticas de violações (últimas 24h)
     $stmt = $conn->query("

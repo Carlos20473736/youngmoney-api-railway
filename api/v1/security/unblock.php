@@ -7,6 +7,7 @@
 header('Content-Type: application/json');
 require_once __DIR__ . '/../../../cors.php';
 require_once __DIR__ . '/../../../database.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -29,6 +30,14 @@ if (!$type || !$value) {
 
 try {
     $conn = getDbConnection();
+    
+    // ========================================
+    // VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+    // ========================================
+    $userEmail = $input['email'] ?? null;
+    $appVersion = $input['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+    // ========================================
     
     if ($type === 'ip') {
         $stmt = $conn->prepare("DELETE FROM security_blocked_ips WHERE ip_address = ?");

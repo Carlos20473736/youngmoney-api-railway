@@ -44,8 +44,20 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 // Incluir configuração do banco de dados
 require_once __DIR__ . '/../../../db_config.php';
+require_once __DIR__ . '/../../../database.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 try {
+    // ========================================
+    // VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+    // ========================================
+    $maintenanceConn = getDbConnection();
+    $userEmail = $_GET['email'] ?? null;
+    $appVersion = $_GET['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($maintenanceConn, $userEmail, $appVersion);
+    $maintenanceConn->close();
+    // ========================================
+    
     // Conectar ao banco de dados
     $pdo = getPDOConnection();
     

@@ -5,9 +5,21 @@ header("Content-Type: application/json");
 require_once '../../database.php';
 require_once __DIR__ . '/../../includes/UltraSecuritySystem.php';
 require_once '../../middleware/auto_reset.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $conn = getDbConnection();
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$requestData = ($method === 'POST' || $method === 'PUT') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // ✅ VALIDAÇÃO ULTRA SEGURA
 $userData = validateSecureRequest($conn, true);

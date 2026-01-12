@@ -21,12 +21,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 date_default_timezone_set('America/Sao_Paulo');
 
 require_once __DIR__ . '/../../includes/DecryptMiddleware.php';
+require_once __DIR__ . '/../../database.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         DecryptMiddleware::sendError('Método não permitido', 405);
         exit;
     }
+    
+    // ========================================
+    // VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+    // ========================================
+    $maintenanceConn = getDbConnection();
+    $userEmail = $_GET['email'] ?? null;
+    $appVersion = $_GET['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($maintenanceConn, $userEmail, $appVersion);
+    $maintenanceConn->close();
+    // ========================================
     
     // Conectar ao banco
     $db_host = $_ENV['DB_HOST'] ?? getenv('DB_HOST');

@@ -12,6 +12,7 @@
 // Incluir configurações do banco de dados (mesmo que abilities.php)
 require_once __DIR__ . '/../../../db_config.php';
 require_once __DIR__ . '/../../../includes/auth_helper.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 // Headers CORS
 header('Content-Type: application/json');
@@ -67,6 +68,18 @@ if (!$user) {
 
 $userId = $user['id'];
 error_log("[BATTERY] User ID: $userId");
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$method = $_SERVER['REQUEST_METHOD'];
+$requestData = ($method === 'POST') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $user['email'] ?? $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Obter data atual (timezone Brasil)
 date_default_timezone_set('America/Sao_Paulo');

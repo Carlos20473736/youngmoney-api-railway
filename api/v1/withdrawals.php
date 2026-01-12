@@ -1,7 +1,6 @@
 <?php
 // Endpoint da API para Saques (v1)
 
-
 // Taxa de conversão: 10.000 pontos = R$ 1,00
 
 header("Content-Type: application/json");
@@ -18,9 +17,21 @@ require_once '../../database.php';
 require_once __DIR__ . '/../../includes/HeadersValidator.php';
 require_once __DIR__ . '/../../includes/auth_helper.php';
 require_once __DIR__ . '/../../includes/security_validation_helper.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $conn = getDbConnection();
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$requestData = ($method === 'POST' || $method === 'PUT') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Validar headers de segurança
 $validator = validateRequestHeaders($conn, true);
@@ -68,7 +79,7 @@ switch ($method) {
             // VALIDAÇÃO DE HEADERS REMOVIDA - estava bloqueando requisições legítimas
             // validateSecurityHeaders($conn, $user);
             
-            $data = json_decode(file_get_contents('php://input'), true);
+            $data = $requestData;
 
             if (!isset($data['user_id']) || !isset($data['pix_key']) || !isset($data['pix_key_type']) || !isset($data['amount'])) {
                 http_response_code(400);

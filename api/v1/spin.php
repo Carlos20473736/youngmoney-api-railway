@@ -1,7 +1,5 @@
 <?php
 /**
-
-
  * Spin Wheel API
  * Backend decide valor aleatório e valida giros diários
  * 
@@ -36,9 +34,22 @@ require_once __DIR__ . '/../../includes/HeadersValidator.php';
 require_once __DIR__ . '/../../middleware/auto_reset.php';
 require_once __DIR__ . '/../../includes/security_validation_helper.php';
 require_once __DIR__ . '/../../includes/auth_helper.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 // Obter conexão
 $conn = getDbConnection();
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$method = $_SERVER['REQUEST_METHOD'];
+$requestData = ($method === 'POST') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Autenticar usuário usando auth_helper (mesma lógica do profile.php)
 $user = getAuthenticatedUser($conn);

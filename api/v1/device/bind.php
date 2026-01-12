@@ -49,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Carregar configuração
 require_once __DIR__ . '/../../../database.php';
 require_once __DIR__ . '/../../../includes/auth_helper.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 try {
     // Conectar ao banco
@@ -64,6 +65,16 @@ try {
     }
     
     $user_id = $user['id'];
+    
+    // ========================================
+    // VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+    // ========================================
+    $rawBodyCheck = file_get_contents('php://input');
+    $requestData = json_decode($rawBodyCheck, true) ?? [];
+    $userEmail = $user['email'] ?? $requestData['email'] ?? null;
+    $appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+    // ========================================
     
     // Ler body da requisição (suporta túnel criptografado)
     $rawBody = isset($GLOBALS['_SECURE_REQUEST_BODY']) ? $GLOBALS['_SECURE_REQUEST_BODY'] : file_get_contents('php://input');

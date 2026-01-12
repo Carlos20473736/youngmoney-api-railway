@@ -11,7 +11,9 @@
  * 2. A chave muda a cada 5 segundos
  * 3. Sem a chave correta, é impossível criptografar/descriptografar
  * 
- * @version 1.0.0
+ * INCLUI VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO DO APP
+ * 
+ * @version 2.0.0
  */
 
 header('Content-Type: application/json');
@@ -210,6 +212,37 @@ error_log("[Tunnel] Request descriptografada: " . $requestData['method'] . " " .
 error_log("[Tunnel] Body: " . ($requestData['body'] ?? 'EMPTY'));
 
 // ============================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO DO APP
+// ============================================
+
+require_once __DIR__ . '/../../database.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
+
+$conn = getDbConnection();
+
+// Extrair dados do body para verificação
+$bodyData = [];
+if (!empty($requestData['body'])) {
+    $bodyData = json_decode($requestData['body'], true) ?? [];
+}
+
+// Extrair email do usuário (pode vir do body ou headers)
+$userEmail = $bodyData['email'] ?? $requestData['headers']['email'] ?? null;
+
+// Extrair versão do app (pode vir do body, headers ou payload)
+$appVersion = $bodyData['app_version'] ?? $bodyData['version'] ?? $requestData['headers']['X-App-Version'] ?? $payload['app_version'] ?? null;
+
+// Verificar se é um endpoint que não precisa de verificação de versão
+$requestUrl = $requestData['url'] ?? '';
+$skipVersionCheck = (
+    strpos($requestUrl, '/app/check-update') !== false ||
+    strpos($requestUrl, '/app/version') !== false
+);
+
+// Executar verificação de manutenção e versão
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion, !$skipVersionCheck);
+
+// ============================================
 // EXECUTAR REQUISIÇÃO INTERNA
 // ============================================
 
@@ -290,6 +323,8 @@ echo json_encode([
     'timestamp' => $responseTimestamp,
     'http_code' => $httpCode
 ]);
+
+$conn->close();
 
 error_log("[Tunnel] Resposta enviada - HTTP $httpCode");
 ?>

@@ -72,6 +72,23 @@ if (empty($token) || $token !== $expectedToken) {
 // Configurar timezone
 date_default_timezone_set('America/Sao_Paulo');
 
+require_once __DIR__ . '/../../../database.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+try {
+    $maintenanceConn = getDbConnection();
+    $userEmail = $input['email'] ?? null;
+    $appVersion = $input['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+    checkMaintenanceAndVersion($maintenanceConn, $userEmail, $appVersion);
+    $maintenanceConn->close();
+} catch (Exception $e) {
+    // Continuar mesmo se falhar a verificação
+}
+// ========================================
+
 try {
     // Conectar ao banco de dados usando MySQLi
     $db_host = $_ENV['MYSQLHOST'] ?? getenv('MYSQLHOST') ?: 'localhost';

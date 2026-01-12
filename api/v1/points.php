@@ -1,14 +1,24 @@
 <?php
-// Endpoint da API para Pontos (v1 )
-
-
+// Endpoint da API para Pontos (v1)
 
 header("Content-Type: application/json");
 require_once '../../database.php';
 require_once __DIR__ . '/../../includes/HeadersValidator.php';
+require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $conn = getDbConnection();
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$requestData = ($method === 'POST' || $method === 'PUT') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Validar headers de segurança
 $validator = validateRequestHeaders($conn, true);
@@ -32,14 +42,14 @@ switch ($method) {
             echo json_encode($history);
             $stmt->close();
         } else {
-            http_response_code(400 );
+            http_response_code(400);
             echo json_encode(['message' => 'User ID is required']);
         }
         break;
 
     case 'POST':
         // Lógica para adicionar pontos a um usuário
-        $data = json_decode(file_get_contents('php://input'), true);
+        $data = $requestData;
 
         if (isset($data['user_id']) && isset($data['points_earned']) && isset($data['activity_type'])) {
             $userId = intval($data['user_id']);
@@ -62,22 +72,22 @@ switch ($method) {
                 $stmt2->close();
 
                 $conn->commit();
-                http_response_code(200 );
+                http_response_code(200);
                 echo json_encode(['message' => 'Points added successfully']);
 
             } catch (Exception $e) {
                 $conn->rollback();
-                http_response_code(500 );
+                http_response_code(500);
                 echo json_encode(['message' => 'Failed to add points', 'error' => $e->getMessage()]);
             }
         } else {
-            http_response_code(400 );
+            http_response_code(400);
             echo json_encode(['message' => 'User ID, points earned, and activity type are required']);
         }
         break;
 
     default:
-        http_response_code(405 );
+        http_response_code(405);
         echo json_encode(['message' => 'Method Not Allowed']);
         break;
 }

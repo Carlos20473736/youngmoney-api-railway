@@ -23,6 +23,10 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
     exit;
 });
 
+// Includes para verificação de manutenção
+require_once __DIR__ . '/../../../database.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
+
 // Headers CORS
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -40,6 +44,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     echo json_encode(['success' => false, 'error' => 'Method not allowed']);
     exit;
 }
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$conn = getDbConnection();
+$userEmail = $_GET['email'] ?? null;
+$appVersion = $_GET['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+$conn->close();
+// ========================================
 
 // Obter level da query string
 $level = isset($_GET['level']) ? intval($_GET['level']) : 1;

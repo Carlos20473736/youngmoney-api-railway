@@ -20,6 +20,7 @@
 // Incluir configurações do banco de dados
 require_once __DIR__ . '/../../../db_config.php';
 require_once __DIR__ . '/../../../includes/auth_helper.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 // Headers CORS
 header('Content-Type: application/json');
@@ -77,6 +78,18 @@ if (!$user) {
 }
 
 $userId = $user['id'];
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$method = $_SERVER['REQUEST_METHOD'];
+$requestData = ($method === 'POST') 
+    ? json_decode(file_get_contents('php://input'), true) ?? []
+    : $_GET;
+$userEmail = $user['email'] ?? $requestData['email'] ?? null;
+$appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Processar requisição
 $method = $_SERVER['REQUEST_METHOD'];

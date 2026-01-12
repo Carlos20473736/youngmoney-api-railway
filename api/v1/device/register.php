@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 require_once __DIR__ . '/../../../database.php';
+require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
 
 try {
     $conn = getDbConnection();
@@ -34,6 +35,14 @@ try {
 // Obter dados da requisição
 $rawBody = file_get_contents('php://input');
 $data = json_decode($rawBody, true);
+
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
+$userEmail = $data['email'] ?? null;
+$appVersion = $data['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
+checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
 // Validar campos obrigatórios
 $requiredFields = ['device_id', 'device_key', 'device_fingerprint', 'app_hash'];
