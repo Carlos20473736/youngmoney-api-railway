@@ -21,7 +21,9 @@
  *     "download_url": "https://play.google.com/store/apps/details?id=...",
  *     "secondary_download_url": "https://exemplo.com/download/app.apk",
  *     "force_update": true,
- *     "release_notes": "Nova versão disponível com melhorias"
+ *     "release_notes": "Nova versão disponível com melhorias",
+ *     "open_in_browser": false,
+ *     "url_type": "playstore"
  *   }
  * }
  * 
@@ -35,6 +37,10 @@
  *     "min_version": "44.0"
  *   }
  * }
+ * 
+ * Campos especiais:
+ * - open_in_browser: true se a URL principal deve abrir no navegador (Chrome)
+ * - url_type: "playstore" se for link da Play Store, "browser" se for link externo
  */
 
 header('Content-Type: application/json');
@@ -74,6 +80,26 @@ function compareVersions($v1, $v2) {
     }
     
     return 0;
+}
+
+/**
+ * Verifica se a URL é da Play Store
+ * Retorna true se for link da Play Store (market:// ou play.google.com)
+ */
+function isPlayStoreUrl($url) {
+    if (empty($url)) return false;
+    
+    // Verifica se começa com market:// (intent da Play Store)
+    if (strpos($url, 'market://') === 0) {
+        return true;
+    }
+    
+    // Verifica se é URL da Play Store
+    if (strpos($url, 'play.google.com') !== false) {
+        return true;
+    }
+    
+    return false;
 }
 
 try {
@@ -117,6 +143,11 @@ try {
         $updateRequired = compareVersions($appVersion, $minVersion) < 0;
     }
     
+    // Determinar se deve abrir no navegador ou na Play Store
+    $isPlayStore = isPlayStoreUrl($downloadUrl);
+    $openInBrowser = !$isPlayStore && !empty($downloadUrl);
+    $urlType = $isPlayStore ? 'playstore' : 'browser';
+    
     $response = [
         'success' => true,
         'data' => [
@@ -127,12 +158,15 @@ try {
             'download_url' => $downloadUrl,
             'secondary_download_url' => $secondaryDownloadUrl,
             'force_update' => $forceUpdate && $updateRequired,
-            'release_notes' => $releaseNotes
+            'release_notes' => $releaseNotes,
+            // Novos campos para indicar como abrir a URL
+            'open_in_browser' => $openInBrowser,
+            'url_type' => $urlType
         ]
     ];
     
     // Log para debug
-    error_log("check-update: app_version=$appVersion, min_version=$minVersion, update_required=" . ($updateRequired ? 'true' : 'false'));
+    error_log("check-update: app_version=$appVersion, min_version=$minVersion, update_required=" . ($updateRequired ? 'true' : 'false') . ", url_type=$urlType");
     
     echo json_encode($response);
     
