@@ -50,7 +50,7 @@ $maintenanceExemptEndpoints = [
     '/api/v1/secure.php',
     '/api/v1/app/check-update.php',  // Verificação de atualização do app
     '/api/v1/app/version.php',        // Versão do app
-    '/api/v1/security/allowed-installers.php'  // Verificação de origem do app (Play Store vs fontes desconhecidas)
+    // REMOVIDO: /api/v1/security/allowed-installers.php - Agora verifica versão internamente
 ];
 
 // Endpoints isentos de verificação de versão (podem ser acessados por qualquer versão)
