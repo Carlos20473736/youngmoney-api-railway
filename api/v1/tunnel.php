@@ -337,18 +337,37 @@ if ($error) {
 }
 
 // ============================================
-// CRIPTOGRAFAR RESPOSTA
+// VERIFICAR SE É LOGIN E RETORNAR RESPOSTA
 // ============================================
 
-$responseTimestamp = round(microtime(true) * 1000);
-$encryptedResponse = encryptAES256($response, $responseTimestamp);
+// Verificar se é um endpoint de login (não encriptar resposta de login)
+$isLoginEndpoint = (
+    strpos($url, 'google-login') !== false ||
+    strpos($url, 'device-login') !== false ||
+    strpos($url, '/login') !== false
+);
 
-// Retornar resposta criptografada
-echo json_encode([
-    'encrypted_response' => $encryptedResponse,
-    'timestamp' => $responseTimestamp,
-    'http_code' => $httpCode
-]);
+if ($isLoginEndpoint) {
+    // Retornar resposta SEM criptografia para endpoints de login
+    // Isso evita erros de descriptografia no app durante o login
+    echo json_encode([
+        'response' => json_decode($response, true) ?: $response,
+        'timestamp' => round(microtime(true) * 1000),
+        'http_code' => $httpCode,
+        'encrypted' => false
+    ]);
+} else {
+    // Criptografar resposta para outros endpoints
+    $responseTimestamp = round(microtime(true) * 1000);
+    $encryptedResponse = encryptAES256($response, $responseTimestamp);
+
+    // Retornar resposta criptografada
+    echo json_encode([
+        'encrypted_response' => $encryptedResponse,
+        'timestamp' => $responseTimestamp,
+        'http_code' => $httpCode
+    ]);
+}
 
 $conn->close();
 

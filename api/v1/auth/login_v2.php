@@ -140,7 +140,7 @@ try {
     $stmt->execute([$userId]);
     $userData = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // 10. ENVIAR RESPOSTA COM SEED CRIPTOGRAFADO
+    // 10. ENVIAR RESPOSTA SEM CRIPTOGRAFIA (JSON puro)
     DecryptMiddleware::sendSuccess([
         'jwt' => $jwt,
         'encrypted_seed' => $encryptedSeed,  // ⭐ SEED CRIPTOGRAFADO
@@ -157,7 +157,7 @@ try {
         'name' => $userData['name'],
         'photo_url' => $userData['profile_picture'],
         'balance' => intval($userData['points'])
-    ], true); // Resposta criptografada com V1
+    ]); // Resposta JSON puro (sem criptografia)
     
     error_log("Login V2 successful for user $userId - seed and salt generated");
     

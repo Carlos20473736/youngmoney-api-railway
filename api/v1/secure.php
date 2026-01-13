@@ -311,17 +311,30 @@ try {
 }
 $response = ob_get_clean();
 
-// Criptografar resposta
-$encryptedResponse = $validator->encryptData($deviceKey, $response, $timestamp);
+// Verificar se é um endpoint de login (não encriptar resposta de login)
+$isLoginEndpoint = (
+    strpos($endpoint, 'google-login') !== false ||
+    strpos($endpoint, 'device-login') !== false ||
+    strpos($endpoint, 'login') !== false
+);
 
-if ($encryptedResponse === null) {
-    // Se falhar criptografia, retornar resposta sem criptografia (fallback)
+if ($isLoginEndpoint) {
+    // Retornar resposta SEM criptografia para endpoints de login
+    // Isso evita erros de descriptografia no app durante o login
     echo $response;
-    exit;
-}
+} else {
+    // Criptografar resposta para outros endpoints
+    $encryptedResponse = $validator->encryptData($deviceKey, $response, $timestamp);
 
-// Retornar resposta criptografada
-echo json_encode([
-    'encrypted_response' => $encryptedResponse,
-    'timestamp' => round(microtime(true) * 1000)
-]);
+    if ($encryptedResponse === null) {
+        // Se falhar criptografia, retornar resposta sem criptografia (fallback)
+        echo $response;
+        exit;
+    }
+
+    // Retornar resposta criptografada
+    echo json_encode([
+        'encrypted_response' => $encryptedResponse,
+        'timestamp' => round(microtime(true) * 1000)
+    ]);
+}
