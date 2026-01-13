@@ -168,8 +168,19 @@ try {
     $stmt->close();
     
     // Se o level enviado é diferente do salvo, resetar o progresso do level
+    // CORREÇÃO: Sempre que mudar de level, zera o score para começar do zero
     if ($currentLevel != $savedLevel) {
         $levelProgress = 0;
+        
+        // Atualizar o banco para refletir o novo level com score zerado
+        $stmtReset = $conn->prepare("INSERT INTO candy_level_progress (user_id, current_level, level_score) 
+                                     VALUES (?, ?, 0) 
+                                     ON DUPLICATE KEY UPDATE current_level = ?, level_score = 0");
+        $stmtReset->bind_param("iii", $userId, $currentLevel, $currentLevel);
+        $stmtReset->execute();
+        $stmtReset->close();
+        
+        error_log("[SCORE.PHP] Level changed from $savedLevel to $currentLevel - Score reset to 0");
     }
     
     // Calcular meta do level atual
