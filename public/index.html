@@ -445,8 +445,15 @@
         isProcessing: false,
         isLoading: true,
         requiredImpressionsLoaded: false,
-        sdkLoaded: false
+        sdkLoaded: false,
+        // Flags para evitar envio duplicado de postbacks
+        lastImpressionSent: 0,
+        lastClickSent: 0,
+        isSendingPostback: false
     };
+
+    // Debounce mínimo entre postbacks do mesmo tipo (em ms)
+    const POSTBACK_DEBOUNCE_MS = 3000;
 
     // ========================================
     // FUNÇÕES DE INICIALIZAÇÃO
@@ -560,8 +567,33 @@
         }
     }
 
-    // Enviar postback para o servidor
+    // Enviar postback para o servidor (com proteção contra duplicação)
     async function sendPostback(eventType) {
+        const now = Date.now();
+        
+        // Verificar se já está enviando um postback
+        if (TaskState.isSendingPostback) {
+            console.log('[POSTBACK] ⏳ Já existe um postback em andamento, ignorando...');
+            return;
+        }
+        
+        // Verificar debounce para evitar envios duplicados
+        if (eventType === 'impression') {
+            if (now - TaskState.lastImpressionSent < POSTBACK_DEBOUNCE_MS) {
+                console.log('[POSTBACK] ⏳ Impressão ignorada (debounce ativo)');
+                return;
+            }
+            TaskState.lastImpressionSent = now;
+        } else if (eventType === 'click') {
+            if (now - TaskState.lastClickSent < POSTBACK_DEBOUNCE_MS) {
+                console.log('[POSTBACK] ⏳ Clique ignorado (debounce ativo)');
+                return;
+            }
+            TaskState.lastClickSent = now;
+        }
+        
+        TaskState.isSendingPostback = true;
+        
         try {
             console.log('[POSTBACK] Enviando', eventType, '...');
 
@@ -576,7 +608,8 @@
             const url = `${POSTBACK_URL}?${params.toString()}`;
             console.log('[POSTBACK] URL:', url);
 
-            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            // Usar originalFetch para evitar interceptação recursiva
+            const response = await originalFetch(url, { method: 'GET', mode: 'cors' });
             const data = await response.json();
 
             console.log('[POSTBACK] ✅ Resposta:', data);
@@ -586,6 +619,8 @@
 
         } catch (error) {
             console.error('[POSTBACK] ❌ Erro:', error);
+        } finally {
+            TaskState.isSendingPostback = false;
         }
     }
 
@@ -646,8 +681,8 @@
         }).then(() => {
             console.log('[AD] ✅ Anúncio exibido!');
             
-            // Enviar postback de impressão
-            sendPostback('impression');
+            // NÃO enviar postback aqui - deixar o interceptador cuidar disso
+            // para evitar duplicação de impressões
 
             // Aguardar e parar processamento
             setTimeout(() => {
@@ -667,20 +702,22 @@
     // INTERCEPTAÇÃO DE CLIQUES DO MONETAG
     // ========================================
 
-    // Interceptar fetch para detectar cliques
+    // Salvar referência original do fetch ANTES de qualquer interceptação
     const originalFetch = window.fetch;
+    
+    // Interceptar fetch para detectar cliques (apenas do SDK Monetag, não nossos próprios postbacks)
     window.fetch = function(...args) {
         const url = args[0];
         
-        // Detectar postback do Monetag
-        if (typeof url === 'string') {
-            // Verificar se é um clique em anúncio
+        // Detectar postback do Monetag (ignorar nossos próprios postbacks)
+        if (typeof url === 'string' && !url.includes(POSTBACK_SERVER)) {
+            // Verificar se é um clique em anúncio do SDK Monetag
             if (url.includes('event_type=click') || url.includes('event_type%3Dclick')) {
                 console.log('[INTERCEPT] 🎯 Clique detectado!');
                 sendPostback('click');
                 showCountdownOverlay();
             }
-            // Verificar se é uma impressão
+            // Verificar se é uma impressão do SDK Monetag
             else if (url.includes('event_type=impression') || url.includes('event_type%3Dimpression')) {
                 console.log('[INTERCEPT] 👁️ Impressão detectada!');
                 sendPostback('impression');
@@ -690,10 +727,10 @@
         return originalFetch.apply(this, args);
     };
 
-    // Interceptar XMLHttpRequest
+    // Interceptar XMLHttpRequest (ignorar nossos próprios postbacks)
     const originalXHROpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-        if (typeof url === 'string') {
+        if (typeof url === 'string' && !url.includes(POSTBACK_SERVER)) {
             if (url.includes('event_type=click') || url.includes('event_type%3Dclick')) {
                 console.log('[INTERCEPT XHR] 🎯 Clique detectado!');
                 sendPostback('click');
