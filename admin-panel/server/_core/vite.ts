@@ -6,6 +6,9 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
+// __dirname is injected by esbuild banner in production
+declare const __dirname: string;
+
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
@@ -26,7 +29,8 @@ export async function setupVite(app: Express, server: Server) {
 
     try {
       const clientTemplate = path.resolve(
-        process.cwd(),
+        __dirname,
+        "../..",
         "client",
         "index.html"
       );
@@ -47,8 +51,8 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // In production, the dist folder is at the root of the app
-  const distPath = path.resolve(process.cwd(), "dist", "public");
+  // In production, static files are in dist/public relative to dist/index.js
+  const distPath = path.resolve(__dirname, "public");
   
   if (!fs.existsSync(distPath)) {
     console.error(
