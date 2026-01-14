@@ -98,6 +98,37 @@ export const appRouter = router({
         await railwayDb.createAdminLog('DELETE_ALL_USERS', `Todos os usuários foram excluídos. Total: ${result.count}`);
         return { success: true, count: result.count };
       }),
+
+    // Endpoint para contar usuários online
+    onlineCount: adminProcedure
+      .input(z.object({
+        minutesThreshold: z.number().optional().default(5),
+      }))
+      .query(async ({ input }) => {
+        const count = await railwayDb.getOnlineUsersCount(input.minutesThreshold);
+        return { count, thresholdMinutes: input.minutesThreshold };
+      }),
+
+    // Endpoint para estatísticas de usuários online
+    onlineStats: adminProcedure
+      .input(z.object({
+        minutesThreshold: z.number().optional().default(5),
+      }))
+      .query(async ({ input }) => {
+        const stats = await railwayDb.getOnlineUsersStats(input.minutesThreshold);
+        return stats;
+      }),
+
+    // Endpoint para listar usuários online
+    onlineList: adminProcedure
+      .input(z.object({
+        minutesThreshold: z.number().optional().default(5),
+        limit: z.number().optional().default(100),
+      }))
+      .query(async ({ input }) => {
+        const users = await railwayDb.getOnlineUsers(input.minutesThreshold, input.limit);
+        return users;
+      }),
   }),
 
   // ============= POINT TRANSACTIONS =============

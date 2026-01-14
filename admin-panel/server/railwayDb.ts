@@ -861,3 +861,79 @@ export async function getUserPointsHistory(userId: number, limit = 100) {
     return [];
   }
 }
+
+
+// ============= USUÁRIOS ONLINE =============
+
+export async function getOnlineUsersCount(minutesThreshold = 5) {
+  try {
+    const rows = await executeRawQuery(
+      `SELECT COUNT(*) as online_count 
+       FROM users 
+       WHERE updated_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+      [minutesThreshold]
+    );
+    return rows[0]?.online_count || 0;
+  } catch (error) {
+    console.warn("[Railway DB] Error counting online users:", error);
+    return 0;
+  }
+}
+
+export async function getOnlineUsers(minutesThreshold = 5, limit = 100) {
+  try {
+    const rows = await executeRawQuery(
+      `SELECT id, name, email, username, photo_url, profile_picture, updated_at
+       FROM users 
+       WHERE updated_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
+       ORDER BY updated_at DESC
+       LIMIT ?`,
+      [minutesThreshold, limit]
+    );
+    return rows;
+  } catch (error) {
+    console.warn("[Railway DB] Error fetching online users:", error);
+    return [];
+  }
+}
+
+export async function getOnlineUsersStats(minutesThreshold = 5) {
+  try {
+    // Usuários online agora
+    const onlineRows = await executeRawQuery(
+      `SELECT COUNT(*) as count 
+       FROM users 
+       WHERE updated_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
+      [minutesThreshold]
+    );
+    
+    // Usuários ativos hoje
+    const todayRows = await executeRawQuery(
+      `SELECT COUNT(*) as count 
+       FROM users 
+       WHERE DATE(updated_at) = CURDATE()`
+    );
+    
+    // Usuários ativos na última hora
+    const hourRows = await executeRawQuery(
+      `SELECT COUNT(*) as count 
+       FROM users 
+       WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)`
+    );
+    
+    return {
+      onlineNow: onlineRows[0]?.count || 0,
+      activeToday: todayRows[0]?.count || 0,
+      activeLastHour: hourRows[0]?.count || 0,
+      thresholdMinutes: minutesThreshold
+    };
+  } catch (error) {
+    console.warn("[Railway DB] Error fetching online users stats:", error);
+    return {
+      onlineNow: 0,
+      activeToday: 0,
+      activeLastHour: 0,
+      thresholdMinutes: minutesThreshold
+    };
+  }
+}

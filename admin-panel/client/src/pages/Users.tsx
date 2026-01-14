@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Eye, Search, Loader2, Users as UsersIcon, Coins, Wallet, Trash2, AlertTriangle, Mail, AtSign } from "lucide-react";
+import { Eye, Search, Loader2, Users as UsersIcon, Coins, Wallet, Trash2, AlertTriangle, Mail, AtSign, Wifi, Clock, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
@@ -23,6 +23,20 @@ export default function Users() {
 
   // Buscar TODOS os usuários (limite alto para pegar todos)
   const { data, isLoading, refetch } = trpc.appUsers.list.useQuery({ limit: 10000, offset: 0 });
+
+  // Buscar estatísticas de usuários online (atualiza a cada 30 segundos)
+  const { data: onlineStats, refetch: refetchOnline } = trpc.appUsers.onlineStats.useQuery(
+    { minutesThreshold: 5 },
+    { refetchInterval: 30000 } // Atualiza a cada 30 segundos
+  );
+
+  // Atualizar contagem online periodicamente
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchOnline();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [refetchOnline]);
 
   const updatePointsMutation = trpc.appUsers.updatePoints.useMutation({
     onSuccess: () => {
@@ -123,7 +137,49 @@ export default function Users() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card de Usuários Online - NOVO */}
+        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-green-700 flex items-center gap-2">
+              <div className="relative">
+                <Wifi className="w-4 h-4" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              </div>
+              Usuarios Online
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-bold text-green-600">
+                {formatNumber(onlineStats?.onlineNow || 0)}
+              </span>
+              <Badge variant="outline" className="bg-green-100 text-green-700 text-xs">
+                Agora
+              </Badge>
+            </div>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Ultima hora:
+                </span>
+                <span className="font-medium text-green-600">{formatNumber(onlineStats?.activeLastHour || 0)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Activity className="w-3 h-3" />
+                  Ativos hoje:
+                </span>
+                <span className="font-medium text-green-600">{formatNumber(onlineStats?.activeToday || 0)}</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Atualiza a cada 30s
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total de Usuarios</CardTitle>
