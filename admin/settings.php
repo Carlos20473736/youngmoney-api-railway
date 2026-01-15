@@ -67,7 +67,7 @@ try {
         echo json_encode([
             'success' => true,
             'data' => [
-                'reset_time' => $settings['reset_time'] ?? '21:00',
+                'reset_time' => $settings['reset_time'] ?? '00:00',
                 'max_daily_spins' => (int)($settings['max_daily_spins'] ?? 10),
                 'withdrawal_limits' => [
                     'min' => (int)($settings['min_withdrawal'] ?? 10),

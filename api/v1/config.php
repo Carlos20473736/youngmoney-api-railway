@@ -63,7 +63,7 @@ try {
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
     
-    $reset_time = $row ? $row['setting_value'] : '21:00';
+    $reset_time = $row ? $row['setting_value'] : '00:00';
     
     list($reset_hour, $reset_minute) = explode(':', $reset_time);
     

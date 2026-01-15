@@ -29,7 +29,7 @@ try {
         // Inserir padrões
         $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)");
         $defaults = [
-            ['reset_time', '21:00'],
+            ['reset_time', '00:00'],
             ['min_withdrawal', '10'],
             ['max_withdrawal', '1000']
         ];

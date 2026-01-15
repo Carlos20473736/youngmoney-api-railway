@@ -32,7 +32,7 @@ try {
     // 2. Inserir valores padrão
     echo "2. Inserindo valores padrão...\n";
     $settings = [
-        ['reset_time', '21:00'],
+        ['reset_time', '00:00'],
         ['min_withdrawal', '10'],
         ['max_withdrawal', '1000']
     ];
