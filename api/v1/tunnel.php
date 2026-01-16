@@ -262,7 +262,9 @@ $skipVersionCheck = (
     strpos($requestUrl, '/app/version') !== false ||
     strpos($requestUrl, '/device/check') !== false ||
     strpos($requestUrl, '/device/register') !== false ||
-    strpos($requestUrl, '/auth/google-login') !== false
+    strpos($requestUrl, '/auth/google-login') !== false ||
+    strpos($requestUrl, '/auth/email-login') !== false ||
+    strpos($requestUrl, '/auth/email-register') !== false
 );
 
 // Executar verificação de manutenção e versão
@@ -344,6 +346,8 @@ if ($error) {
 $isLoginEndpoint = (
     strpos($url, 'google-login') !== false ||
     strpos($url, 'device-login') !== false ||
+    strpos($url, 'email-login') !== false ||
+    strpos($url, 'email-register') !== false ||
     strpos($url, '/login') !== false
 );
 

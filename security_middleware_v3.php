@@ -46,6 +46,8 @@ $maintenanceExemptEndpoints = [
     '/api/v1/device/register.php',
     '/api/v1/auth/google-login.php',
     '/api/v1/auth/device-login.php',
+    '/api/v1/auth/email-login.php',     // Login por email e senha
+    '/api/v1/auth/email-register.php',  // Registro por email e senha
     '/api/v1/tunnel.php',
     '/api/v1/secure.php',
     '/api/v1/app/check-update.php',  // Verificação de atualização do app
@@ -58,6 +60,8 @@ $maintenanceExemptEndpoints = [
 $versionExemptEndpoints = [
     '/api/v1/app/check-update.php',
     '/api/v1/app/version.php',
+    '/api/v1/auth/email-login.php',     // Login por email e senha
+    '/api/v1/auth/email-register.php',  // Registro por email e senha
     '/admin/',
     '/health',
     '/ping',
