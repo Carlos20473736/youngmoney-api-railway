@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Young Money - Login</title>
+    
+    <!-- Google Sign-In -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0a0e27 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Estrelas animadas */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0;
+        }
+        
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #fff;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 20px;
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(255, 215, 0, 0.3);
+        }
+        
+        .logo-placeholder {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #0a0e27;
+            box-shadow: 0 10px 40px rgba(255, 215, 0, 0.3);
+        }
+        
+        h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 40px;
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .login-title {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+        
+        .login-description {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 24px;
+        }
+        
+        .google-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            padding: 14px 24px;
+            background: #fff;
+            color: #333;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .google-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .google-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .google-btn img {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .divider span {
+            padding: 0 16px;
+        }
+        
+        /* Loading State */
+        .loading-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 215, 0, 0.2);
+            border-top-color: #ffd700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        /* Success State */
+        .success-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .success-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            animation: scaleIn 0.3s ease;
+        }
+        
+        @keyframes scaleIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+        
+        .success-text {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .success-description {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-top: 8px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+        
+        .user-details {
+            text-align: left;
+        }
+        
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .user-email {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .open-app-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #0a0e27;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 16px;
+            text-decoration: none;
+        }
+        
+        .open-app-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+        }
+        
+        /* Error State */
+        .error-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .error-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        
+        .error-text {
+            font-size: 16px;
+            color: #f44336;
+        }
+        
+        .retry-btn {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .retry-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .footer {
+            margin-top: 24px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .footer a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+        }
+        
+        /* Manual Token Input */
+        .manual-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .manual-title {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 12px;
+        }
+        
+        .token-display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            color: #ffd700;
+            margin-bottom: 12px;
+        }
+        
+        .copy-btn {
+            padding: 8px 16px;
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .copy-btn:hover {
+            background: rgba(255, 215, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Estrelas de fundo -->
+    <div class="stars" id="stars"></div>
+    
+    <div class="container">
+        <div class="logo-placeholder">YM</div>
+        <h1>Young Money</h1>
+        <p class="subtitle">Sua jornada financeira começa aqui</p>
+        
+        <div class="login-card">
+            <!-- Login Form -->
+            <div id="loginForm">
+                <h2 class="login-title">Entrar no App</h2>
+                <p class="login-description">Faça login com sua conta Google para continuar</p>
+                
+                <button class="google-btn" id="googleBtn" onclick="handleGoogleLogin()">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+                    Continuar com Google
+                </button>
+            </div>
+            
+            <!-- Loading State -->
+            <div class="loading-container" id="loadingState">
+                <div class="spinner"></div>
+                <p class="loading-text" id="loadingText">Autenticando...</p>
+            </div>
+            
+            <!-- Success State -->
+            <div class="success-container" id="successState">
+                <div class="success-icon">✓</div>
+                <p class="success-text">Login realizado!</p>
+                <p class="success-description">Clique no botão abaixo para abrir o app</p>
+                
+                <div class="user-info" id="userInfo">
+                    <img class="user-avatar" id="userAvatar" src="" alt="Avatar">
+                    <div class="user-details">
+                        <p class="user-name" id="userName"></p>
+                        <p class="user-email" id="userEmail"></p>
+                    </div>
+                </div>
+                
+                <a class="open-app-btn" id="openAppBtn" href="#">
+                    🚀 Abrir Young Money
+                </a>
+                
+                <div class="manual-section" id="manualSection">
+                    <p class="manual-title">Se o app não abrir automaticamente, copie o token:</p>
+                    <div class="token-display" id="tokenDisplay"></div>
+                    <button class="copy-btn" onclick="copyToken()">📋 Copiar Token</button>
+                </div>
+            </div>
+            
+            <!-- Error State -->
+            <div class="error-container" id="errorState">
+                <div class="error-icon">✕</div>
+                <p class="error-text" id="errorText">Erro ao fazer login</p>
+                <button class="retry-btn" onclick="retry()">Tentar novamente</button>
+            </div>
+        </div>
+        
+        <p class="footer">
+            <a href="/privacy-policy.html">Política de Privacidade</a> · 
+            <a href="#">Termos de Uso</a>
+        </p>
+    </div>
+    
+    <script>
+        // Configurações
+        const API_BASE_URL = window.location.origin;
+        const GOOGLE_CLIENT_ID = '458046371381-frhg4qc9q9ck5iaks6lrerusb5j3jb00.apps.googleusercontent.com';
+        
+        let currentToken = '';
+        let deepLink = '';
+        
+        // Gerar estrelas
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.width = Math.random() * 2 + 1 + 'px';
+                star.style.height = star.style.width;
+                starsContainer.appendChild(star);
+            }
+        }
+        createStars();
+        
+        // Inicializar Google Sign-In
+        function initGoogleSignIn() {
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: true
+            });
+        }
+        
+        // Aguardar carregamento do Google Sign-In
+        window.onload = function() {
+            if (typeof google !== 'undefined') {
+                initGoogleSignIn();
+            } else {
+                // Aguardar script carregar
+                setTimeout(initGoogleSignIn, 1000);
+            }
+        };
+        
+        // Handler do login Google
+        function handleGoogleLogin() {
+            google.accounts.id.prompt((notification) => {
+                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                    // Se o prompt não aparecer, usar popup
+                    google.accounts.oauth2.initTokenClient({
+                        client_id: GOOGLE_CLIENT_ID,
+                        scope: 'email profile openid',
+                        callback: (response) => {
+                            if (response.access_token) {
+                                // Usar access_token para obter ID token
+                                fetchGoogleUserInfo(response.access_token);
+                            }
+                        }
+                    }).requestAccessToken();
+                }
+            });
+        }
+        
+        // Buscar informações do usuário com access_token
+        async function fetchGoogleUserInfo(accessToken) {
+            showLoading('Obtendo informações...');
+            
+            try {
+                const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                
+                if (!response.ok) throw new Error('Falha ao obter informações do usuário');
+                
+                const userInfo = await response.json();
+                
+                // Criar um token JWT simples para a API
+                const payload = {
+                    sub: userInfo.sub,
+                    email: userInfo.email,
+                    name: userInfo.name,
+                    picture: userInfo.picture
+                };
+                
+                // Codificar como JWT (simplificado - apenas para transmissão)
+                const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+                const body = btoa(JSON.stringify(payload));
+                const fakeToken = `${header}.${body}.`;
+                
+                await processGoogleToken(fakeToken);
+                
+            } catch (error) {
+                console.error('Erro ao buscar info do usuário:', error);
+                showError('Erro ao obter informações do Google');
+            }
+        }
+        
+        // Callback do Google Sign-In (One Tap)
+        function handleCredentialResponse(response) {
+            if (response.credential) {
+                processGoogleToken(response.credential);
+            }
+        }
+        
+        // Processar token do Google
+        async function processGoogleToken(googleToken) {
+            showLoading('Gerando link de acesso...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/auth/link-login.php?action=generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        google_token: googleToken
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    currentToken = data.data.link_token;
+                    deepLink = data.data.deep_link;
+                    
+                    showSuccess(data.data.user);
+                    
+                    // Tentar abrir o app automaticamente após 1 segundo
+                    setTimeout(() => {
+                        window.location.href = deepLink;
+                    }, 1000);
+                    
+                } else if (data.maintenance) {
+                    showError('Sistema em manutenção. Tente novamente mais tarde.');
+                } else {
+                    showError(data.message || 'Erro ao gerar link de acesso');
+                }
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                showError('Erro de conexão. Verifique sua internet.');
+            }
+        }
+        
+        // UI States
+        function showLoading(text) {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('loadingState').style.display = 'flex';
+            document.getElementById('successState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'none';
+            document.getElementById('loadingText').textContent = text;
+        }
+        
+        function showSuccess(user) {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('successState').style.display = 'flex';
+            document.getElementById('errorState').style.display = 'none';
+            
+            // Preencher dados do usuário
+            if (user) {
+                document.getElementById('userName').textContent = user.name || 'Usuário';
+                document.getElementById('userEmail').textContent = user.email || '';
+                if (user.profile_picture) {
+                    document.getElementById('userAvatar').src = user.profile_picture;
+                } else {
+                    document.getElementById('userAvatar').src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name || 'U') + '&background=ffd700&color=0a0e27';
+                }
+            }
+            
+            // Configurar botão de abrir app
+            document.getElementById('openAppBtn').href = deepLink;
+            
+            // Mostrar token para cópia manual
+            document.getElementById('tokenDisplay').textContent = currentToken;
+        }
+        
+        function showError(message) {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('successState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'flex';
+            document.getElementById('errorText').textContent = message;
+        }
+        
+        function retry() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('successState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'none';
+        }
+        
+        function copyToken() {
+            navigator.clipboard.writeText(currentToken).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = '✓ Copiado!';
+                setTimeout(() => {
+                    btn.textContent = '📋 Copiar Token';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
