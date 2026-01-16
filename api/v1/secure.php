@@ -165,8 +165,12 @@ $endpointMap = [
     // Auth
     '/api/v1/auth/google-login.php' => __DIR__ . '/auth/google-login.php',
     '/api/v1/auth/device-login.php' => __DIR__ . '/auth/device-login.php',
+    '/api/v1/auth/email-login.php' => __DIR__ . '/auth/email-login.php',
+    '/api/v1/auth/email-register.php' => __DIR__ . '/auth/email-register.php',
     '/auth/google-login.php' => __DIR__ . '/auth/google-login.php',
     '/auth/device-login.php' => __DIR__ . '/auth/device-login.php',
+    '/auth/email-login.php' => __DIR__ . '/auth/email-login.php',
+    '/auth/email-register.php' => __DIR__ . '/auth/email-register.php',
     
     // User
     '/user/profile.php' => __DIR__ . '/../../user/profile.php',
@@ -315,6 +319,8 @@ $response = ob_get_clean();
 $isLoginEndpoint = (
     strpos($endpoint, 'google-login') !== false ||
     strpos($endpoint, 'device-login') !== false ||
+    strpos($endpoint, 'email-login') !== false ||
+    strpos($endpoint, 'email-register') !== false ||
     strpos($endpoint, 'login') !== false
 );
 
