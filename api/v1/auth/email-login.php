@@ -5,6 +5,8 @@
  * Endpoint para login usando email e senha
  * Se o usuário não existir, cria automaticamente uma nova conta
  * Suporta requisições criptografadas e JSON puro
+ * 
+ * INCLUI VERIFICAÇÃO DE DISPOSITIVO VINCULADO (igual ao login Google)
  */
 
 header('Content-Type: application/json');
@@ -62,6 +64,10 @@ try {
     $name = isset($data['name']) ? trim($data['name']) : null;
     $invitedByCode = $data['invited_by_code'] ?? null;
     
+    // Capturar device_id e device_info para verificação de vinculação
+    $deviceId = $data['device_id'] ?? null;
+    $deviceInfo = $data['device_info'] ?? '{}';
+    
     // Validar formato do email
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
@@ -118,6 +124,63 @@ try {
     }
     // ========================================
     
+    // ========================================
+    // VERIFICAR VINCULAÇÃO DE DISPOSITIVO
+    // (Igual ao login Google - impede múltiplas contas por dispositivo)
+    // ========================================
+    if ($deviceId && strlen($deviceId) >= 32) {
+        error_log("[EMAIL-LOGIN] Verificando vinculação do dispositivo: " . substr($deviceId, 0, 16) . "...");
+        
+        // Verificar se dispositivo já está vinculado a outra conta
+        $stmt = $conn->prepare("
+            SELECT 
+                db.id,
+                db.user_id,
+                db.device_id,
+                db.email as binding_email,
+                u.email as user_email
+            FROM device_bindings db
+            LEFT JOIN users u ON db.user_id = u.id
+            WHERE db.device_id = ?
+            AND db.is_active = 1
+            LIMIT 1
+        ");
+        $stmt->bind_param("s", $deviceId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $existingBinding = $result->fetch_assoc();
+        $stmt->close();
+        
+        if ($existingBinding) {
+            // Dispositivo já vinculado - verificar se é a mesma conta
+            $boundEmail = $existingBinding['binding_email'] ?? $existingBinding['user_email'] ?? '';
+            
+            if (!empty($boundEmail) && strtolower($boundEmail) !== strtolower($email)) {
+                // Dispositivo vinculado a OUTRA conta - BLOQUEAR
+                error_log("[EMAIL-LOGIN] ⛔ BLOQUEADO - Dispositivo vinculado a: $boundEmail, tentando logar: $email");
+                
+                http_response_code(403);
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Este dispositivo já está vinculado a outra conta',
+                    'code' => 'DEVICE_BOUND_TO_OTHER_ACCOUNT',
+                    'blocked' => true,
+                    'existing_email' => $boundEmail
+                ]);
+                $conn->close();
+                exit;
+            } else {
+                // Mesmo email ou email vazio - permitir login
+                error_log("[EMAIL-LOGIN] ✅ Dispositivo vinculado ao mesmo email - permitindo login");
+            }
+        } else {
+            error_log("[EMAIL-LOGIN] ✅ Dispositivo livre - permitindo login");
+        }
+    } else {
+        error_log("[EMAIL-LOGIN] ⚠️ device_id não fornecido ou inválido - pulando verificação de vinculação");
+    }
+    // ========================================
+    
     // 4. BUSCAR USUÁRIO PELO EMAIL
     $stmt = $conn->prepare("
         SELECT id, email, name, profile_picture, points, password_hash, google_id
@@ -146,6 +209,45 @@ try {
         // USUÁRIO NÃO EXISTE - CRIAR NOVA CONTA
         // ========================================
         error_log("[EMAIL-LOGIN] Usuário não encontrado, criando nova conta: $email");
+        
+        // ========================================
+        // VERIFICAR SE DISPOSITIVO JÁ TEM CONTA (para novos cadastros)
+        // ========================================
+        if ($deviceId && strlen($deviceId) >= 32) {
+            $stmt = $conn->prepare("
+                SELECT 
+                    db.user_id,
+                    db.email as binding_email,
+                    u.email as user_email
+                FROM device_bindings db
+                LEFT JOIN users u ON db.user_id = u.id
+                WHERE db.device_id = ?
+                AND db.is_active = 1
+                LIMIT 1
+            ");
+            $stmt->bind_param("s", $deviceId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $existingBinding = $result->fetch_assoc();
+            $stmt->close();
+            
+            if ($existingBinding) {
+                $boundEmail = $existingBinding['binding_email'] ?? $existingBinding['user_email'] ?? 'Conta já cadastrada';
+                error_log("[EMAIL-LOGIN] ⛔ BLOQUEADO - Tentativa de criar nova conta em dispositivo já vinculado a: $boundEmail");
+                
+                http_response_code(403);
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Este dispositivo já está vinculado a outra conta',
+                    'code' => 'DEVICE_BOUND_TO_OTHER_ACCOUNT',
+                    'blocked' => true,
+                    'existing_email' => $boundEmail
+                ]);
+                $conn->close();
+                exit;
+            }
+        }
+        // ========================================
         
         // Validar tamanho da senha para novo usuário
         if (strlen($password) < 6) {
@@ -216,6 +318,41 @@ try {
             $stmt->close();
         }
         
+        // ========================================
+        // VINCULAR DISPOSITIVO À NOVA CONTA
+        // ========================================
+        if ($deviceId && strlen($deviceId) >= 32) {
+            try {
+                // Parsear device_info
+                $deviceData = json_decode($deviceInfo, true) ?? [];
+                $androidId = $deviceData['android_id'] ?? null;
+                $model = $deviceData['model'] ?? null;
+                $manufacturer = $deviceData['manufacturer'] ?? null;
+                $androidVersion = $deviceData['android_version'] ?? null;
+                $fingerprint = $deviceData['fingerprint'] ?? null;
+                $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+                
+                $stmt = $conn->prepare("
+                    INSERT INTO device_bindings 
+                    (user_id, email, device_id, device_info, android_id, model, manufacturer, 
+                     android_version, fingerprint, ip_address, is_active, created_at, last_seen)
+                    VALUES 
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+                ");
+                $stmt->bind_param("isssssssss", 
+                    $userId, $email, $deviceId, $deviceInfo, $androidId, $model, 
+                    $manufacturer, $androidVersion, $fingerprint, $ip
+                );
+                $stmt->execute();
+                $stmt->close();
+                
+                error_log("[EMAIL-LOGIN] ✅ Dispositivo vinculado à nova conta: $email (ID: $userId)");
+            } catch (Exception $e) {
+                error_log("[EMAIL-LOGIN] ⚠️ Erro ao vincular dispositivo (não crítico): " . $e->getMessage());
+            }
+        }
+        // ========================================
+        
         // Dados do novo usuário
         $user = [
             'id' => $userId,
@@ -280,6 +417,75 @@ try {
         $stmt->bind_param("sssi", $token, $encryptedSeedForDb, $sessionSalt, $userId);
         $stmt->execute();
         $stmt->close();
+        
+        // ========================================
+        // ATUALIZAR/CRIAR VINCULAÇÃO DO DISPOSITIVO
+        // ========================================
+        if ($deviceId && strlen($deviceId) >= 32) {
+            try {
+                // Verificar se já existe vinculação
+                $stmt = $conn->prepare("SELECT id FROM device_bindings WHERE device_id = ? AND user_id = ? AND is_active = 1");
+                $stmt->bind_param("si", $deviceId, $userId);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $existingBinding = $result->fetch_assoc();
+                $stmt->close();
+                
+                // Parsear device_info
+                $deviceData = json_decode($deviceInfo, true) ?? [];
+                $androidId = $deviceData['android_id'] ?? null;
+                $model = $deviceData['model'] ?? null;
+                $manufacturer = $deviceData['manufacturer'] ?? null;
+                $androidVersion = $deviceData['android_version'] ?? null;
+                $fingerprint = $deviceData['fingerprint'] ?? null;
+                $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+                
+                if ($existingBinding) {
+                    // Atualizar vinculação existente
+                    $stmt = $conn->prepare("
+                        UPDATE device_bindings 
+                        SET device_info = ?,
+                            android_id = ?,
+                            model = ?,
+                            manufacturer = ?,
+                            android_version = ?,
+                            fingerprint = ?,
+                            last_seen = NOW(),
+                            ip_address = ?,
+                            email = ?
+                        WHERE id = ?
+                    ");
+                    $stmt->bind_param("ssssssssi", 
+                        $deviceInfo, $androidId, $model, $manufacturer, 
+                        $androidVersion, $fingerprint, $ip, $email, $existingBinding['id']
+                    );
+                    $stmt->execute();
+                    $stmt->close();
+                    
+                    error_log("[EMAIL-LOGIN] ✅ Vinculação de dispositivo atualizada para: $email");
+                } else {
+                    // Criar nova vinculação
+                    $stmt = $conn->prepare("
+                        INSERT INTO device_bindings 
+                        (user_id, email, device_id, device_info, android_id, model, manufacturer, 
+                         android_version, fingerprint, ip_address, is_active, created_at, last_seen)
+                        VALUES 
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+                    ");
+                    $stmt->bind_param("isssssssss", 
+                        $userId, $email, $deviceId, $deviceInfo, $androidId, $model, 
+                        $manufacturer, $androidVersion, $fingerprint, $ip
+                    );
+                    $stmt->execute();
+                    $stmt->close();
+                    
+                    error_log("[EMAIL-LOGIN] ✅ Nova vinculação de dispositivo criada para: $email");
+                }
+            } catch (Exception $e) {
+                error_log("[EMAIL-LOGIN] ⚠️ Erro ao atualizar vinculação (não crítico): " . $e->getMessage());
+            }
+        }
+        // ========================================
         
         error_log("[EMAIL-LOGIN] Login bem-sucedido para: $email (ID: $userId)");
     }
