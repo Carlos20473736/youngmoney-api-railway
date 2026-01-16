@@ -3,6 +3,7 @@
  * Email Login - Autenticação por Email e Senha
  * 
  * Endpoint para login usando email e senha
+ * Se o usuário não existir, cria automaticamente uma nova conta
  * Suporta requisições criptografadas e JSON puro
  */
 
@@ -58,6 +59,8 @@ try {
     
     $email = trim(strtolower($data['email']));
     $password = $data['password'];
+    $name = isset($data['name']) ? trim($data['name']) : null;
+    $invitedByCode = $data['invited_by_code'] ?? null;
     
     // Validar formato do email
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -125,78 +128,163 @@ try {
     $stmt->execute();
     $result = $stmt->get_result();
     
-    if ($result->num_rows === 0) {
-        error_log("[EMAIL-LOGIN] Usuário não encontrado: $email");
-        http_response_code(401);
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Email ou senha incorretos'
-        ]);
-        $conn->close();
-        exit;
-    }
-    
-    $user = $result->fetch_assoc();
-    $stmt->close();
-    
-    // 5. VERIFICAR SE O USUÁRIO TEM SENHA DEFINIDA
-    if (empty($user['password_hash'])) {
-        // Usuário só tem login Google, não tem senha definida
-        error_log("[EMAIL-LOGIN] Usuário sem senha definida (apenas Google): $email");
-        http_response_code(401);
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Esta conta usa login com Google. Por favor, faça login com o Google.',
-            'code' => 'GOOGLE_ONLY_ACCOUNT'
-        ]);
-        $conn->close();
-        exit;
-    }
-    
-    // 6. VERIFICAR SENHA
-    if (!password_verify($password, $user['password_hash'])) {
-        error_log("[EMAIL-LOGIN] Senha incorreta para: $email");
-        http_response_code(401);
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Email ou senha incorretos'
-        ]);
-        $conn->close();
-        exit;
-    }
-    
-    // 7. GERAR DADOS CRIPTOGRÁFICOS
+    // 5. GERAR DADOS CRIPTOGRÁFICOS (antes do banco para otimizar)
     $masterSeed = SecureKeyManager::generateMasterSeed();
     $sessionSalt = SecureKeyManager::generateSessionSalt();
     $encryptedSeed = SecureKeyManager::encryptSeedWithPassword($masterSeed, $email);
     $token = bin2hex(random_bytes(32));
     
-    // 8. CRIPTOGRAFAR SEED PARA O BANCO
+    // 6. OBTER CHAVE DO SERVIDOR
     $serverKey = getenv('SERVER_ENCRYPTION_KEY');
     if (!$serverKey) {
         error_log("SERVER_ENCRYPTION_KEY not set");
         $serverKey = 'default_key_change_me'; // Fallback
     }
     
-    $userId = $user['id'];
-    $iv = substr(md5($userId), 0, 16);
-    $encryptedSeedForDb = openssl_encrypt($masterSeed, 'AES-256-CBC', $serverKey, 0, $iv);
+    if ($result->num_rows === 0) {
+        // ========================================
+        // USUÁRIO NÃO EXISTE - CRIAR NOVA CONTA
+        // ========================================
+        error_log("[EMAIL-LOGIN] Usuário não encontrado, criando nova conta: $email");
+        
+        // Validar tamanho da senha para novo usuário
+        if (strlen($password) < 6) {
+            http_response_code(400);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'A senha deve ter pelo menos 6 caracteres'
+            ]);
+            $conn->close();
+            exit;
+        }
+        
+        // Se não foi fornecido nome, usar parte do email antes do @
+        if (empty($name)) {
+            $name = ucfirst(explode('@', $email)[0]);
+        }
+        
+        // Validar nome
+        if (strlen($name) < 2) {
+            $name = ucfirst(explode('@', $email)[0]);
+        }
+        
+        // Gerar hash da senha e código de convite
+        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+        $inviteCode = 'YM' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 6));
+        
+        // Processar código de convite se fornecido
+        $invitedBy = null;
+        if ($invitedByCode) {
+            $stmtInvite = $conn->prepare("SELECT id FROM users WHERE invite_code = ?");
+            $stmtInvite->bind_param("s", $invitedByCode);
+            $stmtInvite->execute();
+            $resultInvite = $stmtInvite->get_result();
+            if ($resultInvite->num_rows > 0) {
+                $inviter = $resultInvite->fetch_assoc();
+                $invitedBy = $inviter['id'];
+            }
+            $stmtInvite->close();
+        }
+        
+        // Criar usuário
+        $stmt = $conn->prepare("
+            INSERT INTO users (
+                email, password_hash, name, 
+                invite_code, token, session_salt,
+                points, created_at, salt_updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
+        ");
+        $stmt->bind_param("ssssss", $email, $passwordHash, $name, $inviteCode, $token, $sessionSalt);
+        $stmt->execute();
+        $userId = $conn->insert_id;
+        $stmt->close();
+        
+        // Criptografar e salvar seed
+        $iv = substr(md5($userId), 0, 16);
+        $encryptedSeedForDb = openssl_encrypt($masterSeed, 'AES-256-CBC', $serverKey, 0, $iv);
+        
+        $stmt = $conn->prepare("UPDATE users SET master_seed = ? WHERE id = ?");
+        $stmt->bind_param("si", $encryptedSeedForDb, $userId);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Registrar convite (se houver)
+        if ($invitedBy) {
+            $stmt = $conn->prepare("UPDATE users SET invited_by = ? WHERE id = ?");
+            $stmt->bind_param("ii", $invitedBy, $userId);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+        // Dados do novo usuário
+        $user = [
+            'id' => $userId,
+            'email' => $email,
+            'name' => $name,
+            'google_id' => null,
+            'profile_picture' => null,
+            'points' => 0
+        ];
+        
+        error_log("[EMAIL-LOGIN] Nova conta criada com sucesso: $email (ID: $userId)");
+        
+    } else {
+        // ========================================
+        // USUÁRIO EXISTE - FAZER LOGIN
+        // ========================================
+        $user = $result->fetch_assoc();
+        $stmt->close();
+        
+        // Verificar se o usuário tem senha definida
+        if (empty($user['password_hash'])) {
+            // Usuário só tem login Google, não tem senha definida
+            error_log("[EMAIL-LOGIN] Usuário sem senha definida (apenas Google): $email");
+            http_response_code(401);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Esta conta usa login com Google. Por favor, faça login com o Google.',
+                'code' => 'GOOGLE_ONLY_ACCOUNT'
+            ]);
+            $conn->close();
+            exit;
+        }
+        
+        // Verificar senha
+        if (!password_verify($password, $user['password_hash'])) {
+            error_log("[EMAIL-LOGIN] Senha incorreta para: $email");
+            http_response_code(401);
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Email ou senha incorretos'
+            ]);
+            $conn->close();
+            exit;
+        }
+        
+        $userId = $user['id'];
+        
+        // Criptografar seed para o banco
+        $iv = substr(md5($userId), 0, 16);
+        $encryptedSeedForDb = openssl_encrypt($masterSeed, 'AES-256-CBC', $serverKey, 0, $iv);
+        
+        // Atualizar token e seed do usuário
+        $stmt = $conn->prepare("
+            UPDATE users 
+            SET token = ?, 
+                master_seed = ?, 
+                session_salt = ?,
+                salt_updated_at = NOW(),
+                updated_at = NOW()
+            WHERE id = ?
+        ");
+        $stmt->bind_param("sssi", $token, $encryptedSeedForDb, $sessionSalt, $userId);
+        $stmt->execute();
+        $stmt->close();
+        
+        error_log("[EMAIL-LOGIN] Login bem-sucedido para: $email (ID: $userId)");
+    }
     
-    // 9. ATUALIZAR TOKEN E SEED DO USUÁRIO
-    $stmt = $conn->prepare("
-        UPDATE users 
-        SET token = ?, 
-            master_seed = ?, 
-            session_salt = ?,
-            salt_updated_at = NOW(),
-            updated_at = NOW()
-        WHERE id = ?
-    ");
-    $stmt->bind_param("sssi", $token, $encryptedSeedForDb, $sessionSalt, $userId);
-    $stmt->execute();
-    $stmt->close();
-    
-    // 10. ENVIAR RESPOSTA
+    // 7. ENVIAR RESPOSTA
     $responseData = [
         'token' => $token,
         'encrypted_seed' => $encryptedSeed,
@@ -206,7 +294,7 @@ try {
             'email' => $user['email'],
             'name' => $user['name'],
             'google_id' => $user['google_id'] ?? null,
-            'profile_picture' => $user['profile_picture'],
+            'profile_picture' => $user['profile_picture'] ?? null,
             'points' => (int)$user['points']
         ]
     ];
