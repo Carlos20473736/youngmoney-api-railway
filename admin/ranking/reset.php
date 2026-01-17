@@ -1,33 +1,140 @@
 <?php
+/**
+ * Admin Ranking Reset Endpoint
+ * 
+ * Reset manual do ranking pelo painel administrativo
+ * CORRIGIDO: Agora cria cooldowns para os vencedores
+ * 
+ * Sistema de Cooldown:
+ * - Top 1, 2, 3: 2 dias de cooldown
+ * - Top 4 a 10: 1 dia de cooldown
+ */
+
 require_once __DIR__ . '/../../admin/cors.php';
 require_once __DIR__ . '/../../database.php';
 
 header('Content-Type: application/json');
 
+// Configurar timezone
+date_default_timezone_set('America/Sao_Paulo');
+
 try {
     $conn = getDbConnection();
+    
+    // Obter data e hora atual
+    $current_date = date('Y-m-d');
+    $current_datetime = date('Y-m-d H:i:s');
     
     // Iniciar transação
     $conn->begin_transaction();
     
     try {
+        // ============================================
+        // CRIAR TABELA DE COOLDOWNS SE NÃO EXISTIR
+        // ============================================
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS ranking_cooldowns (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                position INT NOT NULL COMMENT 'Posição no ranking quando ganhou',
+                prize_amount DECIMAL(10,2) NOT NULL COMMENT 'Valor do prêmio recebido',
+                cooldown_days INT NOT NULL COMMENT 'Dias de cooldown (1 ou 2)',
+                cooldown_until DATETIME NOT NULL COMMENT 'Data/hora até quando está bloqueado',
+                reset_date DATE NOT NULL COMMENT 'Data do reset que gerou o cooldown',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_user_cooldown (user_id, cooldown_until),
+                INDEX idx_cooldown_until (cooldown_until)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        
+        // Valores dos prêmios por posição (padronizado)
+        $rankingPrizes = [
+            1 => 10.00,  // 1º lugar: R$ 10,00
+            2 => 5.00,   // 2º lugar: R$ 5,00
+            3 => 2.50,   // 3º lugar: R$ 2,50
+            4 => 1.00,   // 4º lugar: R$ 1,00
+            5 => 1.00,
+            6 => 1.00,
+            7 => 1.00,
+            8 => 1.00,
+            9 => 1.00,
+            10 => 1.00
+        ];
+        
+        // Dias de cooldown por posição
+        // Top 1-3: 2 dias | Top 4-10: 1 dia
+        $cooldownDays = [
+            1 => 2,
+            2 => 2,
+            3 => 2,
+            4 => 1,
+            5 => 1,
+            6 => 1,
+            7 => 1,
+            8 => 1,
+            9 => 1,
+            10 => 1
+        ];
+        
         // 1. Buscar o top 10 do ranking antes de resetar
-        // IMPORTANTE: Apenas usuários com PIX cadastrado participam do ranking
+        // IMPORTANTE: Apenas usuários com PIX cadastrado e SEM cooldown ativo participam do ranking
         $stmt = $conn->prepare("
-            SELECT id 
-            FROM users 
-            WHERE daily_points > 0 
-              AND pix_key IS NOT NULL 
-              AND pix_key != ''
-            ORDER BY daily_points DESC, created_at ASC 
+            SELECT u.id, u.name, u.daily_points
+            FROM users u
+            LEFT JOIN ranking_cooldowns rc ON u.id = rc.user_id AND rc.cooldown_until > ?
+            WHERE u.daily_points > 0 
+              AND u.pix_key IS NOT NULL 
+              AND u.pix_key != ''
+              AND rc.id IS NULL
+            ORDER BY u.daily_points DESC, u.created_at ASC 
             LIMIT 10
         ");
+        $stmt->bind_param("s", $current_datetime);
         $stmt->execute();
         $result = $stmt->get_result();
         
         $top_10_ids = [];
+        $cooldowns_created = [];
+        $position = 1;
+        
         while ($row = $result->fetch_assoc()) {
-            $top_10_ids[] = $row['id'];
+            $user_id = $row['id'];
+            $top_10_ids[] = $user_id;
+            
+            $prizeAmount = $rankingPrizes[$position] ?? 1.00;
+            $userCooldownDays = $cooldownDays[$position] ?? 1;
+            
+            // ============================================
+            // REGISTRAR COOLDOWN PARA O VENCEDOR
+            // ============================================
+            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownDays} days"));
+            
+            $stmt_cooldown = $conn->prepare("
+                INSERT INTO ranking_cooldowns 
+                (user_id, position, prize_amount, cooldown_days, cooldown_until, reset_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt_cooldown->bind_param("iidiss", 
+                $user_id, 
+                $position, 
+                $prizeAmount, 
+                $userCooldownDays, 
+                $cooldownUntil, 
+                $current_date
+            );
+            $stmt_cooldown->execute();
+            $stmt_cooldown->close();
+            
+            $cooldowns_created[] = [
+                'user_id' => $user_id,
+                'name' => $row['name'],
+                'position' => $position,
+                'prize_amount' => $prizeAmount,
+                'cooldown_days' => $userCooldownDays,
+                'cooldown_until' => $cooldownUntil
+            ];
+            
+            $position++;
         }
         $stmt->close();
         
@@ -127,12 +234,14 @@ try {
         
         echo json_encode([
             'success' => true,
-            'message' => 'Sistema resetado com sucesso! (Top 10 do Ranking + Spin + Check-in + MoniTag + Candy Levels)',
+            'message' => 'Sistema resetado com sucesso! (Top 10 do Ranking + Cooldowns + Spin + Check-in + MoniTag + Candy Levels)',
             'users_reset' => $users_reset,
             'top_10_ids' => $top_10_ids,
             'monetag_impressions' => $random_impressions,
             'candy_levels_reset' => $candy_reset,
-            'note' => 'Apenas o top 10 teve pontos zerados. Demais usuários mantiveram seus pontos. Todos os levels do Candy foram resetados para 1.'
+            'cooldowns_created' => count($cooldowns_created),
+            'cooldowns_details' => $cooldowns_created,
+            'note' => 'Apenas o top 10 teve pontos zerados e recebeu cooldown. Demais usuários mantiveram seus pontos. Todos os levels do Candy foram resetados para 1.'
         ]);
         
     } catch (Exception $e) {

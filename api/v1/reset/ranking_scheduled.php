@@ -14,12 +14,17 @@
  * - Cria registros de pagamento pendentes na tabela pix_payments
  * - Zera daily_points de todos os usuários
  * - Permite que usuários acumulem pontos novamente
+ * - CORRIGIDO: Agora cria cooldowns para os vencedores
  * 
- * Valores de Pagamento (conforme APK):
- * - 1º lugar: R$ 20,00
- * - 2º lugar: R$ 10,00
- * - 3º lugar: R$ 5,00
+ * Valores de Pagamento (padronizado):
+ * - 1º lugar: R$ 10,00
+ * - 2º lugar: R$ 5,00
+ * - 3º lugar: R$ 2,50
  * - 4º ao 10º lugar: R$ 1,00 cada
+ * 
+ * Sistema de Cooldown:
+ * - Top 1, 2, 3: 2 dias de cooldown
+ * - Top 4 a 10: 1 dia de cooldown
  * 
  * Segurança:
  * - Token obrigatório via query parameter ou header
@@ -141,12 +146,30 @@ try {
     $conn->begin_transaction();
     
     try {
+        // ============================================
+        // CRIAR TABELA DE COOLDOWNS SE NÃO EXISTIR
+        // ============================================
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS ranking_cooldowns (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                position INT NOT NULL COMMENT 'Posição no ranking quando ganhou',
+                prize_amount DECIMAL(10,2) NOT NULL COMMENT 'Valor do prêmio recebido',
+                cooldown_days INT NOT NULL COMMENT 'Dias de cooldown (1 ou 2)',
+                cooldown_until DATETIME NOT NULL COMMENT 'Data/hora até quando está bloqueado',
+                reset_date DATE NOT NULL COMMENT 'Data do reset que gerou o cooldown',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_user_cooldown (user_id, cooldown_until),
+                INDEX idx_cooldown_until (cooldown_until)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        
         // PASSO 1: Obter o top 10 do ranking ANTES de resetar
-        // Tabela de valores de pagamento conforme APK
+        // Tabela de valores de pagamento (padronizado)
         $payment_values = [
-            1 => 20.00,  // 1º lugar: R$ 20,00
-            2 => 10.00,  // 2º lugar: R$ 10,00
-            3 => 5.00,   // 3º lugar: R$ 5,00
+            1 => 10.00,  // 1º lugar: R$ 10,00
+            2 => 5.00,   // 2º lugar: R$ 5,00
+            3 => 2.50,   // 3º lugar: R$ 2,50
             4 => 1.00,   // 4º ao 10º lugar: R$ 1,00
             5 => 1.00,
             6 => 1.00,
@@ -156,21 +179,38 @@ try {
             10 => 1.00
         ];
         
+        // Dias de cooldown por posição
+        // Top 1-3: 2 dias | Top 4-10: 1 dia
+        $cooldownDays = [
+            1 => 2,
+            2 => 2,
+            3 => 2,
+            4 => 1,
+            5 => 1,
+            6 => 1,
+            7 => 1,
+            8 => 1,
+            9 => 1,
+            10 => 1
+        ];
+        
         // Buscar top 10 do ranking com suas chaves PIX (agora na tabela users)
-        // IMPORTANTE: Apenas usuários com PIX cadastrado participam do ranking
+        // IMPORTANTE: Apenas usuários com PIX cadastrado e SEM cooldown ativo participam do ranking
         $stmt = $conn->prepare("
             SELECT 
-                id as user_id,
-                name,
-                email,
-                daily_points,
-                pix_key_type,
-                pix_key
-            FROM users
-            WHERE daily_points > 0
-              AND pix_key IS NOT NULL 
-              AND pix_key != ''
-            ORDER BY daily_points DESC, created_at ASC
+                u.id as user_id,
+                u.name,
+                u.email,
+                u.daily_points,
+                u.pix_key_type,
+                u.pix_key
+            FROM users u
+            LEFT JOIN ranking_cooldowns rc ON u.id = rc.user_id AND rc.cooldown_until > ?
+            WHERE u.daily_points > 0
+              AND u.pix_key IS NOT NULL 
+              AND u.pix_key != ''
+              AND rc.id IS NULL
+            ORDER BY u.daily_points DESC, u.created_at ASC
             LIMIT 10
         ");
         
@@ -178,6 +218,7 @@ try {
             throw new Exception("Prepare failed: " . $conn->error);
         }
         
+        $stmt->bind_param("s", $current_datetime);
         $stmt->execute();
         $result = $stmt->get_result();
         
@@ -185,10 +226,12 @@ try {
         $position = 1;
         $payments_created = 0;
         $total_payment_amount = 0;
+        $cooldowns_created = [];
         
         while ($row = $result->fetch_assoc()) {
             $user_id = $row['user_id'];
             $amount = $payment_values[$position] ?? 1.00;
+            $userCooldownDays = $cooldownDays[$position] ?? 1;
             
             $top_10_users[] = [
                 'position' => $position,
@@ -198,7 +241,8 @@ try {
                 'daily_points' => (int)$row['daily_points'],
                 'pix_key_type' => $row['pix_key_type'],
                 'pix_key' => $row['pix_key'],
-                'payment_amount' => $amount
+                'payment_amount' => $amount,
+                'cooldown_days' => $userCooldownDays
             ];
             
             // PASSO 2: Criar registro de pagamento pendente
@@ -232,16 +276,54 @@ try {
                 $total_payment_amount += $amount;
             }
             
+            // ============================================
+            // PASSO 3: REGISTRAR COOLDOWN PARA O VENCEDOR
+            // ============================================
+            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownDays} days"));
+            
+            $stmt_cooldown = $conn->prepare("
+                INSERT INTO ranking_cooldowns 
+                (user_id, position, prize_amount, cooldown_days, cooldown_until, reset_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
+            
+            if (!$stmt_cooldown) {
+                throw new Exception("Prepare cooldown failed: " . $conn->error);
+            }
+            
+            $stmt_cooldown->bind_param("iidiss", 
+                $user_id, 
+                $position, 
+                $amount, 
+                $userCooldownDays, 
+                $cooldownUntil, 
+                $current_date
+            );
+            
+            if (!$stmt_cooldown->execute()) {
+                throw new Exception("Execute cooldown failed: " . $stmt_cooldown->error);
+            }
+            
+            $stmt_cooldown->close();
+            
+            $cooldowns_created[] = [
+                'user_id' => $user_id,
+                'name' => $row['name'],
+                'position' => $position,
+                'cooldown_days' => $userCooldownDays,
+                'cooldown_until' => $cooldownUntil
+            ];
+            
             $position++;
         }
         
         $stmt->close();
         
-        // PASSO 3: Coletar IDs do top 10 para resetar apenas eles
+        // PASSO 4: Coletar IDs do top 10 para resetar apenas eles
         $top_10_ids = array_column($top_10_users, 'user_id');
         $usersAffected = count($top_10_ids);
         
-        // PASSO 4: Resetar daily_points para 0 APENAS para o top 10
+        // PASSO 5: Resetar daily_points para 0 APENAS para o top 10
         if (!empty($top_10_ids)) {
             $placeholders = implode(',', array_fill(0, count($top_10_ids), '?'));
             $stmt = $conn->prepare("
@@ -265,7 +347,7 @@ try {
             $stmt->close();
         }
         
-        // PASSO 5: Registrar log do reset
+        // PASSO 6: Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO ranking_reset_logs 
             (users_affected, reset_datetime) 
@@ -284,10 +366,10 @@ try {
         // Retornar sucesso com informações dos pagamentos criados
         echo json_encode([
             'success' => true,
-            'message' => 'Reset do ranking executado com sucesso! Pagamentos pendentes criados.',
+            'message' => 'Reset do ranking executado com sucesso! Pagamentos pendentes e cooldowns criados.',
             'data' => [
                 'reset_type' => 'ranking_scheduled',
-                'description' => 'Apenas o top 10 teve daily_points zerado. Demais usuários mantiveram seus pontos. Pagamentos pendentes criados para o top 10.',
+                'description' => 'Apenas o top 10 teve daily_points zerado. Demais usuários mantiveram seus pontos. Pagamentos pendentes e cooldowns criados para o top 10.',
                 'reset_time_configured' => $reset_time,
                 'is_reset_time' => $is_reset_time,
                 'current_time' => $current_time,
@@ -302,6 +384,10 @@ try {
                     'total_amount' => round($total_payment_amount, 2),
                     'status' => 'pending',
                     'top_10_ranking' => $top_10_users
+                ],
+                'cooldowns' => [
+                    'total_created' => count($cooldowns_created),
+                    'details' => $cooldowns_created
                 ]
             ]
         ], JSON_UNESCAPED_UNICODE);
