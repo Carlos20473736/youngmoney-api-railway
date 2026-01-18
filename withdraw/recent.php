@@ -65,6 +65,7 @@ try {
     
     // Buscar saques recentes aprovados/completados
     // Inclui receipt_url se existir na tabela
+    // SEM LIMITE - Retorna TODOS os comprovantes
     $stmt = $conn->prepare("
         SELECT w.id, w.amount, w.created_at, w.updated_at, w.receipt_url,
                u.email, u.profile_picture, u.photo_url, u.name
@@ -72,7 +73,6 @@ try {
         INNER JOIN users u ON w.user_id = u.id
         WHERE w.status IN ('approved', 'completed')
         ORDER BY w.updated_at DESC, w.created_at DESC
-        LIMIT 20
     ");
     $stmt->execute();
     $result = $stmt->get_result();
