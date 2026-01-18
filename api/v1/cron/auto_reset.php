@@ -3,7 +3,7 @@
  * Endpoint de Reset Automático Diário - CORRIGIDO
  * 
  * Este endpoint é chamado pelo cron-job.org a cada minuto.
- * Reseta APENAS às 20:00 (8 da noite) horário de Brasília:
+ * Reseta APENAS às 00:00 (meia-noite) horário de Brasília:
  * 
  * 1. Ranking (daily_points = 0) - APENAS TOP 10
  * 2. Spin (DELETE registros de HOJE)
@@ -13,7 +13,7 @@
  * - Top 1, 2, 3: 2 dias de cooldown
  * - Top 4 a 10: 1 dia de cooldown
  * 
- * CORREÇÃO: Agora verifica se é exatamente 20:00 e se já não foi resetado hoje
+ * CORREÇÃO: Agora verifica se é exatamente 00:00 (meia-noite) e se já não foi resetado hoje
  */
 
 header('Content-Type: application/json');
@@ -49,11 +49,11 @@ try {
     $current_minute = (int)date('i');
     
     // ============================================
-    // HORÁRIO FIXO: 20:00 (8 da noite)
+    // HORÁRIO FIXO: 00:00 (meia-noite)
     // ============================================
-    $reset_hour = 20;  // 8 da noite
+    $reset_hour = 0;   // meia-noite
     $reset_minute = 0; // em ponto
-    $reset_time = '20:00';
+    $reset_time = '00:00';
     
     // Buscar último horário de reset
     $stmt = $mysqli->prepare("
@@ -71,7 +71,7 @@ try {
     // VERIFICAÇÃO DE HORÁRIO - CORRIGIDO
     // ============================================
     // Só executa o reset se:
-    // 1. For exatamente 20:00 (hora e minuto)
+    // 1. For exatamente 00:00 (meia-noite)
     // 2. Não tiver sido executado hoje ainda
     
     $should_reset = false;
@@ -85,7 +85,7 @@ try {
     
     $already_reset_today = ($last_reset_date === $current_date);
     
-    // Verificar se é a hora certa (20:00)
+    // Verificar se é a hora certa (00:00 - meia-noite)
     $is_reset_time = ($current_hour === $reset_hour && $current_minute === $reset_minute);
     
     if ($already_reset_today) {
@@ -96,7 +96,7 @@ try {
         $reason = 'Ainda não é o horário de reset. Horário atual: ' . $current_time . '. Reset programado para: ' . $reset_time;
     } else {
         $should_reset = true;
-        $reason = 'Horário de reset atingido (20:00) e ainda não foi executado hoje';
+        $reason = 'Horário de reset atingido (00:00 - meia-noite) e ainda não foi executado hoje';
     }
     
     // ============================================
@@ -408,7 +408,7 @@ try {
     echo json_encode([
         'success' => true,
         'reset_executed' => true,
-        'message' => 'Reset diário executado com sucesso às 20:00!',
+        'message' => 'Reset diário executado com sucesso às 00:00 (meia-noite)!',
         'data' => [
             'prizes' => [
                 'total_awarded' => count($prizesAwarded),
