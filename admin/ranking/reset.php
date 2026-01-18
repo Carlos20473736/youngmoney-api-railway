@@ -61,19 +61,19 @@ try {
             10 => 1.00
         ];
         
-        // Dias de cooldown por posição
-        // Top 1-3: 2 dias | Top 4-10: 1 dia
-        $cooldownDays = [
-            1 => 2,
-            2 => 2,
-            3 => 2,
-            4 => 1,
-            5 => 1,
-            6 => 1,
-            7 => 1,
-            8 => 1,
-            9 => 1,
-            10 => 1
+        // Cooldown por posição (em horas)
+        // Top 1-3: 1 dia (24 horas) | Top 4-10: 2 horas
+        $cooldownHours = [
+            1 => 24,
+            2 => 24,
+            3 => 24,
+            4 => 2,
+            5 => 2,
+            6 => 2,
+            7 => 2,
+            8 => 2,
+            9 => 2,
+            10 => 2
         ];
         
         // 1. Buscar o top 10 do ranking antes de resetar
@@ -102,12 +102,12 @@ try {
             $top_10_ids[] = $user_id;
             
             $prizeAmount = $rankingPrizes[$position] ?? 1.00;
-            $userCooldownDays = $cooldownDays[$position] ?? 1;
+            $userCooldownHours = $cooldownHours[$position] ?? 2;
             
             // ============================================
             // REGISTRAR COOLDOWN PARA O VENCEDOR
             // ============================================
-            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownDays} days"));
+            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownHours} hours"));
             
             $stmt_cooldown = $conn->prepare("
                 INSERT INTO ranking_cooldowns 
@@ -118,7 +118,7 @@ try {
                 $user_id, 
                 $position, 
                 $prizeAmount, 
-                $userCooldownDays, 
+                $userCooldownHours, 
                 $cooldownUntil, 
                 $current_date
             );
@@ -130,7 +130,7 @@ try {
                 'name' => $row['name'],
                 'position' => $position,
                 'prize_amount' => $prizeAmount,
-                'cooldown_days' => $userCooldownDays,
+                'cooldown_hours' => $userCooldownHours,
                 'cooldown_until' => $cooldownUntil
             ];
             

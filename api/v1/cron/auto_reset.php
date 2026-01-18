@@ -163,19 +163,19 @@ try {
         10 => 1.00   // 10º lugar: R$ 1,00
     ];
     
-    // Dias de cooldown por posição
-    // Top 1-3: 2 dias | Top 4-10: 1 dia
-    $cooldownDays = [
-        1 => 2,
-        2 => 2,
-        3 => 2,
-        4 => 1,
-        5 => 1,
-        6 => 1,
-        7 => 1,
-        8 => 1,
-        9 => 1,
-        10 => 1
+    // Cooldown por posição (em horas)
+    // Top 1-3: 1 dia (24 horas) | Top 4-10: 2 horas
+    $cooldownHours = [
+        1 => 24,
+        2 => 24,
+        3 => 24,
+        4 => 2,
+        5 => 2,
+        6 => 2,
+        7 => 2,
+        8 => 2,
+        9 => 2,
+        10 => 2
     ];
     
     // Buscar Top 10 do ranking (apenas usuários com pontos > 0, PIX cadastrado e SEM cooldown ativo)
@@ -197,7 +197,7 @@ try {
     
     while ($user = $topRankingResult->fetch_assoc()) {
         $prizeAmount = $rankingPrizes[$position] ?? 0;
-        $userCooldownDays = $cooldownDays[$position] ?? 1;
+        $userCooldownHours = $cooldownHours[$position] ?? 2;
         
         if ($prizeAmount > 0) {
             // Verificar se usuário tem PIX cadastrado
@@ -225,7 +225,7 @@ try {
                     'prize' => $prizeAmount,
                     'status' => 'withdrawal_created',
                     'pix_key' => substr($user['pix_key'], 0, 4) . '****', // Mascarar PIX
-                    'cooldown_days' => $userCooldownDays
+                    'cooldown_hours' => $userCooldownHours
                 ];
             } else {
                 // Usuário sem PIX - converter prêmio em pontos (R$ 1,00 = 10.000 pontos)
@@ -252,14 +252,14 @@ try {
                     'prize' => $prizeAmount,
                     'status' => 'converted_to_points',
                     'points_bonus' => $pointsBonus,
-                    'cooldown_days' => $userCooldownDays
+                    'cooldown_hours' => $userCooldownHours
                 ];
             }
             
             // ============================================
             // REGISTRAR COOLDOWN PARA O VENCEDOR
             // ============================================
-            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownDays} days"));
+            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownHours} hours"));
             
             $stmt = $mysqli->prepare("
                 INSERT INTO ranking_cooldowns 
@@ -270,7 +270,7 @@ try {
                 $user['id'], 
                 $position, 
                 $prizeAmount, 
-                $userCooldownDays, 
+                $userCooldownHours, 
                 $cooldownUntil, 
                 $current_date
             );
@@ -280,7 +280,7 @@ try {
                 'user_id' => $user['id'],
                 'name' => $user['name'],
                 'position' => $position,
-                'cooldown_days' => $userCooldownDays,
+                'cooldown_hours' => $userCooldownHours,
                 'cooldown_until' => $cooldownUntil
             ];
         }
