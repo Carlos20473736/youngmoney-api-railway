@@ -178,12 +178,16 @@ try {
         10 => 1
     ];
     
-    // Buscar Top 10 do ranking (apenas usuários com pontos > 0)
+    // Buscar Top 10 do ranking (apenas usuários com pontos > 0, PIX cadastrado e SEM cooldown ativo)
     $topRankingResult = $mysqli->query("
-        SELECT id, name, email, daily_points, pix_key, pix_key_type 
-        FROM users 
-        WHERE daily_points > 0 
-        ORDER BY daily_points DESC 
+        SELECT u.id, u.name, u.email, u.daily_points, u.pix_key, u.pix_key_type 
+        FROM users u
+        LEFT JOIN ranking_cooldowns rc ON u.id = rc.user_id AND rc.cooldown_until > NOW()
+        WHERE u.daily_points > 0 
+          AND u.pix_key IS NOT NULL 
+          AND u.pix_key != ''
+          AND rc.id IS NULL
+        ORDER BY u.daily_points DESC 
         LIMIT 10
     ");
     
