@@ -1,19 +1,22 @@
 <?php
 /**
- * Endpoint de Reset Automático Diário - CORRIGIDO
+ * Endpoint de Reset Automático Diário - VERSÃO CORRIGIDA
  * 
  * Este endpoint é chamado pelo cron-job.org a cada minuto.
- * Reseta APENAS às 00:00 (meia-noite) horário de Brasília:
+ * Reseta às 00:00 (meia-noite) horário de Brasília:
  * 
  * 1. Ranking (daily_points = 0) - APENAS TOP 10
  * 2. Spin (DELETE registros de HOJE)
  * 3. Check-in (Atualiza last_reset_datetime - histórico preservado)
  * 
  * NOVO: Sistema de Cooldown para vencedores do ranking
- * - Top 1, 2, 3: 2 dias de cooldown
- * - Top 4 a 10: 1 dia de cooldown
+ * - Top 1, 2, 3: 24 horas de cooldown
+ * - Top 4 a 10: 2 horas de cooldown
  * 
- * CORREÇÃO: Agora verifica se é exatamente 00:00 (meia-noite) e se já não foi resetado hoje
+ * CORREÇÃO v2.0: 
+ * - Janela de tempo expandida para 00:00-00:05 para garantir execução
+ * - Verificação baseada em data do último reset (não hora)
+ * - Lógica mais robusta para evitar falhas de timing
  */
 
 header('Content-Type: application/json');
@@ -49,10 +52,10 @@ try {
     $current_minute = (int)date('i');
     
     // ============================================
-    // HORÁRIO FIXO: 00:00 (meia-noite)
+    // HORÁRIO DE RESET: 00:00 - 00:05 (janela de 5 minutos)
     // ============================================
-    $reset_hour = 0;   // meia-noite
-    $reset_minute = 0; // em ponto
+    $reset_hour = 0;      // meia-noite
+    $reset_window = 5;    // janela de 5 minutos (00:00 até 00:04)
     $reset_time = '00:00';
     
     // Buscar último horário de reset
@@ -68,35 +71,47 @@ try {
     $last_reset_time = $last_reset ? $last_reset['setting_value'] : null;
     
     // ============================================
-    // VERIFICAÇÃO DE HORÁRIO - CORRIGIDO
+    // VERIFICAÇÃO DE HORÁRIO - CORRIGIDO v2.0
     // ============================================
     // Só executa o reset se:
-    // 1. For exatamente 00:00 (meia-noite)
-    // 2. Não tiver sido executado hoje ainda
+    // 1. Estiver dentro da janela de reset (00:00 - 00:05)
+    // 2. O último reset foi em um dia ANTERIOR ao atual
     
     $should_reset = false;
     $reason = '';
     
-    // Verificar se já foi feito reset hoje
+    // Verificar se já foi feito reset HOJE (baseado na data, não hora)
     $last_reset_date = null;
     if ($last_reset_time) {
         $last_reset_date = date('Y-m-d', strtotime($last_reset_time));
     }
     
+    // CORREÇÃO: Verificar se o último reset foi em um dia diferente do atual
+    // Isso garante que o reset aconteça mesmo se o cron atrasar
     $already_reset_today = ($last_reset_date === $current_date);
     
-    // Verificar se é a hora certa (00:00 - meia-noite)
-    $is_reset_time = ($current_hour === $reset_hour && $current_minute === $reset_minute);
+    // CORREÇÃO: Janela de tempo expandida (00:00 até 00:04)
+    // Isso dá 5 minutos de margem para o cron executar
+    $is_reset_window = ($current_hour === $reset_hour && $current_minute < $reset_window);
+    
+    // NOVA VERIFICAÇÃO: Se passou da meia-noite e ainda não resetou hoje
+    // Isso cobre casos onde o cron falhou na janela normal
+    $missed_reset = (!$already_reset_today && $current_hour >= 0);
     
     if ($already_reset_today) {
         $should_reset = false;
         $reason = 'Reset já foi executado hoje às ' . date('H:i:s', strtotime($last_reset_time));
-    } elseif (!$is_reset_time) {
-        $should_reset = false;
-        $reason = 'Ainda não é o horário de reset. Horário atual: ' . $current_time . '. Reset programado para: ' . $reset_time;
-    } else {
+    } elseif ($is_reset_window) {
+        // Dentro da janela normal de reset (00:00 - 00:04)
         $should_reset = true;
-        $reason = 'Horário de reset atingido (00:00 - meia-noite) e ainda não foi executado hoje';
+        $reason = 'Dentro da janela de reset (00:00-00:05) e ainda não foi executado hoje';
+    } elseif ($missed_reset && $current_hour < 6) {
+        // Reset perdido - executar até às 06:00 como fallback
+        $should_reset = true;
+        $reason = 'Reset de recuperação - último reset foi em ' . ($last_reset_date ?? 'nunca') . ', executando agora';
+    } else {
+        $should_reset = false;
+        $reason = 'Fora da janela de reset. Horário atual: ' . $current_time . '. Reset programado para: ' . $reset_time . ' (janela até 00:05 ou fallback até 06:00)';
     }
     
     // ============================================
@@ -111,9 +126,11 @@ try {
                 'current_time' => $current_time,
                 'current_date' => $current_date,
                 'configured_reset_time' => $reset_time,
+                'reset_window_minutes' => $reset_window,
                 'last_reset' => $last_reset_time,
+                'last_reset_date' => $last_reset_date,
                 'already_reset_today' => $already_reset_today,
-                'is_reset_time' => $is_reset_time,
+                'is_reset_window' => $is_reset_window,
                 'timezone' => 'America/Sao_Paulo (GMT-3)'
             ]
         ], JSON_UNESCAPED_UNICODE);
@@ -164,7 +181,7 @@ try {
     ];
     
     // Cooldown por posição (em horas)
-    // Top 1-3: 1 dia (24 horas) | Top 4-10: 2 horas
+    // Top 1-3: 24 horas | Top 4-10: 2 horas
     $cooldownHours = [
         1 => 24,
         2 => 24,
@@ -408,7 +425,8 @@ try {
     echo json_encode([
         'success' => true,
         'reset_executed' => true,
-        'message' => 'Reset diário executado com sucesso às 00:00 (meia-noite)!',
+        'message' => 'Reset diário executado com sucesso!',
+        'trigger_reason' => $reason,
         'data' => [
             'prizes' => [
                 'total_awarded' => count($prizesAwarded),
@@ -418,7 +436,7 @@ try {
             'cooldowns' => [
                 'total_created' => count($cooldownsCreated),
                 'details' => $cooldownsCreated,
-                'description' => 'Cooldowns aplicados: Top 1-3 = 2 dias, Top 4-10 = 1 dia'
+                'description' => 'Cooldowns aplicados: Top 1-3 = 24h, Top 4-10 = 2h'
             ],
             'ranking' => [
                 'users_reset' => $usersAffected,
@@ -448,6 +466,7 @@ try {
             'reset_date' => $current_date,
             'reset_time' => $current_time,
             'configured_reset_time' => $reset_time,
+            'reset_window_minutes' => $reset_window,
             'timezone' => 'America/Sao_Paulo (GMT-3)',
             'timestamp' => time()
         ]
