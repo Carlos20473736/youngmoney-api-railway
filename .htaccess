@@ -44,6 +44,10 @@ php_value auto_prepend_file "/app/security_middleware_v3.php"
     # Permitir acesso direto a arquivos na pasta /monetag/
     RewriteCond %{REQUEST_URI} ^/monetag/
     RewriteRule ^ - [L]
+    
+    # Permitir acesso direto a arquivos na pasta /pix/
+    RewriteCond %{REQUEST_URI} ^/pix/
+    RewriteRule ^ - [L]
 </IfModule>
 
 # Desabilitar listagem de diretórios
