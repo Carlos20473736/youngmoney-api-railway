@@ -5,11 +5,12 @@ import StarField from '@/components/StarField';
 
 /*
  * Design: Glassmorphism Cosmos
- * Página de autenticação - recebe YMID via URL do app Android
- * URL: /auth?ymid=123456
+ * Página de autenticação - recebe YMID e EMAIL via URL do app Android
+ * URL: /auth?ymid=123456&email=usuario@email.com
  */
 
 const YMID_STORAGE_KEY = 'youngmoney_ymid';
+const EMAIL_STORAGE_KEY = 'youngmoney_email';
 
 export default function Auth() {
   const [, setLocation] = useLocation();
@@ -20,10 +21,17 @@ export default function Auth() {
   useEffect(() => {
     const params = new URLSearchParams(search);
     const ymid = params.get('ymid');
+    const email = params.get('email');
 
     if (ymid && ymid.trim()) {
       // Salvar YMID no localStorage
       localStorage.setItem(YMID_STORAGE_KEY, ymid.trim());
+      
+      // Salvar EMAIL no localStorage se fornecido
+      if (email && email.trim()) {
+        localStorage.setItem(EMAIL_STORAGE_KEY, email.trim());
+      }
+      
       setStatus('success');
       setMessage('Conta vinculada com sucesso!');
       

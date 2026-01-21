@@ -17,29 +17,28 @@ import { toast } from 'sonner';
 /*
  * Design: Glassmorphism Cosmos
  * Dashboard de tarefas - mostra progresso de impressões e cliques
- * Integra com Monetag Mini App Telegram para anúncios
+ * Integra com API Monetag para estatísticas em tempo real
+ * Inclui sistema de overlay de 15 segundos para anúncios
  */
 
 const YMID_STORAGE_KEY = 'youngmoney_ymid';
+const EMAIL_STORAGE_KEY = 'youngmoney_email';
 const API_BASE_URL = 'https://monetag-postback-server-production.up.railway.app/api/stats/user';
+const POSTBACK_SERVER = 'https://monetag-postback-server-production.up.railway.app';
+const POSTBACK_URL = `${POSTBACK_SERVER}/api/postback`;
+const YOUNGMONEY_API = 'https://youngmoney-api-railway-production.up.railway.app';
 
-// ========================================
-// CONFIGURAÇÃO MONETAG MINI APP TELEGRAM
-// ========================================
+// Configuração do Monetag SDK
 const ZONE_ID = '10325249';
 const SDK_FUNC = 'show_10325249';
 const SCRIPT_SRC = 'https://libtl.com/sdk.js';
 
-// Servidor de Postback
-const POSTBACK_SERVER = 'https://monetag-postback-server-production.up.railway.app';
-const POSTBACK_URL = `${POSTBACK_SERVER}/api/postback`;
-
-// Young Money API
-const YOUNGMONEY_API = 'https://youngmoney-api-railway-production.up.railway.app';
-
 // Requisitos para completar a tarefa
-let REQUIRED_IMPRESSIONS = 5;
+const REQUIRED_IMPRESSIONS = 5;
 const REQUIRED_CLICKS = 1;
+
+// Duração do overlay em segundos
+const OVERLAY_DURATION = 15;
 
 interface UserStats {
   success: boolean;
@@ -55,32 +54,6 @@ interface UserStats {
 declare global {
   interface Window {
     [key: string]: any;
-    Android?: {
-      getUserId?: () => string;
-      getEmail?: () => string;
-      closeActivity?: () => void;
-      onTaskCompleted?: () => void;
-    };
-    AndroidInterface?: {
-      getUserId?: () => string;
-      getEmail?: () => string;
-      closeActivity?: () => void;
-      onTaskCompleted?: () => void;
-    };
-    Telegram?: {
-      WebApp?: {
-        initDataUnsafe?: {
-          user?: {
-            id: number;
-          };
-        };
-        close?: () => void;
-      };
-    };
-    MontagOverlay?: {
-      show: () => void;
-      hide: () => void;
-    };
   }
 }
 
@@ -94,71 +67,109 @@ export default function Tasks() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sdkLoaded, setSdkLoaded] = useState(false);
-  const [requiredImpressionsLoaded, setRequiredImpressionsLoaded] = useState(false);
+  
+  // Estado do overlay
   const [showOverlay, setShowOverlay] = useState(false);
-  const [overlayCountdown, setOverlayCountdown] = useState(15);
+  const [overlayCountdown, setOverlayCountdown] = useState(OVERLAY_DURATION);
   const overlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const overlayCreatedRef = useRef(false);
 
-  // ========================================
-  // SISTEMA DE OVERLAY FLUTUANTE DE 15 SEGUNDOS
-  // ========================================
-  const OVERLAY_DURATION = 15;
-
-  const createFloatingOverlay = useCallback(() => {
-    if (overlayCreatedRef.current) {
-      console.log('[OVERLAY] Overlay já existe, ignorando...');
+  // Carregar YMID e EMAIL do localStorage
+  useEffect(() => {
+    const storedYMID = localStorage.getItem(YMID_STORAGE_KEY);
+    if (!storedYMID) {
+      setLocation('/');
       return;
     }
-
-    overlayCreatedRef.current = true;
-    setShowOverlay(true);
-    setOverlayCountdown(OVERLAY_DURATION);
-
-    console.log('[OVERLAY] Criando overlay de ' + OVERLAY_DURATION + ' segundos...');
-
-    overlayIntervalRef.current = setInterval(() => {
-      setOverlayCountdown((prev) => {
-        if (prev <= 1) {
-          if (overlayIntervalRef.current) {
-            clearInterval(overlayIntervalRef.current);
-          }
-          setShowOverlay(false);
-          overlayCreatedRef.current = false;
-          console.log('[OVERLAY] Overlay removido, recarregando página...');
-          window.location.reload();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
-
-  const removeOverlay = useCallback(() => {
-    if (overlayIntervalRef.current) {
-      clearInterval(overlayIntervalRef.current);
+    setYmid(storedYMID);
+    
+    // Buscar email do localStorage primeiro, depois tentar API
+    const storedEmail = localStorage.getItem(EMAIL_STORAGE_KEY);
+    if (storedEmail) {
+      setUserEmail(storedEmail);
+      console.log('[EMAIL] Email obtido do localStorage:', storedEmail);
+    } else {
+      // Fallback: buscar email do profile
+      fetchUserProfile();
     }
-    setShowOverlay(false);
-    overlayCreatedRef.current = false;
-  }, []);
+  }, [setLocation]);
 
-  // Expor funções para uso externo
+  // Carregar SDK do Monetag
   useEffect(() => {
-    window.MontagOverlay = {
-      show: createFloatingOverlay,
-      hide: removeOverlay
+    if (!ymid) return;
+    
+    const loadMonetagSDK = () => {
+      // Verificar se já existe
+      if (document.querySelector(`script[src="${SCRIPT_SRC}"]`)) {
+        console.log('[SDK] Monetag SDK já carregado');
+        setSdkLoaded(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = SCRIPT_SRC;
+      script.setAttribute('data-zone', ZONE_ID);
+      script.setAttribute('data-sdk', SDK_FUNC);
+      script.async = true;
+      
+      script.onload = () => {
+        console.log('[SDK] Monetag SDK carregado com sucesso');
+        setSdkLoaded(true);
+      };
+      
+      script.onerror = () => {
+        console.error('[SDK] Erro ao carregar Monetag SDK');
+        toast.error('Erro ao carregar sistema de anúncios');
+      };
+      
+      document.head.appendChild(script);
+      console.log('[SDK] Carregando Monetag SDK...');
     };
-  }, [createFloatingOverlay, removeOverlay]);
 
-  // ========================================
-  // INTERCEPTAR POSTBACKS DO MONETAG
-  // ========================================
-  useEffect(() => {
-    // Guardar referências originais
-    const originalFetch = window.fetch;
-    const originalXHROpen = XMLHttpRequest.prototype.open;
+    // Configurar interceptadores de postback
+    setupPostbackInterceptors();
+    
+    // Configurar detector de anúncios
+    setupAdDetectionObserver();
+    
+    loadMonetagSDK();
+  }, [ymid]);
 
+  // Buscar email do usuário (fallback se não estiver no localStorage)
+  const fetchUserProfile = async () => {
+    // Verificar localStorage primeiro
+    const storedEmail = localStorage.getItem(EMAIL_STORAGE_KEY);
+    if (storedEmail) {
+      setUserEmail(storedEmail);
+      console.log('[EMAIL] Email já existe no localStorage:', storedEmail);
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${YOUNGMONEY_API}/profile`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const email = data.email || data.user?.email || data.data?.email;
+        if (email) {
+          setUserEmail(email);
+          localStorage.setItem(EMAIL_STORAGE_KEY, email);
+          console.log('[PROFILE] Email obtido da API:', email);
+        }
+      }
+    } catch (err) {
+      console.error('[PROFILE] Erro ao buscar email:', err);
+    }
+  };
+
+  // Configurar interceptadores de postback do Monetag
+  const setupPostbackInterceptors = () => {
     // Interceptar fetch
+    const originalFetch = window.fetch;
     window.fetch = function(...args: Parameters<typeof fetch>) {
       const url = args[0];
       if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
@@ -172,65 +183,123 @@ export default function Tasks() {
       return originalFetch.apply(window, args);
     };
 
-    // Interceptar XMLHttpRequest
-    XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...rest: any[]) {
-      const urlStr = url.toString();
-      if (urlStr.includes('youngmoney-api-railway')) {
-        if (urlStr.includes('%7Bymid%7D') || urlStr.includes('{ymid}')) {
-          console.log('[BLOQUEIO XHR] Postback do Monetag bloqueado:', urlStr);
-          const eventType = urlStr.includes('event_type=click') || urlStr.includes('event_type%3Dclick') ? 'click' : 'impression';
-          sendPostbackToNewServer(eventType);
-          return originalXHROpen.call(this, method, 'about:blank', ...rest);
+    console.log('[INTERCEPTOR] Interceptadores de postback configurados');
+  };
+
+  // Configurar detector de anúncios Monetag
+  const setupAdDetectionObserver = () => {
+    const detectMonetagAd = (): boolean => {
+      const adIndicators = [
+        'iframe[src*="monetag"]',
+        'iframe[src*="libtl"]',
+        'iframe[src*="ad"]',
+        '[class*="monetag"]',
+        '[id*="monetag"]',
+        'div[style*="z-index: 2147483647"]',
+        'div[style*="z-index:2147483647"]',
+        'iframe[style*="z-index"]',
+        'div[id^="container-"]'
+      ];
+
+      for (const selector of adIndicators) {
+        try {
+          const elements = document.querySelectorAll(selector);
+          if (elements.length > 0) {
+            console.log('[DETECTOR] Anúncio detectado via seletor:', selector);
+            return true;
+          }
+        } catch (e) {
+          // Ignorar erros de seletor inválido
         }
       }
-      return originalXHROpen.call(this, method, url, ...rest);
-    };
 
-    // Interceptar Image (pixel tracking)
-    const originalImage = window.Image;
-    const newImage = function(this: HTMLImageElement) {
-      const img = new originalImage();
-      const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-      if (originalSrcDescriptor && originalSrcDescriptor.set) {
-        const originalSrcSetter = originalSrcDescriptor.set;
-        Object.defineProperty(img, 'src', {
-          set: function(value: string) {
-            if (typeof value === 'string' && value.includes('youngmoney-api-railway')) {
-              if (value.includes('%7Bymid%7D') || value.includes('{ymid}')) {
-                console.log('[BLOQUEIO IMG] Postback do Monetag bloqueado:', value);
-                const eventType = value.includes('event_type=click') || value.includes('event_type%3Dclick') ? 'click' : 'impression';
-                sendPostbackToNewServer(eventType);
-                return;
-              }
-            }
-            originalSrcSetter.call(this, value);
-          },
-          get: function() {
-            return this.getAttribute('src');
-          }
-        });
+      // Verificar iframes
+      const iframes = document.querySelectorAll('iframe');
+      for (const iframe of iframes) {
+        const src = iframe.src || '';
+        const style = iframe.getAttribute('style') || '';
+        if (src.includes('monetag') || src.includes('libtl') || src.includes('ad') || style.includes('z-index')) {
+          console.log('[DETECTOR] Iframe de anúncio detectado:', src);
+          return true;
+        }
       }
-      return img;
-    } as unknown as typeof Image;
-    window.Image = newImage;
 
-    return () => {
-      window.fetch = originalFetch;
-      XMLHttpRequest.prototype.open = originalXHROpen;
-      window.Image = originalImage;
+      return false;
     };
-  }, [ymid, userEmail]);
 
-  // ========================================
-  // ENVIAR POSTBACK PARA NOVO SERVIDOR
-  // ========================================
-  const sendPostbackToNewServer = useCallback((eventType: string) => {
-    console.log('[POSTBACK] Enviando ' + eventType + ' para novo servidor');
+    let adDetected = false;
+    const observer = new MutationObserver(() => {
+      if (adDetected) return;
 
-    // Se for clique, mostrar overlay de 15 segundos
+      if (detectMonetagAd()) {
+        console.log('[OBSERVER] Anúncio Monetag detectado!');
+        
+        // Verificar se usuário já tem cliques
+        if (stats && stats.total_clicks >= 1) {
+          adDetected = true;
+          console.log('[OBSERVER] Usuário tem cliques. Mostrando overlay automático!');
+          if (!overlayCreatedRef.current) {
+            createFloatingOverlay();
+          }
+        } else {
+          console.log('[OBSERVER] Usuário ainda não tem cliques. Overlay não será exibido.');
+          setTimeout(() => { adDetected = false; }, 2000);
+        }
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class', 'src']
+    });
+
+    console.log('[OBSERVER] Observador de anúncios ativado');
+  };
+
+  // Criar overlay flutuante de 15 segundos
+  const createFloatingOverlay = () => {
+    if (overlayCreatedRef.current) {
+      console.log('[OVERLAY] Overlay já existe, ignorando...');
+      return;
+    }
+
+    overlayCreatedRef.current = true;
+    setShowOverlay(true);
+    setOverlayCountdown(OVERLAY_DURATION);
+
+    console.log('[OVERLAY] Criando overlay de', OVERLAY_DURATION, 'segundos...');
+
+    // Iniciar contador regressivo
+    overlayIntervalRef.current = setInterval(() => {
+      setOverlayCountdown(prev => {
+        const newCount = prev - 1;
+        console.log('[OVERLAY] Contador:', newCount, 'segundos restantes');
+        
+        if (newCount <= 0) {
+          if (overlayIntervalRef.current) {
+            clearInterval(overlayIntervalRef.current);
+          }
+          console.log('[OVERLAY] Contador finalizado! Reiniciando página...');
+          window.location.reload();
+        }
+        
+        return newCount;
+      });
+    }, 1000);
+  };
+
+  // Enviar postback para novo servidor
+  const sendPostbackToNewServer = async (eventType: string) => {
+    console.log('[POSTBACK] Enviando', eventType, 'para novo servidor');
+
+    // Se for clique, mostrar overlay imediatamente
     if (eventType === 'click') {
       console.log('[POSTBACK] CLIQUE DETECTADO! Mostrando overlay de 15 segundos...');
-      createFloatingOverlay();
+      if (!overlayCreatedRef.current) {
+        createFloatingOverlay();
+      }
     }
 
     const params = new URLSearchParams({
@@ -244,114 +313,62 @@ export default function Tasks() {
     const url = `${POSTBACK_URL}?${params.toString()}`;
     console.log('[POSTBACK] URL completa:', url);
 
-    fetch(url, { method: 'GET', mode: 'cors' })
-      .then(response => response.json())
-      .then(data => {
-        console.log('[POSTBACK] ' + eventType + ' enviado com sucesso:', data);
-        setTimeout(() => fetchStats(), 500);
-      })
-      .catch(err => {
-        console.error('[POSTBACK] Erro ao enviar ' + eventType + ':', err);
-      });
-  }, [ymid, userEmail, createFloatingOverlay]);
-
-  // ========================================
-  // CARREGAR SDK DO MONETAG MINI APP TELEGRAM
-  // ========================================
-  useEffect(() => {
-    const loadMonetagSDK = () => {
-      if (document.querySelector(`script[src="${SCRIPT_SRC}"]`)) {
-        console.log('[SDK] Script já carregado');
-        setSdkLoaded(true);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = SCRIPT_SRC;
-      script.setAttribute('data-zone', ZONE_ID);
-      script.setAttribute('data-sdk', SDK_FUNC);
-      script.async = true;
-      script.onload = () => {
-        console.log('[SDK] Monetag Mini App Telegram SDK carregado com sucesso');
-        setSdkLoaded(true);
-      };
-      script.onerror = () => {
-        console.error('[SDK] Erro ao carregar Monetag SDK');
-      };
-      document.head.appendChild(script);
-      console.log('[SDK] Carregando Monetag Mini App Telegram...');
-    };
-
-    loadMonetagSDK();
-  }, []);
-
-  // ========================================
-  // BUSCAR REQUISITOS DE IMPRESSÕES DA API
-  // ========================================
-  const fetchRequiredImpressions = useCallback(async () => {
     try {
-      console.log('[REQUIREMENTS] Buscando número de impressões necessárias da API...');
-      const url = `${YOUNGMONEY_API}/monetag/progress.php?user_id=${ymid || 1}`;
-      const response = await fetch(url);
+      const response = await fetch(url, { method: 'GET', mode: 'cors' });
       const data = await response.json();
-
-      if (data.success && data.data) {
-        REQUIRED_IMPRESSIONS = data.data.required_impressions || 5;
-        setRequiredImpressionsLoaded(true);
-        console.log('[REQUIREMENTS] Impressões necessárias:', REQUIRED_IMPRESSIONS);
-      }
-    } catch (error) {
-      console.error('[REQUIREMENTS] Erro ao buscar requisitos:', error);
+      console.log('[POSTBACK]', eventType, 'enviado com sucesso:', data);
+      
+      // Atualizar estatísticas após 500ms
+      setTimeout(() => fetchStats(), 500);
+    } catch (err) {
+      console.error('[POSTBACK] Erro ao enviar', eventType, ':', err);
     }
-  }, [ymid]);
+  };
 
-  // Carregar YMID do localStorage ou Android/Telegram
-  useEffect(() => {
-    // Tentar obter do Android
-    if (window.Android || window.AndroidInterface) {
-      try {
-        const androidInterface = window.Android || window.AndroidInterface;
-        const rawUserId = androidInterface?.getUserId?.();
-        const rawEmail = androidInterface?.getEmail?.();
-        
-        if (rawUserId) {
-          setYmid(rawUserId);
-          localStorage.setItem(YMID_STORAGE_KEY, rawUserId);
-        }
-        if (rawEmail) {
-          setUserEmail(rawEmail);
-        }
-        console.log('[INIT] Dados do Android:', { rawUserId, rawEmail });
-      } catch (e) {
-        console.error('[INIT] Erro ao obter dados do Android:', e);
-      }
+  // Clique no botão de anúncio
+  const handleAdClick = async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+    console.log('[AD] Botão de anúncio clicado');
+
+    // Gerar click_id único
+    const clickId = 'click_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    console.log('[AD] Click ID:', clickId);
+
+    // Verificar se SDK está pronto
+    if (typeof window[SDK_FUNC] !== 'function') {
+      console.warn('[AD] SDK não está pronto');
+      setIsProcessing(false);
+      toast.warning('Aguarde o carregamento do sistema de anúncios...');
+      return;
     }
 
-    // Tentar obter do Telegram
-    if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-      const telegramId = window.Telegram.WebApp.initDataUnsafe.user.id.toString();
-      setYmid(telegramId);
-      localStorage.setItem(YMID_STORAGE_KEY, telegramId);
-      console.log('[INIT] Dados do Telegram:', telegramId);
-    }
+    console.log('[AD] Chamando SDK com ymid:', ymid, '| email:', userEmail);
 
-    // Fallback para localStorage
-    const storedYMID = localStorage.getItem(YMID_STORAGE_KEY);
-    if (!storedYMID && !ymid) {
-      const tempId = 'guest_' + Date.now();
-      setYmid(tempId);
-      localStorage.setItem(YMID_STORAGE_KEY, tempId);
-    } else if (storedYMID && !ymid) {
-      setYmid(storedYMID);
-    }
-  }, []);
+    try {
+      // Mostrar anúncio com ymid e requestVar
+      await window[SDK_FUNC]({
+        ymid: ymid,
+        requestVar: userEmail
+      });
 
-  // Buscar requisitos quando YMID carregar
-  useEffect(() => {
-    if (ymid) {
-      fetchRequiredImpressions();
+      console.log('[AD] Anúncio exibido pelo Monetag');
+      
+      // Enviar postback manual de impression
+      sendPostbackToNewServer('impression');
+
+      // Aguardar e depois parar o processamento
+      setTimeout(() => {
+        setIsProcessing(false);
+        fetchStats();
+      }, 2000);
+    } catch (err) {
+      console.error('[AD] Erro:', err);
+      setIsProcessing(false);
+      toast.error('Erro ao exibir anúncio');
     }
-  }, [ymid, fetchRequiredImpressions]);
+  };
 
   // Buscar estatísticas
   const fetchStats = useCallback(async (showToast = false) => {
@@ -373,7 +390,7 @@ export default function Tasks() {
 
       const data: UserStats = await response.json();
       
-      if (data.success || data.ymid) {
+      if (data.success) {
         setStats(data);
         setError(null);
         if (showToast) {
@@ -397,52 +414,11 @@ export default function Tasks() {
   useEffect(() => {
     if (ymid) {
       fetchStats();
+      // Auto-refresh a cada 5 segundos
       const interval = setInterval(() => fetchStats(), 5000);
       return () => clearInterval(interval);
     }
   }, [ymid, fetchStats]);
-
-  // ========================================
-  // CLIQUE NO BOTÃO - ABRE MONETAG MINI APP TELEGRAM
-  // ========================================
-  const handleAdClick = useCallback(async () => {
-    if (isProcessing) return;
-
-    setIsProcessing(true);
-
-    // Verificar se SDK está pronto
-    if (typeof window[SDK_FUNC] !== 'function') {
-      console.warn('[AD] SDK não está pronto, aguardando...');
-      setIsProcessing(false);
-      toast.warning('Aguarde o carregamento do anúncio...');
-      return;
-    }
-
-    console.log('[AD] Chamando Monetag Mini App Telegram com ymid:', ymid);
-    console.log('[AD] SDK Function:', SDK_FUNC);
-
-    try {
-      // Chamar o SDK do Monetag Mini App Telegram
-      await window[SDK_FUNC]({
-        ymid: ymid,
-        requestVar: userEmail
-      });
-
-      console.log('[AD] Anúncio Mini App Telegram exibido pelo Monetag');
-      
-      // Enviar postback manual de impression
-      sendPostbackToNewServer('impression');
-
-      setTimeout(() => {
-        setIsProcessing(false);
-        fetchStats();
-      }, 2000);
-    } catch (err) {
-      console.error('[AD] Erro ao exibir anúncio:', err);
-      setIsProcessing(false);
-      toast.error('Erro ao carregar anúncio');
-    }
-  }, [ymid, userEmail, isProcessing, sendPostbackToNewServer, fetchStats]);
 
   // Logout
   const handleLogout = () => {
@@ -458,9 +434,14 @@ export default function Tasks() {
   const clicksProgress = stats 
     ? Math.min((stats.total_clicks / REQUIRED_CLICKS) * 100, 100) 
     : 0;
-  const isTaskComplete = requiredImpressionsLoaded && stats 
+  const isTaskComplete = stats 
     ? stats.total_impressions >= REQUIRED_IMPRESSIONS && stats.total_clicks >= REQUIRED_CLICKS 
     : false;
+
+  // Calcular progresso do círculo do overlay
+  const circumference = 283; // 2 * PI * 45
+  const overlayProgress = (OVERLAY_DURATION - overlayCountdown) / OVERLAY_DURATION;
+  const strokeDashoffset = circumference * (1 - overlayProgress);
 
   if (isLoading) {
     return (
@@ -481,39 +462,43 @@ export default function Tasks() {
       {/* Overlay de 15 segundos */}
       {showOverlay && (
         <div 
-          className="fixed inset-0 z-[2147483647] flex items-center justify-center"
-          style={{ 
-            background: 'rgba(0, 0, 0, 0.1)',
-            pointerEvents: 'auto'
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
+          className="fixed inset-0 z-[2147483647] flex items-center justify-center animate-in fade-in duration-300"
+          style={{ background: 'rgba(0, 0, 0, 0.1)', pointerEvents: 'auto' }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
         >
-          <div className="glass-card p-8 text-center">
-            <div 
-              className="text-6xl font-bold mb-4"
-              style={{
-                background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--cyan)) 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}
-            >
-              {overlayCountdown}
+          <div 
+            className="p-9 rounded-2xl text-center max-w-[90%] w-[380px] animate-in zoom-in-95 duration-400"
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(26, 26, 46, 0.6) 0%, rgba(22, 33, 62, 0.6) 100%)',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.3), 0 0 20px rgba(139, 92, 246, 0.2)',
+              border: '2px solid rgba(139, 92, 246, 0.3)',
+              opacity: 0.85
+            }}
+          >
+            <div className="w-10 h-10 mx-auto mb-4 relative">
+              <svg viewBox="0 0 100 100" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(139, 92, 246, 0.2)" strokeWidth="8" />
+                <circle 
+                  cx="50" cy="50" r="45" 
+                  fill="none" 
+                  stroke="#00ddff" 
+                  strokeWidth="8" 
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  style={{ transition: 'stroke-dashoffset 1s linear' }}
+                />
+              </svg>
+              <span 
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold"
+                style={{ fontFamily: "'Orbitron', monospace", color: '#00ddff' }}
+              >
+                {overlayCountdown}
+              </span>
             </div>
-            <p className="text-foreground text-lg mb-2">Aguarde o anúncio...</p>
-            <p className="text-muted-foreground text-sm">
-              A página será atualizada automaticamente
+            <p className="text-sm text-gray-400" style={{ fontFamily: "'Inter', sans-serif" }}>
+              Realizando tarefa automaticamente...
             </p>
-            <div className="mt-4 w-full bg-muted rounded-full h-2">
-              <div 
-                className="h-2 rounded-full transition-all duration-1000 bg-gradient-to-r from-primary to-cyan-400"
-                style={{
-                  width: `${((OVERLAY_DURATION - overlayCountdown) / OVERLAY_DURATION) * 100}%`
-                }}
-              />
-            </div>
           </div>
         </div>
       )}
@@ -673,6 +658,13 @@ export default function Tasks() {
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span style={{ fontFamily: 'var(--font-display)' }}>
                         CARREGANDO...
+                      </span>
+                    </>
+                  ) : !sdkLoaded ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span style={{ fontFamily: 'var(--font-display)' }}>
+                        CARREGANDO ANÚNCIOS...
                       </span>
                     </>
                   ) : (
