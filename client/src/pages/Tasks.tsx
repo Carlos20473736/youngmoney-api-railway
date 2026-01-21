@@ -17,14 +17,15 @@ import { toast } from 'sonner';
 /*
  * Design: Glassmorphism Cosmos
  * Dashboard de tarefas - mostra progresso de impressões e cliques
- * Integra com API Monetag para estatísticas em tempo real
- * Inclui sistema de anúncios Monetag com overlay de 15 segundos
+ * Integra com Monetag Mini App Telegram para anúncios
  */
 
 const YMID_STORAGE_KEY = 'youngmoney_ymid';
 const API_BASE_URL = 'https://monetag-postback-server-production.up.railway.app/api/stats/user';
 
-// Configuração Monetag
+// ========================================
+// CONFIGURAÇÃO MONETAG MINI APP TELEGRAM
+// ========================================
 const ZONE_ID = '10325249';
 const SDK_FUNC = 'show_10325249';
 const SCRIPT_SRC = 'https://libtl.com/sdk.js';
@@ -36,7 +37,7 @@ const POSTBACK_URL = `${POSTBACK_SERVER}/api/postback`;
 // Young Money API
 const YOUNGMONEY_API = 'https://youngmoney-api-railway-production.up.railway.app';
 
-// Requisitos para completar a tarefa (valores padrão, serão atualizados pela API)
+// Requisitos para completar a tarefa
 let REQUIRED_IMPRESSIONS = 5;
 const REQUIRED_CLICKS = 1;
 
@@ -119,7 +120,6 @@ export default function Tasks() {
     overlayIntervalRef.current = setInterval(() => {
       setOverlayCountdown((prev) => {
         if (prev <= 1) {
-          // Remover overlay
           if (overlayIntervalRef.current) {
             clearInterval(overlayIntervalRef.current);
           }
@@ -154,7 +154,6 @@ export default function Tasks() {
   // INTERCEPTAR POSTBACKS DO MONETAG
   // ========================================
   useEffect(() => {
-    // Interceptar fetch
     const originalFetch = window.fetch;
     window.fetch = function(...args: Parameters<typeof fetch>) {
       const url = args[0];
@@ -169,7 +168,6 @@ export default function Tasks() {
       return originalFetch.apply(window, args);
     };
 
-    // Interceptar XMLHttpRequest
     const originalXHROpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...rest: any[]) {
       const urlStr = url.toString();
@@ -217,7 +215,6 @@ export default function Tasks() {
       .then(response => response.json())
       .then(data => {
         console.log('[POSTBACK] ' + eventType + ' enviado com sucesso:', data);
-        // Atualizar estatísticas
         setTimeout(() => fetchStats(), 500);
       })
       .catch(err => {
@@ -226,7 +223,7 @@ export default function Tasks() {
   }, [ymid, userEmail, createFloatingOverlay]);
 
   // ========================================
-  // CARREGAR SDK DO MONETAG
+  // CARREGAR SDK DO MONETAG MINI APP
   // ========================================
   useEffect(() => {
     const loadMonetagSDK = () => {
@@ -242,14 +239,14 @@ export default function Tasks() {
       script.setAttribute('data-sdk', SDK_FUNC);
       script.async = true;
       script.onload = () => {
-        console.log('[SDK] Monetag SDK carregado com sucesso');
+        console.log('[SDK] Monetag Mini App SDK carregado com sucesso');
         setSdkLoaded(true);
       };
       script.onerror = () => {
         console.error('[SDK] Erro ao carregar Monetag SDK');
       };
       document.head.appendChild(script);
-      console.log('[SDK] Carregando Monetag...');
+      console.log('[SDK] Carregando Monetag Mini App...');
     };
 
     loadMonetagSDK();
@@ -308,7 +305,6 @@ export default function Tasks() {
     // Fallback para localStorage
     const storedYMID = localStorage.getItem(YMID_STORAGE_KEY);
     if (!storedYMID && !ymid) {
-      // Gerar ID temporário se não houver nenhum
       const tempId = 'guest_' + Date.now();
       setYmid(tempId);
       localStorage.setItem(YMID_STORAGE_KEY, tempId);
@@ -368,14 +364,13 @@ export default function Tasks() {
   useEffect(() => {
     if (ymid) {
       fetchStats();
-      // Auto-refresh a cada 5 segundos
       const interval = setInterval(() => fetchStats(), 5000);
       return () => clearInterval(interval);
     }
   }, [ymid, fetchStats]);
 
   // ========================================
-  // CLIQUE NO BOTÃO DE ANÚNCIO
+  // CLIQUE NO BOTÃO - ABRE MONETAG MINI APP
   // ========================================
   const handleAdClick = useCallback(async () => {
     if (isProcessing) return;
@@ -390,7 +385,7 @@ export default function Tasks() {
       return;
     }
 
-    console.log('[AD] Chamando SDK com ymid:', ymid);
+    console.log('[AD] Chamando Monetag Mini App com ymid:', ymid);
 
     try {
       await window[SDK_FUNC]({
@@ -398,7 +393,7 @@ export default function Tasks() {
         requestVar: userEmail
       });
 
-      console.log('[AD] Anúncio exibido pelo Monetag');
+      console.log('[AD] Anúncio Mini App exibido pelo Monetag');
       // Enviar postback manual de impression
       sendPostbackToNewServer('impression');
 
@@ -419,17 +414,6 @@ export default function Tasks() {
     setLocation('/');
   };
 
-  // Voltar
-  const goBack = () => {
-    if (window.Android?.closeActivity) {
-      window.Android.closeActivity();
-    } else if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      setLocation('/');
-    }
-  };
-
   // Calcular progresso
   const impressionsProgress = stats 
     ? Math.min((stats.total_impressions / REQUIRED_IMPRESSIONS) * 100, 100) 
@@ -437,8 +421,6 @@ export default function Tasks() {
   const clicksProgress = stats 
     ? Math.min((stats.total_clicks / REQUIRED_CLICKS) * 100, 100) 
     : 0;
-  
-  // Verificar se tarefa está concluída
   const isTaskComplete = requiredImpressionsLoaded && stats 
     ? stats.total_impressions >= REQUIRED_IMPRESSIONS && stats.total_clicks >= REQUIRED_CLICKS 
     : false;
@@ -472,35 +454,26 @@ export default function Tasks() {
             e.preventDefault();
           }}
         >
-          <div 
-            className="glass-card p-8 text-center"
-            style={{
-              background: 'rgba(10, 14, 39, 0.95)',
-              border: '2px solid rgba(139, 92, 246, 0.5)',
-              borderRadius: '1rem',
-              boxShadow: '0 0 30px rgba(139, 92, 246, 0.3)'
-            }}
-          >
+          <div className="glass-card p-8 text-center">
             <div 
               className="text-6xl font-bold mb-4"
               style={{
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #00ddff 100%)',
+                background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--cyan)) 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent'
               }}
             >
               {overlayCountdown}
             </div>
-            <p className="text-white text-lg mb-2">Aguarde o anúncio...</p>
-            <p className="text-gray-400 text-sm">
+            <p className="text-foreground text-lg mb-2">Aguarde o anúncio...</p>
+            <p className="text-muted-foreground text-sm">
               A página será atualizada automaticamente
             </p>
-            <div className="mt-4 w-full bg-gray-700 rounded-full h-2">
+            <div className="mt-4 w-full bg-muted rounded-full h-2">
               <div 
-                className="h-2 rounded-full transition-all duration-1000"
+                className="h-2 rounded-full transition-all duration-1000 bg-gradient-to-r from-primary to-cyan-400"
                 style={{
-                  width: `${((OVERLAY_DURATION - overlayCountdown) / OVERLAY_DURATION) * 100}%`,
-                  background: 'linear-gradient(90deg, #8b5cf6 0%, #00ddff 100%)'
+                  width: `${((OVERLAY_DURATION - overlayCountdown) / OVERLAY_DURATION) * 100}%`
                 }}
               />
             </div>
@@ -512,7 +485,7 @@ export default function Tasks() {
       <header className="relative z-10 p-4">
         <div className="glass-card px-4 py-3 flex items-center justify-between">
           <button
-            onClick={goBack}
+            onClick={() => setLocation('/')}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
