@@ -1,2 +1,2 @@
 #!/bin/bash
-php -S 0.0.0.0:${PORT:-8080} -t .
+php -S 0.0.0.0:${PORT:-8080} router.php
