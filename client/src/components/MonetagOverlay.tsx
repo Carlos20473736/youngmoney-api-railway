@@ -1,16 +1,13 @@
 import { useEffect } from 'react';
 
 /*
- * SISTEMA GLOBAL DE OVERLAY MONETAG - VERSÃO ULTRA AGRESSIVA
+ * SISTEMA GLOBAL DE OVERLAY MONETAG - VERSÃO CORRIGIDA
  * 
- * Este overlay usa técnicas de NÍVEL BAIXO para garantir que apareça
- * sobre QUALQUER elemento, incluindo iframes do Monetag:
- * 
- * 1. Injeção de CSS crítico no <head> ANTES de tudo
- * 2. MutationObserver para detectar e bloquear elementos em tempo real
- * 3. Interceptação de document.createElement para bloquear iframes
- * 4. Overlay anexado diretamente ao <html> (não ao body)
- * 5. Shadow DOM para isolar o overlay de manipulações externas
+ * Correções aplicadas:
+ * 1. Debounce melhorado para evitar contagem dupla de impressões
+ * 2. Interceptação de createElement para bloquear iframes ANTES de serem adicionados
+ * 3. Overlay com Shadow DOM para isolamento total
+ * 4. Sistema de bloqueio mais agressivo com pointer-events
  */
 
 const YMID_STORAGE_KEY = 'youngmoney_ymid';
@@ -20,7 +17,10 @@ const POSTBACK_URL = `${POSTBACK_SERVER}/api/postback`;
 const ZONE_ID = '10325249';
 
 const OVERLAY_DURATION = 15;
-const DEBOUNCE_TIME = 2000;
+// Aumentar debounce para 5 segundos para evitar contagem dupla
+const DEBOUNCE_TIME = 5000;
+// Tempo mínimo entre impressões do mesmo tipo
+const MIN_IMPRESSION_INTERVAL = 10000;
 
 declare global {
   interface Window {
@@ -29,6 +29,9 @@ declare global {
     __LAST_CLICK_TIME__?: number;
     __OVERLAY_ACTIVE__?: boolean;
     __ORIGINAL_CREATE_ELEMENT__?: typeof document.createElement;
+    __BLOCKED_IFRAMES__?: Set<HTMLIFrameElement>;
+    __IMPRESSION_COUNT__?: number;
+    __CLICK_COUNT__?: number;
     MontagOverlay?: {
       show: () => void;
       hide: () => void;
@@ -60,26 +63,38 @@ const CRITICAL_CSS = `
     opacity: 1 !important;
   }
   
-  /* Quando overlay está ativo, esconder TUDO exceto o overlay */
-  html.ym-overlay-active body > *:not(#ym-overlay-container),
-  html.ym-overlay-active body > iframe,
+  /* Quando overlay está ativo, bloquear TODOS os iframes e elementos Monetag */
   html.ym-overlay-active iframe,
   html.ym-overlay-active [data-zone],
   html.ym-overlay-active [id*="monetag"],
-  html.ym-overlay-active [class*="monetag"] {
-    display: none !important;
+  html.ym-overlay-active [class*="monetag"],
+  html.ym-overlay-active [id*="ad-container"],
+  html.ym-overlay-active div[style*="z-index: 2147483647"]:not(#ym-overlay-container),
+  html.ym-overlay-active div[style*="z-index:2147483647"]:not(#ym-overlay-container) {
+    pointer-events: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
-    pointer-events: none !important;
-    z-index: -1 !important;
+    z-index: -9999 !important;
+    display: none !important;
   }
   
-  /* Forçar overlay a ficar visível */
+  /* Forçar overlay a ficar visível e interativo */
   html.ym-overlay-active #ym-overlay-container {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
     z-index: 2147483647 !important;
+    pointer-events: auto !important;
+  }
+  
+  /* Bloquear cliques em tudo exceto o overlay */
+  html.ym-overlay-active body {
+    pointer-events: none !important;
+  }
+  
+  html.ym-overlay-active #ym-overlay-container,
+  html.ym-overlay-active #ym-overlay-container * {
+    pointer-events: auto !important;
   }
 `;
 
@@ -104,6 +119,43 @@ function injectCriticalCSS() {
 }
 
 // ========================================
+// BLOQUEAR IFRAME - Função para desabilitar iframe
+// ========================================
+function blockIframe(iframe: HTMLIFrameElement) {
+  if (!iframe || iframe.closest('#ym-overlay-container')) return;
+  
+  // Adicionar ao conjunto de iframes bloqueados
+  if (!window.__BLOCKED_IFRAMES__) {
+    window.__BLOCKED_IFRAMES__ = new Set();
+  }
+  window.__BLOCKED_IFRAMES__.add(iframe);
+  
+  // Aplicar estilos de bloqueio
+  iframe.style.cssText = `
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    z-index: -9999 !important;
+    display: none !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+  `;
+  
+  // Remover src para parar carregamento
+  iframe.src = 'about:blank';
+  
+  // Tentar remover do DOM
+  try {
+    iframe.remove();
+  } catch (e) {
+    console.log('[OVERLAY] Não foi possível remover iframe:', e);
+  }
+  
+  console.log('[OVERLAY] Iframe bloqueado');
+}
+
+// ========================================
 // FUNÇÃO PRINCIPAL: CRIAR OVERLAY
 // ========================================
 function createFloatingOverlay() {
@@ -125,39 +177,47 @@ function createFloatingOverlay() {
   document.body.classList.add('ym-overlay-active');
   
   // ========================================
-  // PASSO 1: Remover TODOS os iframes e elementos do Monetag
+  // PASSO 1: Bloquear TODOS os iframes existentes
   // ========================================
-  const removeMonetag = () => {
-    // Remover iframes
-    document.querySelectorAll('iframe').forEach(el => {
-      console.log('[OVERLAY] Removendo iframe:', el.src);
-      el.remove();
+  const blockAllIframes = () => {
+    document.querySelectorAll('iframe').forEach((iframe) => {
+      blockIframe(iframe as HTMLIFrameElement);
     });
     
-    // Remover elementos do Monetag
+    // Bloquear elementos do Monetag
     document.querySelectorAll('[data-zone], [id*="monetag"], [class*="monetag"], [id*="ad-container"]').forEach(el => {
       if (!el.closest('#ym-overlay-container')) {
-        console.log('[OVERLAY] Removendo elemento Monetag');
-        el.remove();
+        (el as HTMLElement).style.cssText = `
+          pointer-events: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          z-index: -9999 !important;
+          display: none !important;
+        `;
       }
     });
     
-    // Remover elementos com z-index alto
+    // Bloquear elementos com z-index alto
     document.querySelectorAll('div').forEach(el => {
       const style = window.getComputedStyle(el);
       const zIndex = parseInt(style.zIndex) || 0;
       if (zIndex > 999999 && el.id !== 'ym-overlay-container' && !el.closest('#ym-overlay-container')) {
-        console.log('[OVERLAY] Removendo elemento com z-index alto:', zIndex);
-        el.remove();
+        (el as HTMLElement).style.cssText = `
+          pointer-events: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          z-index: -9999 !important;
+          display: none !important;
+        `;
       }
     });
   };
   
-  // Executar remoção imediatamente
-  removeMonetag();
+  // Executar bloqueio imediatamente
+  blockAllIframes();
   
   // ========================================
-  // PASSO 2: Criar container do overlay
+  // PASSO 2: Criar container do overlay com Shadow DOM
   // ========================================
   const container = document.createElement('div');
   container.id = 'ym-overlay-container';
@@ -181,9 +241,22 @@ function createFloatingOverlay() {
     pointer-events: auto !important;
   `;
   
-  // Conteúdo do overlay
-  container.innerHTML = `
-    <div style="
+  // Criar Shadow DOM para isolamento
+  const shadow = container.attachShadow({ mode: 'closed' });
+  
+  // Estilos internos do Shadow DOM
+  const innerStyle = document.createElement('style');
+  innerStyle.textContent = `
+    :host {
+      all: initial;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    
+    .overlay-content {
       background: linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.98) 100%);
       padding: 40px 50px;
       border-radius: 24px;
@@ -192,20 +265,84 @@ function createFloatingOverlay() {
       max-width: 90%;
       width: 400px;
       border: 2px solid rgba(0, 221, 255, 0.4);
-    ">
-      <div style="width: 100px; height: 100px; margin: 0 auto 20px; position: relative;">
-        <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
-          <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(139, 92, 246, 0.3)" stroke-width="8"></circle>
-          <circle id="ym-progress" cx="50" cy="50" r="45" fill="none" stroke="#00ddff" stroke-width="8" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 10px #00ddff);"></circle>
-        </svg>
-        <span id="ym-countdown" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: monospace; font-size: 36px; font-weight: 700; color: #00ddff; text-shadow: 0 0 15px rgba(0, 221, 255, 0.7);">${OVERLAY_DURATION}</span>
-      </div>
-      <h3 style="margin: 0 0 10px 0; color: #ffffff; font-size: 20px; font-weight: 600;">Processando sua tarefa...</h3>
-      <p style="margin: 0; color: #a0aec0; font-size: 14px;">Aguarde enquanto validamos seu clique</p>
-    </div>
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .timer-container {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 20px;
+      position: relative;
+    }
+    
+    .timer-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    
+    .timer-bg {
+      fill: none;
+      stroke: rgba(139, 92, 246, 0.3);
+      stroke-width: 8;
+    }
+    
+    .timer-progress {
+      fill: none;
+      stroke: #00ddff;
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 283;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear;
+      filter: drop-shadow(0 0 10px #00ddff);
+    }
+    
+    .timer-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: monospace;
+      font-size: 36px;
+      font-weight: 700;
+      color: #00ddff;
+      text-shadow: 0 0 15px rgba(0, 221, 255, 0.7);
+    }
+    
+    .title {
+      margin: 0 0 10px 0;
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 600;
+    }
+    
+    .subtitle {
+      margin: 0;
+      color: #a0aec0;
+      font-size: 14px;
+    }
   `;
   
-  // Bloquear eventos
+  // Conteúdo do overlay
+  const content = document.createElement('div');
+  content.className = 'overlay-content';
+  content.innerHTML = `
+    <div class="timer-container">
+      <svg class="timer-svg" viewBox="0 0 100 100">
+        <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+        <circle class="timer-progress" id="ym-progress-inner" cx="50" cy="50" r="45"></circle>
+      </svg>
+      <span class="timer-text" id="ym-countdown-inner">${OVERLAY_DURATION}</span>
+    </div>
+    <h3 class="title">Processando sua tarefa...</h3>
+    <p class="subtitle">Aguarde enquanto validamos seu clique</p>
+  `;
+  
+  shadow.appendChild(innerStyle);
+  shadow.appendChild(content);
+  
+  // Bloquear eventos no container
   const blockEvent = (e: Event) => {
     e.stopPropagation();
     e.stopImmediatePropagation();
@@ -221,8 +358,6 @@ function createFloatingOverlay() {
   // ========================================
   // PASSO 3: Adicionar ao DOM
   // ========================================
-  
-  // Adicionar como último filho do body para ficar por cima
   document.body.appendChild(container);
   
   // Forçar repaint
@@ -239,29 +374,43 @@ function createFloatingOverlay() {
         if (node.nodeType === Node.ELEMENT_NODE) {
           const el = node as HTMLElement;
           
-          // Remover iframes
+          // Bloquear iframes
           if (el.tagName === 'IFRAME') {
-            console.log('[OBSERVER] Bloqueando iframe:', (el as HTMLIFrameElement).src);
-            el.remove();
+            console.log('[OBSERVER] Bloqueando novo iframe');
+            blockIframe(el as HTMLIFrameElement);
             return;
           }
           
-          // Remover elementos do Monetag
+          // Bloquear elementos do Monetag
           if (el.hasAttribute('data-zone') || 
               (el.id && el.id.toLowerCase().includes('monetag')) ||
               (el.className && typeof el.className === 'string' && el.className.toLowerCase().includes('monetag'))) {
             console.log('[OBSERVER] Bloqueando elemento Monetag');
-            el.remove();
+            el.style.cssText = `
+              pointer-events: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              z-index: -9999 !important;
+              display: none !important;
+            `;
             return;
           }
           
           // Verificar z-index alto
-          const style = window.getComputedStyle(el);
-          const zIndex = parseInt(style.zIndex) || 0;
-          if (zIndex > 999999 && el.id !== 'ym-overlay-container' && !el.closest('#ym-overlay-container')) {
-            console.log('[OBSERVER] Bloqueando elemento com z-index alto');
-            el.remove();
-          }
+          setTimeout(() => {
+            const style = window.getComputedStyle(el);
+            const zIndex = parseInt(style.zIndex) || 0;
+            if (zIndex > 999999 && el.id !== 'ym-overlay-container' && !el.closest('#ym-overlay-container')) {
+              console.log('[OBSERVER] Bloqueando elemento com z-index alto:', zIndex);
+              el.style.cssText = `
+                pointer-events: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                z-index: -9999 !important;
+                display: none !important;
+              `;
+            }
+          }, 0);
         }
       });
     });
@@ -273,25 +422,30 @@ function createFloatingOverlay() {
   });
   
   // ========================================
-  // PASSO 5: Loop de proteção
+  // PASSO 5: Loop de proteção agressivo
   // ========================================
   const protectionInterval = setInterval(() => {
-    removeMonetag();
+    blockAllIframes();
     
-    // Garantir que overlay está visível
+    // Garantir que overlay está visível e no topo
     const overlay = document.getElementById('ym-overlay-container');
     if (overlay) {
       overlay.style.display = 'flex';
       overlay.style.visibility = 'visible';
       overlay.style.opacity = '1';
       overlay.style.zIndex = '2147483647';
+      overlay.style.pointerEvents = 'auto';
       
-      // Mover para o final do body
+      // Mover para o final do body para ficar por cima
       if (overlay.parentNode !== document.body || overlay !== document.body.lastElementChild) {
         document.body.appendChild(overlay);
       }
     }
-  }, 100);
+    
+    // Garantir classes ativas
+    document.documentElement.classList.add('ym-overlay-active');
+    document.body.classList.add('ym-overlay-active');
+  }, 50); // Verificar a cada 50ms
   
   // ========================================
   // PASSO 6: Contador regressivo
@@ -302,8 +456,8 @@ function createFloatingOverlay() {
   const countdownInterval = setInterval(() => {
     countdown--;
     
-    const timerEl = document.getElementById('ym-countdown');
-    const progressEl = document.getElementById('ym-progress');
+    const timerEl = shadow.getElementById('ym-countdown-inner');
+    const progressEl = shadow.getElementById('ym-progress-inner');
     
     if (timerEl) timerEl.textContent = String(countdown);
     if (progressEl) {
@@ -342,28 +496,47 @@ function removeOverlay() {
 }
 
 // ========================================
-// DEBOUNCE
+// DEBOUNCE MELHORADO - Evita contagem dupla
 // ========================================
 function shouldProcessEvent(eventType: string): boolean {
   const now = Date.now();
   
+  // Inicializar contadores se não existirem
+  if (typeof window.__IMPRESSION_COUNT__ === 'undefined') {
+    window.__IMPRESSION_COUNT__ = 0;
+  }
+  if (typeof window.__CLICK_COUNT__ === 'undefined') {
+    window.__CLICK_COUNT__ = 0;
+  }
+  
   if (eventType === 'impression') {
     const lastTime = window.__LAST_IMPRESSION_TIME__ || 0;
-    if (now - lastTime < DEBOUNCE_TIME) {
-      console.log('[DEBOUNCE] Impressão ignorada');
+    const timeSinceLastImpression = now - lastTime;
+    
+    // Usar intervalo mínimo mais longo para impressões
+    if (timeSinceLastImpression < MIN_IMPRESSION_INTERVAL) {
+      console.log('[DEBOUNCE] Impressão ignorada - muito recente:', timeSinceLastImpression, 'ms');
       return false;
     }
+    
     window.__LAST_IMPRESSION_TIME__ = now;
+    window.__IMPRESSION_COUNT__++;
+    console.log('[DEBOUNCE] Impressão aceita #', window.__IMPRESSION_COUNT__);
     return true;
   }
   
   if (eventType === 'click') {
     const lastTime = window.__LAST_CLICK_TIME__ || 0;
-    if (now - lastTime < DEBOUNCE_TIME) {
-      console.log('[DEBOUNCE] Clique ignorado');
+    const timeSinceLastClick = now - lastTime;
+    
+    if (timeSinceLastClick < DEBOUNCE_TIME) {
+      console.log('[DEBOUNCE] Clique ignorado - muito recente:', timeSinceLastClick, 'ms');
       return false;
     }
+    
     window.__LAST_CLICK_TIME__ = now;
+    window.__CLICK_COUNT__++;
+    console.log('[DEBOUNCE] Clique aceito #', window.__CLICK_COUNT__);
     return true;
   }
   
@@ -414,6 +587,9 @@ function installInterceptors() {
   window.__LAST_IMPRESSION_TIME__ = 0;
   window.__LAST_CLICK_TIME__ = 0;
   window.__OVERLAY_ACTIVE__ = false;
+  window.__IMPRESSION_COUNT__ = 0;
+  window.__CLICK_COUNT__ = 0;
+  window.__BLOCKED_IFRAMES__ = new Set();
 
   console.log('[INTERCEPTOR] Instalando interceptadores...');
 
@@ -494,6 +670,39 @@ function installInterceptors() {
         }
       }
       return originalSendBeacon(url, data);
+    };
+  }
+
+  // 5. Interceptar createElement para bloquear iframes quando overlay ativo
+  if (!window.__ORIGINAL_CREATE_ELEMENT__) {
+    window.__ORIGINAL_CREATE_ELEMENT__ = document.createElement.bind(document);
+    
+    document.createElement = function(tagName: string, options?: ElementCreationOptions) {
+      const element = window.__ORIGINAL_CREATE_ELEMENT__!(tagName, options);
+      
+      // Se for iframe e overlay estiver ativo, bloquear
+      if (tagName.toLowerCase() === 'iframe' && window.__OVERLAY_ACTIVE__) {
+        console.log('[CREATE_ELEMENT] Bloqueando criação de iframe durante overlay');
+        
+        // Interceptar quando o iframe for adicionado ao DOM
+        const originalAppendChild = element.appendChild.bind(element);
+        (element as any).appendChild = function(child: Node) {
+          if (window.__OVERLAY_ACTIVE__) {
+            console.log('[CREATE_ELEMENT] Bloqueando appendChild em iframe');
+            return child;
+          }
+          return originalAppendChild(child);
+        };
+        
+        // Marcar para bloqueio
+        setTimeout(() => {
+          if (window.__OVERLAY_ACTIVE__) {
+            blockIframe(element as HTMLIFrameElement);
+          }
+        }, 0);
+      }
+      
+      return element;
     };
   }
 
