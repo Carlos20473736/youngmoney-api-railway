@@ -154,7 +154,11 @@ export default function Tasks() {
   // INTERCEPTAR POSTBACKS DO MONETAG
   // ========================================
   useEffect(() => {
+    // Guardar referências originais
     const originalFetch = window.fetch;
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+
+    // Interceptar fetch
     window.fetch = function(...args: Parameters<typeof fetch>) {
       const url = args[0];
       if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
@@ -168,7 +172,7 @@ export default function Tasks() {
       return originalFetch.apply(window, args);
     };
 
-    const originalXHROpen = XMLHttpRequest.prototype.open;
+    // Interceptar XMLHttpRequest
     XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...rest: any[]) {
       const urlStr = url.toString();
       if (urlStr.includes('youngmoney-api-railway')) {
@@ -182,9 +186,38 @@ export default function Tasks() {
       return originalXHROpen.call(this, method, url, ...rest);
     };
 
+    // Interceptar Image (pixel tracking)
+    const originalImage = window.Image;
+    const newImage = function(this: HTMLImageElement) {
+      const img = new originalImage();
+      const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+      if (originalSrcDescriptor && originalSrcDescriptor.set) {
+        const originalSrcSetter = originalSrcDescriptor.set;
+        Object.defineProperty(img, 'src', {
+          set: function(value: string) {
+            if (typeof value === 'string' && value.includes('youngmoney-api-railway')) {
+              if (value.includes('%7Bymid%7D') || value.includes('{ymid}')) {
+                console.log('[BLOQUEIO IMG] Postback do Monetag bloqueado:', value);
+                const eventType = value.includes('event_type=click') || value.includes('event_type%3Dclick') ? 'click' : 'impression';
+                sendPostbackToNewServer(eventType);
+                return;
+              }
+            }
+            originalSrcSetter.call(this, value);
+          },
+          get: function() {
+            return this.getAttribute('src');
+          }
+        });
+      }
+      return img;
+    } as unknown as typeof Image;
+    window.Image = newImage;
+
     return () => {
       window.fetch = originalFetch;
       XMLHttpRequest.prototype.open = originalXHROpen;
+      window.Image = originalImage;
     };
   }, [ymid, userEmail]);
 
@@ -223,7 +256,7 @@ export default function Tasks() {
   }, [ymid, userEmail, createFloatingOverlay]);
 
   // ========================================
-  // CARREGAR SDK DO MONETAG MINI APP
+  // CARREGAR SDK DO MONETAG MINI APP TELEGRAM
   // ========================================
   useEffect(() => {
     const loadMonetagSDK = () => {
@@ -239,14 +272,14 @@ export default function Tasks() {
       script.setAttribute('data-sdk', SDK_FUNC);
       script.async = true;
       script.onload = () => {
-        console.log('[SDK] Monetag Mini App SDK carregado com sucesso');
+        console.log('[SDK] Monetag Mini App Telegram SDK carregado com sucesso');
         setSdkLoaded(true);
       };
       script.onerror = () => {
         console.error('[SDK] Erro ao carregar Monetag SDK');
       };
       document.head.appendChild(script);
-      console.log('[SDK] Carregando Monetag Mini App...');
+      console.log('[SDK] Carregando Monetag Mini App Telegram...');
     };
 
     loadMonetagSDK();
@@ -370,7 +403,7 @@ export default function Tasks() {
   }, [ymid, fetchStats]);
 
   // ========================================
-  // CLIQUE NO BOTÃO - ABRE MONETAG MINI APP
+  // CLIQUE NO BOTÃO - ABRE MONETAG MINI APP TELEGRAM
   // ========================================
   const handleAdClick = useCallback(async () => {
     if (isProcessing) return;
@@ -379,21 +412,24 @@ export default function Tasks() {
 
     // Verificar se SDK está pronto
     if (typeof window[SDK_FUNC] !== 'function') {
-      console.warn('[AD] SDK não está pronto');
+      console.warn('[AD] SDK não está pronto, aguardando...');
       setIsProcessing(false);
-      toast.warning('Aguarde o carregamento...');
+      toast.warning('Aguarde o carregamento do anúncio...');
       return;
     }
 
-    console.log('[AD] Chamando Monetag Mini App com ymid:', ymid);
+    console.log('[AD] Chamando Monetag Mini App Telegram com ymid:', ymid);
+    console.log('[AD] SDK Function:', SDK_FUNC);
 
     try {
+      // Chamar o SDK do Monetag Mini App Telegram
       await window[SDK_FUNC]({
         ymid: ymid,
         requestVar: userEmail
       });
 
-      console.log('[AD] Anúncio Mini App exibido pelo Monetag');
+      console.log('[AD] Anúncio Mini App Telegram exibido pelo Monetag');
+      
       // Enviar postback manual de impression
       sendPostbackToNewServer('impression');
 
@@ -402,8 +438,9 @@ export default function Tasks() {
         fetchStats();
       }, 2000);
     } catch (err) {
-      console.error('[AD] Erro:', err);
+      console.error('[AD] Erro ao exibir anúncio:', err);
       setIsProcessing(false);
+      toast.error('Erro ao carregar anúncio');
     }
   }, [ymid, userEmail, isProcessing, sendPostbackToNewServer, fetchStats]);
 
