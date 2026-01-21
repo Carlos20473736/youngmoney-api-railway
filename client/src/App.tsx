@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import Tasks from "./pages/Tasks";
+import MonetagOverlay from "./components/MonetagOverlay";
 
 function Router() {
   return (
@@ -25,6 +26,8 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
+          {/* Sistema global de overlay Monetag - funciona em todas as páginas */}
+          <MonetagOverlay />
           <Toaster 
             position="top-center"
             toastOptions={{
