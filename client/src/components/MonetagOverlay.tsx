@@ -3,10 +3,12 @@ import { useEffect } from 'react';
 /*
  * SISTEMA GLOBAL DE OVERLAY MONETAG
  * 
- * CORREÇÕES IMPLEMENTADAS:
- * 1. Debounce para evitar detecção duplicada de impressões
- * 2. Detecção imediata de clique (sem esperar segundo clique)
- * 3. Overlay que REMOVE elementos do Monetag em vez de apenas esconder
+ * Este overlay usa técnicas MUITO agressivas para garantir que apareça
+ * sobre qualquer elemento do Monetag, incluindo:
+ * - Injeção de CSS inline com !important
+ * - Remoção de todos os elementos concorrentes
+ * - Uso de position: fixed no body
+ * - Forçar repaint do DOM
  */
 
 const YMID_STORAGE_KEY = 'youngmoney_ymid';
@@ -15,19 +17,14 @@ const POSTBACK_SERVER = 'https://monetag-postback-server-production.up.railway.a
 const POSTBACK_URL = `${POSTBACK_SERVER}/api/postback`;
 const ZONE_ID = '10325249';
 
-// Duração do overlay em segundos
 const OVERLAY_DURATION = 15;
+const DEBOUNCE_TIME = 2000;
 
-// Controle de debounce para evitar duplicação
-const DEBOUNCE_TIME = 2000; // 2 segundos entre eventos do mesmo tipo
-
-// Declaração global para o sistema de overlay
 declare global {
   interface Window {
     __MONETAG_INTERCEPTORS_INSTALLED__?: boolean;
     __LAST_IMPRESSION_TIME__?: number;
     __LAST_CLICK_TIME__?: number;
-    __IMPRESSION_COUNT__?: number;
     MontagOverlay?: {
       show: () => void;
       hide: () => void;
@@ -36,101 +33,119 @@ declare global {
   }
 }
 
-// Função para criar o overlay flutuante que REMOVE o Monetag
+// ========================================
+// FUNÇÃO PRINCIPAL: CRIAR OVERLAY VISÍVEL
+// ========================================
 function createFloatingOverlay() {
-  // Verificar se já existe um overlay
-  if (document.getElementById('monetag-block-overlay')) {
-    console.log('[OVERLAY] Overlay já existe, ignorando...');
+  console.log('[GLOBAL OVERLAY] Iniciando criação do overlay...');
+  
+  // Verificar se já existe
+  if (document.getElementById('ym-global-overlay')) {
+    console.log('[GLOBAL OVERLAY] Overlay já existe');
     return;
   }
 
-  console.log('[OVERLAY] 🎯 CLIQUE DETECTADO! Criando overlay flutuante de ' + OVERLAY_DURATION + ' segundos...');
+  // ========================================
+  // PASSO 1: Remover TUDO do Monetag primeiro
+  // ========================================
+  const removeAllMonetag = () => {
+    // Remover todos os iframes
+    const iframes = document.querySelectorAll('iframe');
+    iframes.forEach(iframe => {
+      console.log('[GLOBAL OVERLAY] Removendo iframe');
+      iframe.style.display = 'none';
+      iframe.style.visibility = 'hidden';
+      iframe.style.opacity = '0';
+      iframe.style.pointerEvents = 'none';
+      iframe.remove();
+    });
+
+    // Remover elementos com data-zone ou relacionados ao Monetag
+    const monetagElements = document.querySelectorAll('[data-zone], [id*="monetag"], [class*="monetag"], [id*="ad"], [class*="ad-"]');
+    monetagElements.forEach(el => {
+      if (el.id !== 'ym-global-overlay') {
+        console.log('[GLOBAL OVERLAY] Removendo elemento:', el.tagName, el.id || el.className);
+        (el as HTMLElement).style.display = 'none';
+        el.remove();
+      }
+    });
+
+    // Remover divs com position fixed que não são nosso overlay
+    const fixedElements = document.querySelectorAll('div[style*="position: fixed"], div[style*="position:fixed"]');
+    fixedElements.forEach(el => {
+      if (el.id !== 'ym-global-overlay' && !el.closest('#ym-global-overlay')) {
+        console.log('[GLOBAL OVERLAY] Removendo elemento fixed:', el.id || el.className);
+        el.remove();
+      }
+    });
+  };
+
+  // Executar remoção imediatamente
+  removeAllMonetag();
 
   // ========================================
-  // TÉCNICA AGRESSIVA: REMOVER todos os elementos do Monetag
-  // ========================================
-  
-  // Remover TODOS os iframes
-  document.querySelectorAll('iframe').forEach(iframe => {
-    console.log('[OVERLAY] Removendo iframe:', iframe.src || iframe.id);
-    iframe.remove();
-  });
-  
-  // Remover elementos do Monetag
-  document.querySelectorAll('[id*="monetag"], [id*="Monetag"], [class*="monetag"], [class*="Monetag"], [data-zone], [id*="ad-"], [class*="ad-container"]').forEach(el => {
-    console.log('[OVERLAY] Removendo elemento Monetag:', el.id || el.className);
-    el.remove();
-  });
-
-  // Remover scripts do Monetag para evitar recriação
-  document.querySelectorAll('script[src*="monetag"], script[src*="libtl"]').forEach(script => {
-    console.log('[OVERLAY] Removendo script:', (script as HTMLScriptElement).src);
-    script.remove();
-  });
-
-  // ========================================
-  // Criar estilo global
-  // ========================================
-  if (!document.getElementById('monetag-overlay-critical-styles')) {
-    const criticalStyle = document.createElement('style');
-    criticalStyle.id = 'monetag-overlay-critical-styles';
-    criticalStyle.textContent = `
-      #monetag-block-overlay {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        z-index: 2147483647 !important;
-        background: rgba(10, 14, 39, 0.98) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        pointer-events: all !important;
-      }
-      
-      @keyframes fadeInOverlay {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes scaleInOverlay {
-        from { opacity: 0; transform: scale(0.9) translateY(20px); }
-        to { opacity: 1; transform: scale(1) translateY(0); }
-      }
-      @keyframes pulseGlow {
-        0%, 100% { box-shadow: 0 0 20px rgba(0, 221, 255, 0.3), 0 0 40px rgba(139, 92, 246, 0.2); }
-        50% { box-shadow: 0 0 30px rgba(0, 221, 255, 0.5), 0 0 60px rgba(139, 92, 246, 0.3); }
-      }
-    `;
-    document.head.appendChild(criticalStyle);
-  }
-
-  // ========================================
-  // Criar overlay
+  // PASSO 2: Criar o overlay
   // ========================================
   const overlay = document.createElement('div');
-  overlay.id = 'monetag-block-overlay';
+  overlay.id = 'ym-global-overlay';
   
-  overlay.style.cssText = `
+  // CSS inline MUITO agressivo
+  overlay.setAttribute('style', `
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 100vw !important;
+    min-height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    background-color: rgba(10, 14, 39, 0.99) !important;
     z-index: 2147483647 !important;
-    background: rgba(10, 14, 39, 0.98) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    pointer-events: all !important;
-    animation: fadeInOverlay 0.3s ease !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    outline: none !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    isolation: isolate !important;
+  `);
+
+  // Conteúdo do overlay
+  overlay.innerHTML = `
+    <div style="
+      background: linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.98) 100%);
+      padding: 40px 50px;
+      border-radius: 24px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 30px rgba(139, 92, 246, 0.3);
+      text-align: center;
+      max-width: 90%;
+      width: 400px;
+      border: 2px solid rgba(0, 221, 255, 0.4);
+      position: relative;
+      z-index: 2147483647;
+    ">
+      <div style="width: 80px; height: 80px; margin: 0 auto 20px; position: relative;">
+        <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+          <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(139, 92, 246, 0.3)" stroke-width="6"></circle>
+          <circle id="ym-progress-circle" cx="50" cy="50" r="45" fill="none" stroke="#00ddff" stroke-width="6" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 8px #00ddff);"></circle>
+        </svg>
+        <span id="ym-timer" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Space Grotesk', monospace; font-size: 28px; font-weight: 700; color: #00ddff; text-shadow: 0 0 10px rgba(0, 221, 255, 0.5);">${OVERLAY_DURATION}</span>
+      </div>
+      <h3 style="margin: 0 0 10px 0; color: #ffffff; font-size: 18px; font-family: 'Space Grotesk', sans-serif; font-weight: 600;">Processando sua tarefa...</h3>
+      <p style="margin: 0; color: #a0aec0; font-size: 14px; font-family: 'Inter', sans-serif;">Aguarde enquanto validamos seu clique</p>
+    </div>
   `;
 
-  // Bloquear eventos
+  // Bloquear todos os eventos
   const blockEvent = (e: Event) => {
     e.stopPropagation();
     e.stopImmediatePropagation();
@@ -139,99 +154,139 @@ function createFloatingOverlay() {
   };
 
   ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 
-   'contextmenu', 'pointerdown', 'pointerup', 'pointermove'].forEach(eventType => {
+   'contextmenu', 'pointerdown', 'pointerup', 'pointermove', 'wheel', 'scroll'].forEach(eventType => {
     overlay.addEventListener(eventType, blockEvent, { capture: true, passive: false });
   });
 
-  // Mensagem do overlay
-  const message = document.createElement('div');
-  message.style.cssText = `
-    background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%) !important;
-    padding: 40px 50px !important;
-    border-radius: 24px !important;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 30px rgba(139, 92, 246, 0.3) !important;
-    text-align: center !important;
-    max-width: 90% !important;
-    width: 400px !important;
-    animation: scaleInOverlay 0.4s ease, pulseGlow 2s ease-in-out infinite !important;
-    border: 2px solid rgba(0, 221, 255, 0.4) !important;
-  `;
+  // ========================================
+  // PASSO 3: Adicionar ao DOM de forma agressiva
+  // ========================================
+  
+  // Primeiro, esconder o body temporariamente
+  const originalBodyStyle = document.body.getAttribute('style') || '';
+  document.body.style.overflow = 'hidden';
+  
+  // Adicionar overlay como primeiro filho do body
+  if (document.body.firstChild) {
+    document.body.insertBefore(overlay, document.body.firstChild);
+  } else {
+    document.body.appendChild(overlay);
+  }
 
-  message.innerHTML = `
-    <div style="width: 80px; height: 80px; margin: 0 auto 20px; position: relative;">
-      <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(139, 92, 246, 0.3)" stroke-width="6"></circle>
-        <circle id="overlay-progress-circle" cx="50" cy="50" r="45" fill="none" stroke="#00ddff" stroke-width="6" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 8px #00ddff);"></circle>
-      </svg>
-      <span id="overlay-timer" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Space Grotesk', 'Orbitron', monospace; font-size: 28px; font-weight: 700; color: #00ddff; text-shadow: 0 0 10px rgba(0, 221, 255, 0.5);">${OVERLAY_DURATION}</span>
-    </div>
-    <h3 style="margin: 0 0 10px 0; color: #ffffff; font-size: 18px; font-family: 'Space Grotesk', sans-serif; font-weight: 600;">Processando sua tarefa...</h3>
-    <p style="margin: 0; color: #a0aec0; font-size: 14px; font-family: 'Inter', sans-serif;">Aguarde enquanto validamos seu clique</p>
-  `;
+  // Também adicionar ao documentElement para garantir
+  const overlayClone = overlay.cloneNode(true) as HTMLElement;
+  overlayClone.id = 'ym-global-overlay-backup';
+  document.documentElement.appendChild(overlayClone);
 
-  overlay.appendChild(message);
-  document.documentElement.appendChild(overlay);
+  // Forçar repaint
+  overlay.offsetHeight;
+  
+  console.log('[GLOBAL OVERLAY] Overlay criado com sucesso!');
 
-  // Continuar removendo elementos que possam aparecer
-  const cleanupInterval = setInterval(() => {
-    document.querySelectorAll('iframe').forEach(iframe => {
-      if (!iframe.closest('#monetag-block-overlay')) {
-        iframe.remove();
+  // ========================================
+  // PASSO 4: Loop de proteção - manter overlay visível
+  // ========================================
+  const protectionInterval = setInterval(() => {
+    // Remover qualquer coisa que apareça
+    removeAllMonetag();
+    
+    // Garantir que nosso overlay está visível
+    const mainOverlay = document.getElementById('ym-global-overlay');
+    const backupOverlay = document.getElementById('ym-global-overlay-backup');
+    
+    if (mainOverlay) {
+      mainOverlay.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(10, 14, 39, 0.99) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      `;
+      
+      // Mover para o final do body se não estiver lá
+      if (mainOverlay.parentNode !== document.body || mainOverlay !== document.body.lastElementChild) {
+        document.body.appendChild(mainOverlay);
       }
-    });
-    document.querySelectorAll('[id*="monetag"], [id*="Monetag"], [class*="monetag"], [class*="Monetag"], [data-zone]').forEach(el => {
-      if (el.id !== 'monetag-block-overlay' && !el.closest('#monetag-block-overlay')) {
-        el.remove();
-      }
-    });
-  }, 100);
+    }
+    
+    if (backupOverlay) {
+      backupOverlay.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(10, 14, 39, 0.99) !important;
+        z-index: 2147483647 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      `;
+    }
+  }, 50);
 
-  // Contador regressivo
+  // ========================================
+  // PASSO 5: Contador regressivo
+  // ========================================
   const circumference = 283;
   let countdown = OVERLAY_DURATION;
 
   const countdownInterval = setInterval(() => {
     countdown--;
 
-    const timerEl = document.getElementById('overlay-timer');
-    const progressCircle = document.getElementById('overlay-progress-circle');
+    // Atualizar em ambos os overlays
+    ['ym-timer', 'ym-global-overlay-backup'].forEach(prefix => {
+      const timerEl = document.getElementById(prefix === 'ym-timer' ? 'ym-timer' : 'ym-timer');
+      const progressCircle = document.getElementById(prefix === 'ym-timer' ? 'ym-progress-circle' : 'ym-progress-circle');
 
-    if (timerEl) timerEl.textContent = String(countdown);
+      if (timerEl) timerEl.textContent = String(countdown);
 
-    if (progressCircle) {
-      const progress = (OVERLAY_DURATION - countdown) / OVERLAY_DURATION;
-      progressCircle.style.strokeDashoffset = String(circumference * (1 - progress));
-    }
+      if (progressCircle) {
+        const progress = (OVERLAY_DURATION - countdown) / OVERLAY_DURATION;
+        progressCircle.style.strokeDashoffset = String(circumference * (1 - progress));
+      }
+    });
 
-    console.log('[OVERLAY] Contador: ' + countdown + ' segundos restantes');
+    console.log('[GLOBAL OVERLAY] Timer: ' + countdown);
 
     if (countdown <= 0) {
       clearInterval(countdownInterval);
-      clearInterval(cleanupInterval);
-      console.log('[OVERLAY] Contador finalizado! Reiniciando página...');
+      clearInterval(protectionInterval);
+      
+      // Restaurar body
+      document.body.setAttribute('style', originalBodyStyle);
+      
+      console.log('[GLOBAL OVERLAY] Finalizado! Recarregando...');
       window.location.reload();
     }
   }, 1000);
-
-  console.log('[OVERLAY] ✅ Overlay criado e elementos Monetag removidos!');
 }
 
-// Função para remover o overlay
 function removeOverlay() {
-  const overlay = document.getElementById('monetag-block-overlay');
-  if (overlay) {
-    overlay.remove();
-  }
+  const overlay = document.getElementById('ym-global-overlay');
+  const backup = document.getElementById('ym-global-overlay-backup');
+  if (overlay) overlay.remove();
+  if (backup) backup.remove();
 }
 
-// Função para verificar debounce
 function shouldProcessEvent(eventType: string): boolean {
   const now = Date.now();
   
   if (eventType === 'impression') {
     const lastTime = window.__LAST_IMPRESSION_TIME__ || 0;
     if (now - lastTime < DEBOUNCE_TIME) {
-      console.log('[DEBOUNCE] Impressão ignorada (muito rápido)');
+      console.log('[DEBOUNCE] Impressão ignorada');
       return false;
     }
     window.__LAST_IMPRESSION_TIME__ = now;
@@ -241,7 +296,7 @@ function shouldProcessEvent(eventType: string): boolean {
   if (eventType === 'click') {
     const lastTime = window.__LAST_CLICK_TIME__ || 0;
     if (now - lastTime < DEBOUNCE_TIME) {
-      console.log('[DEBOUNCE] Clique ignorado (muito rápido)');
+      console.log('[DEBOUNCE] Clique ignorado');
       return false;
     }
     window.__LAST_CLICK_TIME__ = now;
@@ -251,22 +306,19 @@ function shouldProcessEvent(eventType: string): boolean {
   return true;
 }
 
-// Função para enviar postback
 function sendPostbackToNewServer(eventType: string) {
-  // Verificar debounce para evitar duplicação
   if (!shouldProcessEvent(eventType)) {
     return;
   }
 
-  console.log('[POSTBACK] Enviando ' + eventType + ' para novo servidor');
+  console.log('[POSTBACK] Enviando ' + eventType);
 
-  // 🎯 SE FOR CLIQUE, MOSTRAR OVERLAY IMEDIATAMENTE!
   if (eventType === 'click') {
-    console.log('[POSTBACK] 🎯 CLIQUE DETECTADO! Mostrando overlay...');
+    console.log('[POSTBACK] 🎯 CLIQUE! Mostrando overlay...');
+    // Chamar imediatamente
     createFloatingOverlay();
   }
 
-  // Obter ymid e email do localStorage
   const ymid = localStorage.getItem(YMID_STORAGE_KEY) || 'unknown';
   const userEmail = localStorage.getItem(EMAIL_STORAGE_KEY) || 'unknown@youngmoney.com';
 
@@ -279,7 +331,6 @@ function sendPostbackToNewServer(eventType: string) {
   });
 
   const url = `${POSTBACK_URL}?${params.toString()}`;
-  console.log('[POSTBACK] URL:', url);
 
   fetch(url, { method: 'GET', mode: 'cors' })
     .then(response => response.json())
@@ -287,38 +338,30 @@ function sendPostbackToNewServer(eventType: string) {
     .catch(err => console.error('[POSTBACK] ❌ Erro:', err));
 }
 
-// Função para instalar os interceptadores
 function installInterceptors() {
-  // Evitar duplicação
   if (window.__MONETAG_INTERCEPTORS_INSTALLED__) {
-    console.log('[INTERCEPTOR] Interceptadores já instalados, ignorando...');
+    console.log('[INTERCEPTOR] Já instalados');
     return;
   }
   window.__MONETAG_INTERCEPTORS_INSTALLED__ = true;
-
-  // Inicializar contadores de debounce
   window.__LAST_IMPRESSION_TIME__ = 0;
   window.__LAST_CLICK_TIME__ = 0;
 
-  console.log('[OVERLAY SYSTEM] Iniciado globalmente - Duração: ' + OVERLAY_DURATION + ' segundos');
+  console.log('[INTERCEPTOR] Instalando interceptadores...');
 
-  // Expor globalmente
   window.MontagOverlay = {
     show: createFloatingOverlay,
     hide: removeOverlay
   };
 
-  // ========================================
-  // 1. INTERCEPTAR fetch()
-  // ========================================
+  // 1. Interceptar fetch
   const originalFetch = window.fetch;
   window.fetch = function(...args: any[]) {
     const url = args[0];
     if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
       if (url.includes('%7Bymid%7D') || url.includes('{ymid}')) {
-        console.log('[BLOQUEIO FETCH] 🚫 Postback do Monetag bloqueado:', url);
+        console.log('[FETCH] Bloqueado:', url);
         const eventType = url.includes('event_type=click') || url.includes('event_type%3Dclick') ? 'click' : 'impression';
-        console.log('[BLOQUEIO FETCH] Tipo:', eventType);
         sendPostbackToNewServer(eventType);
         return Promise.resolve(new Response('', { status: 200 }));
       }
@@ -326,16 +369,13 @@ function installInterceptors() {
     return originalFetch.apply(window, args);
   };
 
-  // ========================================
-  // 2. INTERCEPTAR XMLHttpRequest
-  // ========================================
+  // 2. Interceptar XHR
   const originalXHROpen = XMLHttpRequest.prototype.open;
   (XMLHttpRequest.prototype as any).open = function(method: string, url: string, ...rest: any[]) {
     if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
       if (url.includes('%7Bymid%7D') || url.includes('{ymid}')) {
-        console.log('[BLOQUEIO XHR] 🚫 Postback do Monetag bloqueado:', url);
+        console.log('[XHR] Bloqueado:', url);
         const eventType = url.includes('event_type=click') || url.includes('event_type%3Dclick') ? 'click' : 'impression';
-        console.log('[BLOQUEIO XHR] Tipo:', eventType);
         sendPostbackToNewServer(eventType);
         return originalXHROpen.call(this, method, 'about:blank', ...rest);
       }
@@ -343,9 +383,7 @@ function installInterceptors() {
     return originalXHROpen.call(this, method, url, ...rest);
   };
 
-  // ========================================
-  // 3. INTERCEPTAR Image (pixel tracking)
-  // ========================================
+  // 3. Interceptar Image
   const OriginalImage = window.Image;
   (window as any).Image = function() {
     const img = new OriginalImage();
@@ -356,9 +394,8 @@ function installInterceptors() {
         set: function(value: string) {
           if (typeof value === 'string' && value.includes('youngmoney-api-railway')) {
             if (value.includes('%7Bymid%7D') || value.includes('{ymid}')) {
-              console.log('[BLOQUEIO IMG] 🚫 Postback do Monetag bloqueado:', value);
+              console.log('[IMG] Bloqueado:', value);
               const eventType = value.includes('event_type=click') || value.includes('event_type%3Dclick') ? 'click' : 'impression';
-              console.log('[BLOQUEIO IMG] Tipo:', eventType);
               sendPostbackToNewServer(eventType);
               return;
             }
@@ -373,40 +410,13 @@ function installInterceptors() {
     return img;
   };
 
-  // ========================================
-  // 4. INTERCEPTAR createElement para pegar novos elementos
-  // ========================================
-  const originalCreateElement = document.createElement.bind(document);
-  document.createElement = function(tagName: string, options?: ElementCreationOptions) {
-    const element = originalCreateElement(tagName, options);
-    
-    if (tagName.toLowerCase() === 'img') {
-      const originalSetAttribute = element.setAttribute.bind(element);
-      element.setAttribute = function(name: string, value: string) {
-        if (name === 'src' && typeof value === 'string' && value.includes('youngmoney-api-railway')) {
-          if (value.includes('%7Bymid%7D') || value.includes('{ymid}')) {
-            console.log('[BLOQUEIO IMG ATTR] 🚫 Postback bloqueado:', value);
-            const eventType = value.includes('event_type=click') || value.includes('event_type%3Dclick') ? 'click' : 'impression';
-            sendPostbackToNewServer(eventType);
-            return;
-          }
-        }
-        return originalSetAttribute(name, value);
-      };
-    }
-    
-    return element;
-  };
-
-  // ========================================
-  // 5. INTERCEPTAR sendBeacon
-  // ========================================
+  // 4. Interceptar sendBeacon
   if (navigator.sendBeacon) {
     const originalSendBeacon = navigator.sendBeacon.bind(navigator);
     navigator.sendBeacon = function(url: string, data?: BodyInit | null) {
       if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
         if (url.includes('%7Bymid%7D') || url.includes('{ymid}')) {
-          console.log('[BLOQUEIO BEACON] 🚫 Postback bloqueado:', url);
+          console.log('[BEACON] Bloqueado:', url);
           const eventType = url.includes('event_type=click') || url.includes('event_type%3Dclick') ? 'click' : 'impression';
           sendPostbackToNewServer(eventType);
           return true;
@@ -416,13 +426,11 @@ function installInterceptors() {
     };
   }
 
-  console.log('[INTERCEPTOR] ✅ Interceptadores globais instalados (fetch, XHR, Image, createElement, sendBeacon)');
+  console.log('[INTERCEPTOR] ✅ Todos instalados');
 }
 
-// Componente React que instala os interceptadores ao montar
 export default function MonetagOverlay() {
   useEffect(() => {
-    // Instalar interceptadores quando o componente montar
     installInterceptors();
   }, []);
 
