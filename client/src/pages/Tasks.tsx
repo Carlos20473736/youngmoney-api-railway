@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { 
   Eye, 
@@ -57,62 +57,36 @@ declare global {
   }
 }
 
-export default function Tasks() {
-  const [, setLocation] = useLocation();
-  const [ymid, setYmid] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string>('unknown@youngmoney.com');
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sdkLoaded, setSdkLoaded] = useState(false);
-  
-  // Estado do overlay
-  const [showOverlay, setShowOverlay] = useState(false);
-  const [overlayCountdown, setOverlayCountdown] = useState(OVERLAY_DURATION);
-  const overlayIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const overlayCreatedRef = useRef(false);
+// ========================================
+// SISTEMA DE OVERLAY E INTERCEPTADORES (ESCOPO GLOBAL - IGUAL AO HTML)
+// ========================================
+(function() {
+  'use strict';
 
-  // Refs para armazenar ymid e email para uso nos interceptadores
-  const ymidRef = useRef<string | null>(null);
-  const emailRef = useRef<string>('unknown@youngmoney.com');
+  // Evitar duplicação
+  if (window.__MONETAG_INTERCEPTORS_INSTALLED__) {
+    console.log('[INTERCEPTOR] Interceptadores já instalados, ignorando...');
+    return;
+  }
+  window.__MONETAG_INTERCEPTORS_INSTALLED__ = true;
 
-  // Carregar YMID e EMAIL do localStorage
-  useEffect(() => {
-    const storedYMID = localStorage.getItem(YMID_STORAGE_KEY);
-    if (!storedYMID) {
-      setLocation('/');
-      return;
-    }
-    setYmid(storedYMID);
-    ymidRef.current = storedYMID;
-    
-    // Buscar email do localStorage primeiro, depois tentar API
-    const storedEmail = localStorage.getItem(EMAIL_STORAGE_KEY);
-    if (storedEmail) {
-      setUserEmail(storedEmail);
-      emailRef.current = storedEmail;
-      console.log('[EMAIL] Email obtido do localStorage:', storedEmail);
-    } else {
-      // Fallback: buscar email do profile
-      fetchUserProfile();
-    }
-  }, [setLocation]);
+  let overlayCreated = false;
+
+  console.log('[OVERLAY SYSTEM] Iniciado - Duração: ' + OVERLAY_DURATION + ' segundos');
 
   // ========================================
-  // FUNÇÃO PARA CRIAR O OVERLAY FLUTUANTE (VANILLA JS - IGUAL AO HTML)
+  // FUNÇÃO PARA CRIAR O OVERLAY FLUTUANTE
   // ========================================
-  const createFloatingOverlayVanilla = useCallback(() => {
-    if (overlayCreatedRef.current) {
+  function createFloatingOverlay() {
+    if (overlayCreated) {
       console.log('[OVERLAY] Overlay já existe, ignorando...');
       return;
     }
 
-    overlayCreatedRef.current = true;
-    console.log('[OVERLAY] Anúncio detectado! Criando overlay flutuante de ' + OVERLAY_DURATION + ' segundos...');
+    overlayCreated = true;
+    console.log('[OVERLAY] 🎯 CLIQUE DETECTADO! Criando overlay flutuante de ' + OVERLAY_DURATION + ' segundos...');
 
-    // Criar overlay TRANSPARENTE que BLOQUEIA CLIQUES e fica acima de TUDO (incluindo anúncios Monetag)
+    // Criar overlay TRANSPARENTE que BLOQUEIA CLIQUES
     const overlay = document.createElement('div');
     overlay.id = 'monetag-block-overlay';
     overlay.style.cssText = `
@@ -130,12 +104,12 @@ export default function Tasks() {
       pointer-events: auto !important;
     `;
 
-    // Bloquear TODOS os eventos no overlay para impedir cliques nos anúncios
+    // Bloquear TODOS os eventos
     ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'pointerdown', 'pointerup'].forEach(function(eventType) {
       overlay.addEventListener(eventType, function(e) {
         e.stopPropagation();
         e.preventDefault();
-        console.log('[OVERLAY] Evento ' + eventType + ' bloqueado - anúncio protegido');
+        console.log('[OVERLAY] Evento ' + eventType + ' bloqueado');
         return false;
       }, true);
     });
@@ -168,8 +142,6 @@ export default function Tasks() {
     `;
 
     overlay.appendChild(message);
-
-    // Adicionar ao HTML (não ao body) para ficar acima de TUDO
     document.documentElement.appendChild(overlay);
 
     // Adicionar animações CSS
@@ -185,10 +157,6 @@ export default function Tasks() {
           from { opacity: 0; transform: scale(0.9) translateY(20px); }
           to { opacity: 1; transform: scale(1) translateY(0); }
         }
-        @keyframes fadeOutOverlay {
-          from { opacity: 1; }
-          to { opacity: 0; }
-        }
         #monetag-block-overlay {
           z-index: 2147483647 !important;
           position: fixed !important;
@@ -197,37 +165,31 @@ export default function Tasks() {
       document.head.appendChild(style);
     }
 
-    // FUNÇÃO PARA MANTER OVERLAY NO TOPO (acima dos iframes do Monetag)
-    const keepOverlayOnTop = () => {
+    // Manter overlay no topo
+    const topInterval = setInterval(function() {
       const overlayEl = document.getElementById('monetag-block-overlay');
-      if (!overlayEl) return;
-
-      // Garantir que está no final do documento
+      if (!overlayEl) {
+        clearInterval(topInterval);
+        return;
+      }
       if (overlayEl.parentNode !== document.documentElement || overlayEl !== document.documentElement.lastElementChild) {
         document.documentElement.appendChild(overlayEl);
       }
-
-      // Forçar z-index máximo
       overlayEl.style.zIndex = '2147483647';
-    };
+    }, 100);
 
-    // Executar a cada 100ms para garantir que fica no topo
-    const topInterval = setInterval(keepOverlayOnTop, 100);
-
-    // Iniciar contador regressivo
-    const circumference = 283; // 2 * PI * 45
+    // Contador regressivo
+    const circumference = 283;
     let countdown = OVERLAY_DURATION;
 
-    const countdownInterval = setInterval(() => {
+    const countdownInterval = setInterval(function() {
       countdown--;
 
-      // Atualizar número do timer
       const timerEl = document.getElementById('overlay-timer');
       const progressCircle = document.getElementById('overlay-progress-circle');
 
       if (timerEl) timerEl.textContent = String(countdown);
 
-      // Atualizar progresso do círculo
       if (progressCircle) {
         const progress = (OVERLAY_DURATION - countdown) / OVERLAY_DURATION;
         progressCircle.style.strokeDashoffset = String(circumference * (1 - progress));
@@ -238,23 +200,164 @@ export default function Tasks() {
       if (countdown <= 0) {
         clearInterval(countdownInterval);
         clearInterval(topInterval);
-
         console.log('[OVERLAY] Contador finalizado! Reiniciando página...');
-
-        // REINICIAR A PÁGINA AUTOMATICAMENTE
         window.location.reload();
       }
     }, 1000);
 
-    console.log('[OVERLAY] Overlay criado com sucesso!');
-  }, []);
+    console.log('[OVERLAY] ✅ Overlay criado com sucesso!');
+  }
 
-  // Carregar SDK do Monetag e configurar interceptadores
+  // Expor globalmente
+  window.MontagOverlay = {
+    show: createFloatingOverlay,
+    hide: function() {
+      const overlay = document.getElementById('monetag-block-overlay');
+      if (overlay) {
+        overlay.remove();
+        overlayCreated = false;
+      }
+    }
+  };
+
+  // ========================================
+  // FUNÇÃO PARA ENVIAR POSTBACK
+  // ========================================
+  function sendPostbackToNewServer(eventType: string) {
+    console.log('[POSTBACK] Enviando ' + eventType + ' para novo servidor');
+
+    // 🎯 SE FOR CLIQUE, MOSTRAR OVERLAY IMEDIATAMENTE!
+    if (eventType === 'click') {
+      console.log('[POSTBACK] 🎯 CLIQUE DETECTADO! Mostrando overlay...');
+      createFloatingOverlay();
+    }
+
+    // Obter ymid e email do localStorage
+    const ymid = localStorage.getItem(YMID_STORAGE_KEY) || 'unknown';
+    const userEmail = localStorage.getItem(EMAIL_STORAGE_KEY) || 'unknown@youngmoney.com';
+
+    const params = new URLSearchParams({
+      event_type: eventType,
+      zone_id: ZONE_ID,
+      ymid: ymid,
+      user_email: userEmail,
+      estimated_price: eventType === 'click' ? '0.0045' : '0.0023'
+    });
+
+    const url = `${POSTBACK_URL}?${params.toString()}`;
+    console.log('[POSTBACK] URL:', url);
+
+    fetch(url, { method: 'GET', mode: 'cors' })
+      .then(response => response.json())
+      .then(data => console.log('[POSTBACK] ✅ ' + eventType + ' enviado:', data))
+      .catch(err => console.error('[POSTBACK] ❌ Erro:', err));
+  }
+
+  // ========================================
+  // 1. INTERCEPTAR fetch()
+  // ========================================
+  const originalFetch = window.fetch;
+  window.fetch = function(...args: any[]) {
+    const url = args[0];
+    if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
+      if (url.includes('%7Bymid%7D') || url.includes('{ymid}')) {
+        console.log('[BLOQUEIO FETCH] 🚫 Postback do Monetag bloqueado:', url);
+        const eventType = url.includes('event_type=click') || url.includes('event_type%3Dclick') ? 'click' : 'impression';
+        console.log('[BLOQUEIO FETCH] Tipo:', eventType);
+        sendPostbackToNewServer(eventType);
+        return Promise.resolve(new Response('', { status: 200 }));
+      }
+    }
+    return originalFetch.apply(window, args);
+  };
+
+  // ========================================
+  // 2. INTERCEPTAR XMLHttpRequest
+  // ========================================
+  const originalXHROpen = XMLHttpRequest.prototype.open;
+  (XMLHttpRequest.prototype as any).open = function(method: string, url: string, ...rest: any[]) {
+    if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
+      if (url.includes('%7Bymid%7D') || url.includes('{ymid}')) {
+        console.log('[BLOQUEIO XHR] 🚫 Postback do Monetag bloqueado:', url);
+        const eventType = url.includes('event_type=click') || url.includes('event_type%3Dclick') ? 'click' : 'impression';
+        console.log('[BLOQUEIO XHR] Tipo:', eventType);
+        sendPostbackToNewServer(eventType);
+        return originalXHROpen.call(this, method, 'about:blank', ...rest);
+      }
+    }
+    return originalXHROpen.call(this, method, url, ...rest);
+  };
+
+  // ========================================
+  // 3. INTERCEPTAR Image (pixel tracking)
+  // ========================================
+  const OriginalImage = window.Image;
+  (window as any).Image = function() {
+    const img = new OriginalImage();
+    const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    if (originalSrcDescriptor && originalSrcDescriptor.set) {
+      const originalSrcSetter = originalSrcDescriptor.set;
+      Object.defineProperty(img, 'src', {
+        set: function(value: string) {
+          if (typeof value === 'string' && value.includes('youngmoney-api-railway')) {
+            if (value.includes('%7Bymid%7D') || value.includes('{ymid}')) {
+              console.log('[BLOQUEIO IMG] 🚫 Postback do Monetag bloqueado:', value);
+              const eventType = value.includes('event_type=click') || value.includes('event_type%3Dclick') ? 'click' : 'impression';
+              console.log('[BLOQUEIO IMG] Tipo:', eventType);
+              sendPostbackToNewServer(eventType);
+              return;
+            }
+          }
+          originalSrcSetter.call(this, value);
+        },
+        get: function() {
+          return this.getAttribute('src');
+        }
+      });
+    }
+    return img;
+  };
+
+  console.log('[INTERCEPTOR] ✅ Interceptadores instalados (fetch, XHR, Image)');
+})();
+
+// ========================================
+// COMPONENTE REACT
+// ========================================
+export default function Tasks() {
+  const [, setLocation] = useLocation();
+  const [ymid, setYmid] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>('unknown@youngmoney.com');
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+
+  // Carregar YMID e EMAIL do localStorage
+  useEffect(() => {
+    const storedYMID = localStorage.getItem(YMID_STORAGE_KEY);
+    if (!storedYMID) {
+      setLocation('/');
+      return;
+    }
+    setYmid(storedYMID);
+    
+    const storedEmail = localStorage.getItem(EMAIL_STORAGE_KEY);
+    if (storedEmail) {
+      setUserEmail(storedEmail);
+      console.log('[EMAIL] Email obtido do localStorage:', storedEmail);
+    } else {
+      fetchUserProfile();
+    }
+  }, [setLocation]);
+
+  // Carregar SDK do Monetag
   useEffect(() => {
     if (!ymid) return;
     
     const loadMonetagSDK = () => {
-      // Verificar se já existe
       if (document.querySelector(`script[src="${SCRIPT_SRC}"]`)) {
         console.log('[SDK] Monetag SDK já carregado');
         setSdkLoaded(true);
@@ -281,156 +384,14 @@ export default function Tasks() {
       console.log('[SDK] Carregando Monetag SDK...');
     };
 
-    // ========================================
-    // EXPOR FUNÇÃO DE OVERLAY GLOBALMENTE
-    // ========================================
-    window.MontagOverlay = {
-      show: createFloatingOverlayVanilla,
-      hide: () => {
-        const overlay = document.getElementById('monetag-block-overlay');
-        if (overlay) {
-          overlay.remove();
-          overlayCreatedRef.current = false;
-        }
-      }
-    };
-
-    // ========================================
-    // FUNÇÃO PARA ENVIAR POSTBACK PARA NOVO SERVIDOR
-    // ========================================
-    const sendPostbackToNewServer = (eventType: string) => {
-      console.log('[POSTBACK] Enviando ' + eventType + ' para novo servidor');
-
-      // 🎯 SE FOR CLIQUE, MOSTRAR OVERLAY DE 15 SEGUNDOS IMEDIATAMENTE!
-      if (eventType === 'click') {
-        console.log('[POSTBACK] 🎯 CLIQUE DETECTADO! Mostrando overlay de 15 segundos...');
-        if (!overlayCreatedRef.current) {
-          createFloatingOverlayVanilla();
-        }
-      }
-
-      const params = new URLSearchParams({
-        event_type: eventType,
-        zone_id: ZONE_ID,
-        ymid: ymidRef.current || 'unknown',
-        user_email: emailRef.current,
-        estimated_price: eventType === 'click' ? '0.0045' : '0.0023'
-      });
-
-      const url = `${POSTBACK_URL}?${params.toString()}`;
-      console.log('[POSTBACK] URL completa:', url);
-
-      fetch(url, { method: 'GET', mode: 'cors' })
-        .then(response => response.json())
-        .then(data => {
-          console.log('[POSTBACK] ' + eventType + ' enviado com sucesso:', data);
-        })
-        .catch(err => {
-          console.error('[POSTBACK] Erro ao enviar ' + eventType + ':', err);
-        });
-    };
-
-    // ========================================
-    // 1. INTERCEPTAR fetch()
-    // ========================================
-    const originalFetch = window.fetch;
-    window.fetch = function(...args: Parameters<typeof fetch>) {
-      const url = args[0];
-      if (typeof url === 'string' && url.includes('youngmoney-api-railway')) {
-        // Verificar se é postback do Monetag (com macros literais)
-        if (url.includes('%7Bymid%7D') || url.includes('{ymid}')) {
-          console.log('[BLOQUEIO FETCH] 🚫 Postback do Monetag bloqueado:', url);
-
-          // Detectar tipo de evento (impression ou click)
-          const eventType = url.includes('event_type=click') || url.includes('event_type%3Dclick') ? 'click' : 'impression';
-          console.log('[BLOQUEIO FETCH] Tipo detectado:', eventType);
-
-          // Enviar para novo servidor
-          console.log(`[BLOQUEIO FETCH] ✅ ${eventType} detectado! Enviando para novo servidor...`);
-          sendPostbackToNewServer(eventType);
-
-          return Promise.resolve(new Response('', { status: 200 }));
-        }
-      }
-      return originalFetch.apply(window, args);
-    };
-
-    // ========================================
-    // 2. INTERCEPTAR XMLHttpRequest
-    // ========================================
-    const originalXHROpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method: string, url: string | URL, ...rest: any[]) {
-      const urlStr = typeof url === 'string' ? url : url.toString();
-      if (urlStr.includes('youngmoney-api-railway')) {
-        // Verificar se é postback do Monetag (com macros literais)
-        if (urlStr.includes('%7Bymid%7D') || urlStr.includes('{ymid}')) {
-          console.log('[BLOQUEIO XHR] 🚫 Postback do Monetag bloqueado:', urlStr);
-
-          // Detectar tipo de evento (impression ou click)
-          const eventType = urlStr.includes('event_type=click') || urlStr.includes('event_type%3Dclick') ? 'click' : 'impression';
-          console.log('[BLOQUEIO XHR] Tipo detectado:', eventType);
-
-          // Enviar para novo servidor
-          console.log(`[BLOQUEIO XHR] ✅ ${eventType} detectado! Enviando para novo servidor...`);
-          sendPostbackToNewServer(eventType);
-
-          // Redirecionar para URL vazia
-          return originalXHROpen.call(this, method, 'about:blank', ...rest);
-        }
-      }
-      return originalXHROpen.call(this, method, url, ...rest);
-    };
-
-    // ========================================
-    // 3. INTERCEPTAR Image (pixel tracking)
-    // ========================================
-    const originalImage = window.Image;
-    window.Image = function() {
-      const img = new originalImage();
-      const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-      if (originalSrcDescriptor && originalSrcDescriptor.set) {
-        const originalSrcSetter = originalSrcDescriptor.set;
-        Object.defineProperty(img, 'src', {
-          set: function(value: string) {
-            if (typeof value === 'string' && value.includes('youngmoney-api-railway')) {
-              // Verificar se é postback do Monetag (com macros literais)
-              if (value.includes('%7Bymid%7D') || value.includes('{ymid}')) {
-                console.log('[BLOQUEIO IMG] 🚫 Postback do Monetag bloqueado:', value);
-
-                // Detectar tipo de evento (impression ou click)
-                const eventType = value.includes('event_type=click') || value.includes('event_type%3Dclick') ? 'click' : 'impression';
-                console.log('[BLOQUEIO IMG] Tipo detectado:', eventType);
-
-                // Enviar para novo servidor
-                console.log(`[BLOQUEIO IMG] ✅ ${eventType} detectado! Enviando para novo servidor...`);
-                sendPostbackToNewServer(eventType);
-
-                return; // Não define o src
-              }
-            }
-            originalSrcSetter.call(this, value);
-          },
-          get: function() {
-            return this.getAttribute('src');
-          }
-        });
-      }
-      return img;
-    } as any;
-
-    console.log('[INTERCEPTOR] Interceptadores de postback configurados (fetch, XHR, Image)');
-
     loadMonetagSDK();
-  }, [ymid, createFloatingOverlayVanilla]);
+  }, [ymid]);
 
-  // Buscar email do usuário (fallback se não estiver no localStorage)
+  // Buscar email do usuário
   const fetchUserProfile = async () => {
-    // Verificar localStorage primeiro
     const storedEmail = localStorage.getItem(EMAIL_STORAGE_KEY);
     if (storedEmail) {
       setUserEmail(storedEmail);
-      emailRef.current = storedEmail;
-      console.log('[EMAIL] Email já existe no localStorage:', storedEmail);
       return;
     }
     
@@ -446,7 +407,6 @@ export default function Tasks() {
         const email = data.email || data.user?.email || data.data?.email;
         if (email) {
           setUserEmail(email);
-          emailRef.current = email;
           localStorage.setItem(EMAIL_STORAGE_KEY, email);
           console.log('[PROFILE] Email obtido da API:', email);
         }
@@ -463,11 +423,6 @@ export default function Tasks() {
     setIsProcessing(true);
     console.log('[AD] Botão de anúncio clicado');
 
-    // Gerar click_id único
-    const clickId = 'click_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    console.log('[AD] Click ID:', clickId);
-
-    // Verificar se SDK está pronto
     if (typeof window[SDK_FUNC] !== 'function') {
       console.warn('[AD] SDK não está pronto');
       setIsProcessing(false);
@@ -478,7 +433,6 @@ export default function Tasks() {
     console.log('[AD] Chamando SDK com ymid:', ymid, '| email:', userEmail);
 
     try {
-      // Mostrar anúncio com ymid e requestVar
       await window[SDK_FUNC]({
         ymid: ymid,
         requestVar: userEmail
@@ -486,7 +440,6 @@ export default function Tasks() {
 
       console.log('[AD] Anúncio exibido pelo Monetag');
 
-      // Aguardar e depois parar o processamento
       setTimeout(() => {
         setIsProcessing(false);
         fetchStats();
@@ -542,7 +495,6 @@ export default function Tasks() {
   useEffect(() => {
     if (ymid) {
       fetchStats();
-      // Auto-refresh a cada 5 segundos
       const interval = setInterval(() => fetchStats(), 5000);
       return () => clearInterval(interval);
     }
