@@ -1,60 +1,59 @@
 {
     auto_https off
     admin off
+    frankenphp
 }
 
 :80 {
     root * /app
     encode gzip
     
-    # Servir arquivos estáticos da pasta public
-    @staticfiles {
-        path /assets/* /__manus__/*
-        file {
-            root /app/public
-        }
-    }
-    handle @staticfiles {
+    # Arquivos estáticos da pasta public (assets, etc)
+    @assets path /assets/*
+    handle @assets {
         root * /app/public
         file_server
     }
     
-    # Rotas do SPA React - servir index.html para rotas específicas
-    @spa {
-        not path /api/* *.php /user/* /ranking/* /pix/* /monetag/* /admin/* /admin-panel/* /invite/* /history/* /settings/* /withdraw/* /notifications/* /database/* /middleware/* /migrations/* /routes/*
-        not path /assets/* /__manus__/*
+    @manus path /__manus__/*
+    handle @manus {
+        root * /app/public
+        file_server
     }
-    handle @spa {
+    
+    # PHP API endpoints - processar primeiro
+    @phpapi {
+        path /api/* /user/* /ranking/* /pix/* /monetag/* /admin/* /admin-panel/* /invite/* /history/* /settings/* /withdraw/* /notifications/* /database/* /middleware/* /migrations/* /routes/*
+    }
+    handle @phpapi {
+        php_server
+    }
+    
+    # Arquivos PHP específicos
+    @phpfile path *.php
+    handle @phpfile {
+        php_server
+    }
+    
+    # SPA - todas as outras rotas vão para o index.html do React
+    handle {
         root * /app/public
         try_files {path} /index.html
         file_server
-    }
-    
-    # PHP API endpoints
-    handle {
-        php_server
     }
     
     # Configuração CORS
     header {
         Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Device-ID, X-Timestamp, X-Signature, X-Proof-Of-Work, X-Challenge, X-Response, X-Request-ID, X-Client-Nonce, X-App-Version, X-Platform, X-Platform-Version, X-Device-Model, X-Session-ID, X-Device-Fingerprint, X-Body-Hash, X-Headers-Hash, X-Full-Request-Hash, X-Encryption-Version, X-Key-Window, X-Security-Level, X-Cipher-Algorithm, X-HMAC-Algorithm, X-API-Version, X-Client-Type, X-User-Agent-Hash, X-Origin-Validation, X-Access-Token-Hash, X-Request-Window, X-Nonce-Signature, X-Rate-Limit-Key, X-Request-Priority, X-Challenge-Response, X-Request-Sequence, X-Request-Timestamp"
+        Access-Control-Allow-Headers "*"
         Access-Control-Allow-Credentials "true"
         Access-Control-Max-Age "86400"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "SAMEORIGIN"
     }
     
-    # Responder a requisições OPTIONS (preflight)
-    @options {
-        method OPTIONS
-    }
+    @options method OPTIONS
     respond @options 200
     
-    # Bloquear acesso a arquivos sensíveis
-    @blocked {
-        path *.env *.sql *.log *.bak *.config .git/*
-    }
+    @blocked path *.env *.sql *.log *.bak *.config .git/*
     respond @blocked 403
 }
