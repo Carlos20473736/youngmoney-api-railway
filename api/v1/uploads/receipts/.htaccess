@@ -1,0 +1,17 @@
+# Servir arquivos de imagem diretamente
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Se o arquivo existe, servir diretamente
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^(.*)$ - [L]
+    
+    # Caso contrário, redirecionar para index.php
+    RewriteRule ^(.*)$ index.php [L,QSA]
+</IfModule>
+
+# Permitir acesso a imagens
+<FilesMatch "\.(jpg|jpeg|png|gif|webp)$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
