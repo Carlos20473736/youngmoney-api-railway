@@ -219,11 +219,21 @@ try {
         )
     ");
     
-    // Adicionar coluna required_clicks se não existir
-    $conn->query("
-        ALTER TABLE user_required_impressions 
-        ADD COLUMN IF NOT EXISTS required_clicks INT DEFAULT 1 AFTER required_impressions
-    ");
+    // Adicionar coluna required_clicks se não existir (usando try-catch para ignorar erro se já existir)
+    try {
+        $conn->query("
+            ALTER TABLE user_required_impressions 
+            ADD COLUMN required_clicks INT DEFAULT 1 AFTER required_impressions
+        ");
+    } catch (Exception $e) {
+        // Coluna já existe, ignorar erro
+        error_log("Coluna required_clicks já existe ou erro: " . $e->getMessage());
+    }
+    // Ignorar erro se coluna já existir (MySQL error 1060)
+    if ($conn->errno == 1060) {
+        // Coluna já existe, continuar normalmente
+        error_log("Coluna required_clicks já existe, continuando...");
+    }
     
     // Buscar todos os usuários
     $users_result = $conn->query("SELECT id FROM users");
