@@ -3,7 +3,7 @@
  * MoniTag Progress Endpoint
  * GET - Retorna progresso diário do usuário (SEM AUTENTICAÇÃO)
  * 
- * Agora cada usuário tem seu próprio número de impressões necessárias (5-10)
+ * Agora cada usuário tem seu próprio número de impressões (5-10) e cliques (1-3) necessários
  */
 
 // CORS MUST be first
@@ -40,13 +40,13 @@ $user_id = (int)$user_id;
 try {
     $conn = getDbConnection();
     
-    // Buscar número de impressões necessárias DO USUÁRIO (randomizado por usuário)
+    // Buscar número de impressões e cliques necessários DO USUÁRIO (randomizado por usuário)
     $required_impressions = 5; // valor padrão
-    $required_clicks = 1; // fixo
+    $required_clicks = 1; // valor padrão
     
     // Primeiro, tentar buscar da tabela user_required_impressions
     $user_settings_stmt = $conn->prepare("
-        SELECT required_impressions FROM user_required_impressions 
+        SELECT required_impressions, required_clicks FROM user_required_impressions 
         WHERE user_id = ?
     ");
     $user_settings_stmt->bind_param("i", $user_id);
@@ -56,16 +56,20 @@ try {
     if ($user_row = $user_settings_result->fetch_assoc()) {
         // Usuário tem valor personalizado
         $required_impressions = (int)$user_row['required_impressions'];
+        $required_clicks = (int)($user_row['required_clicks'] ?? 1);
     } else {
-        // Usuário não tem valor ainda, criar um aleatório (5-10)
+        // Usuário não tem valor ainda, criar um aleatório (impressões: 5-10, cliques: 1-3)
         $required_impressions = rand(5, 10);
+        $required_clicks = rand(1, 3);
         
         $insert_stmt = $conn->prepare("
-            INSERT INTO user_required_impressions (user_id, required_impressions)
-            VALUES (?, ?)
-            ON DUPLICATE KEY UPDATE required_impressions = VALUES(required_impressions)
+            INSERT INTO user_required_impressions (user_id, required_impressions, required_clicks)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE 
+                required_impressions = VALUES(required_impressions),
+                required_clicks = VALUES(required_clicks)
         ");
-        $insert_stmt->bind_param("ii", $user_id, $required_impressions);
+        $insert_stmt->bind_param("iii", $user_id, $required_impressions, $required_clicks);
         $insert_stmt->execute();
         $insert_stmt->close();
     }

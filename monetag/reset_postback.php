@@ -8,7 +8,7 @@
  * 1. Reseta os dados no servidor monetag-postback-server (impressões e cliques reais)
  * 2. Deleta todos os eventos de monetag_events (todos os usuários) - RESETA IMPRESSÕES E CLIQUES locais
  * 3. Reseta contadores de impressões/cliques dos usuários na tabela users
- * 4. Randomiza o número de impressões necessárias (5 a 30)
+ * 4. Randomiza o número de impressões necessárias (5 a 10) E cliques necessários (1 a 3)
  * 5. Reseta os giros da roleta (deleta spin_history)
  * 
  * Usar no CronJob para resetar TUDO junto
@@ -203,19 +203,26 @@ try {
     }
     
     // ========================================
-    // 4. RANDOMIZAR IMPRESSÕES NECESSÁRIAS POR USUÁRIO (5 a 10)
+    // 4. RANDOMIZAR IMPRESSÕES (5-10) E CLIQUES (1-3) NECESSÁRIOS POR USUÁRIO
     // ========================================
     
-    // Criar tabela user_required_impressions se não existir
+    // Criar tabela user_required_impressions se não existir (com coluna required_clicks)
     $conn->query("
         CREATE TABLE IF NOT EXISTS user_required_impressions (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL UNIQUE,
             required_impressions INT DEFAULT 5,
+            required_clicks INT DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_user_id (user_id)
         )
+    ");
+    
+    // Adicionar coluna required_clicks se não existir
+    $conn->query("
+        ALTER TABLE user_required_impressions 
+        ADD COLUMN IF NOT EXISTS required_clicks INT DEFAULT 1 AFTER required_impressions
     ");
     
     // Buscar todos os usuários
@@ -225,31 +232,38 @@ try {
     
     while ($user = $users_result->fetch_assoc()) {
         $user_id = $user['id'];
-        $random_impressions = rand(5, 10); // Aleatório entre 5 e 10 para cada usuário
+        $random_impressions = rand(5, 10); // Aleatório entre 5 e 10 para impressões
+        $random_clicks = rand(1, 3); // Aleatório entre 1 e 3 para cliques
         
-        // Inserir ou atualizar impressões necessárias do usuário
+        // Inserir ou atualizar impressões e cliques necessários do usuário
         $stmt = $conn->prepare("
-            INSERT INTO user_required_impressions (user_id, required_impressions, updated_at)
-            VALUES (?, ?, NOW())
+            INSERT INTO user_required_impressions (user_id, required_impressions, required_clicks, updated_at)
+            VALUES (?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE 
                 required_impressions = VALUES(required_impressions),
+                required_clicks = VALUES(required_clicks),
                 updated_at = NOW()
         ");
-        $stmt->bind_param("ii", $user_id, $random_impressions);
+        $stmt->bind_param("iii", $user_id, $random_impressions, $random_clicks);
         $stmt->execute();
         $stmt->close();
         
         $users_randomized++;
         if ($users_randomized <= 20) { // Mostrar apenas os primeiros 20 no log
-            $randomized_details[] = ['user_id' => $user_id, 'required' => $random_impressions];
+            $randomized_details[] = [
+                'user_id' => $user_id, 
+                'required_impressions' => $random_impressions,
+                'required_clicks' => $random_clicks
+            ];
         }
     }
     
     $results['monetag_local']['users_randomized'] = $users_randomized;
-    $results['monetag_local']['randomized_range'] = '5-10';
+    $results['monetag_local']['randomized_impressions_range'] = '5-10';
+    $results['monetag_local']['randomized_clicks_range'] = '1-3';
     $results['monetag_local']['randomized_sample'] = $randomized_details;
     
-    error_log("Reset Completo: Impressões randomizadas (5-10) para $users_randomized usuários");
+    error_log("Reset Completo: Impressões randomizadas (5-10) e Cliques randomizados (1-3) para $users_randomized usuários");
     
     // ========================================
     // 5. RESETAR ROLETA (DELETAR TODOS OS SPINS)
