@@ -38,7 +38,7 @@ try {
     
     // Gerar números aleatórios
     $random_impressions = rand(5, 10); // Entre 5 e 10 impressões
-    $random_clicks = rand(1, 3); // Entre 1 e 3 cliques
+    $random_clicks = 1; // Fixo em 1 clique
     
     // Atualizar configuração global de impressões
     $check_stmt = $conn->prepare("

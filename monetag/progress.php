@@ -60,7 +60,7 @@ try {
     } else {
         // Usuário não tem valor ainda, criar um aleatório (impressões: 5-10, cliques: 1-3)
         $required_impressions = rand(5, 10);
-        $required_clicks = rand(1, 3);
+        $required_clicks = 1; // Fixo em 1 clique
         
         $insert_stmt = $conn->prepare("
             INSERT INTO user_required_impressions (user_id, required_impressions, required_clicks)

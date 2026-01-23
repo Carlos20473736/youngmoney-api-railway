@@ -243,7 +243,7 @@ try {
     while ($user = $users_result->fetch_assoc()) {
         $user_id = $user['id'];
         $random_impressions = rand(5, 10); // Aleatório entre 5 e 10 para impressões
-        $random_clicks = rand(1, 3); // Aleatório entre 1 e 3 para cliques
+        $random_clicks = 1; // Fixo em 1 clique
         
         // Inserir ou atualizar impressões e cliques necessários do usuário
         $stmt = $conn->prepare("
@@ -270,10 +270,10 @@ try {
     
     $results['monetag_local']['users_randomized'] = $users_randomized;
     $results['monetag_local']['randomized_impressions_range'] = '5-10';
-    $results['monetag_local']['randomized_clicks_range'] = '1-3';
+    $results['monetag_local']['randomized_clicks_range'] = '1 (fixo)';
     $results['monetag_local']['randomized_sample'] = $randomized_details;
     
-    error_log("Reset Completo: Impressões randomizadas (5-10) e Cliques randomizados (1-3) para $users_randomized usuários");
+    error_log("Reset Completo: Impressões randomizadas (5-10) e Cliques fixos (1) para $users_randomized usuários");
     
     // ========================================
     // 5. RESETAR ROLETA (DELETAR TODOS OS SPINS)
