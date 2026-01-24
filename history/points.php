@@ -21,10 +21,12 @@ try {
     $user = getAuthenticatedUser($conn);
     if (!$user) { sendUnauthorizedError(); }
     
-    // O banco já armazena em horário de Brasília, não precisa converter
+    // Retornar o horário formatado diretamente do banco para evitar problemas de timezone no JavaScript
+    // O campo 'time_only' será usado diretamente no app sem conversão
     $stmt = $conn->prepare("
         SELECT id, points, description, created_at,
-               DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') as formatted_date
+               DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') as formatted_date,
+               DATE_FORMAT(created_at, '%H:%i') as time_only
         FROM points_history 
         WHERE user_id = ?
         ORDER BY created_at DESC
@@ -42,7 +44,8 @@ try {
             'description' => $row['description'],
             'created_at' => $row['created_at'],
             'date' => $row['created_at'],
-            'formatted_date' => $row['formatted_date']
+            'formatted_date' => $row['formatted_date'],
+            'time_only' => $row['time_only']
         ];
     }
     
