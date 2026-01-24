@@ -9,14 +9,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 require_once __DIR__ . '/../database.php';
 require_once __DIR__ . '/../includes/auth_helper.php';
 
+// Configurar timezone para Brasília
+date_default_timezone_set('America/Sao_Paulo');
+
 try {
     $conn = getDbConnection();
+    
+    // Configurar timezone no MySQL também
+    $conn->query("SET time_zone = '-03:00'");
+    
     $user = getAuthenticatedUser($conn);
     if (!$user) { sendUnauthorizedError(); }
     
     $stmt = $conn->prepare("
         SELECT id, points, description, created_at,
-               DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') as formatted_date
+               DATE_FORMAT(CONVERT_TZ(created_at, '+00:00', '-03:00'), '%d/%m/%Y %H:%i') as formatted_date,
+               CONVERT_TZ(created_at, '+00:00', '-03:00') as date
         FROM points_history 
         WHERE user_id = ?
         ORDER BY created_at DESC
@@ -32,7 +40,8 @@ try {
             'id' => (int)$row['id'],
             'points' => (int)$row['points'],
             'description' => $row['description'],
-            'created_at' => $row['created_at'],
+            'created_at' => $row['date'],
+            'date' => $row['date'],
             'formatted_date' => $row['formatted_date']
         ];
     }
