@@ -1,15 +1,13 @@
 <?php
 /**
- * API de Reset da Rouleta Agendada
+ * API de Reset da Rouleta
  * 
- * Endpoint: POST /api/v1/reset/roulette_scheduled.php
+ * Endpoint: GET/POST /api/v1/reset/roulette_scheduled.php
  * 
- * Função: Reseta os giros da rouleta baseado na hora configurada no painel ADM
+ * Função: Reseta os giros da rouleta IMEDIATAMENTE ao ser chamado
  * 
  * Lógica:
- * - Lê a hora de reset configurada em system_settings (reset_time)
- * - Verifica se é a hora certa para resetar
- * - Deleta registros de spin_history do dia anterior
+ * - Deleta TODOS os registros de spin_history
  * - Permite que usuários façam novos giros
  * 
  * Segurança:
@@ -79,99 +77,27 @@ try {
     $current_time = date('H:i:s');
     $current_datetime = date('Y-m-d H:i:s');
     
-    // Buscar hora de reset configurada no painel ADM
-    $stmt = $conn->prepare("
-        SELECT setting_value 
-        FROM system_settings 
-        WHERE setting_key = 'reset_time' 
-        LIMIT 1
-    ");
-    
-    if (!$stmt) {
-        throw new Exception("Prepare failed: " . $conn->error);
-    }
-    
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    $reset_time = $row['setting_value'] ?? '00:00:00';
-    $stmt->close();
-    
-    // Verificar se é a hora certa para resetar (com margem de 1 minuto)
-    $reset_hour = substr($reset_time, 0, 2);
-    $reset_minute = substr($reset_time, 3, 2);
-    $current_hour = date('H');
-    $current_minute = date('i');
-    
-    $is_reset_time = ($current_hour === $reset_hour && $current_minute === $reset_minute);
-    
-    // SE NAO FOR A HORA CERTA, RETORNAR SEM FAZER RESET
-    if (!$is_reset_time) {
-        echo json_encode([
-            'success' => true,
-            'message' => 'Reset agendado, mas ainda nao eh a hora certa',
-            'data' => [
-                'reset_type' => 'roulette_scheduled',
-                'description' => 'Reset nao foi executado - aguardando horario configurado',
-                'reset_time_configured' => $reset_time,
-                'is_reset_time' => false,
-                'current_time' => $current_time,
-                'spins_deleted' => 0,
-                'reset_date' => $current_date,
-                'reset_datetime' => $current_datetime,
-                'timezone' => 'America/Sao_Paulo (GMT-3)',
-                'timestamp' => time()
-            ]
-        ], JSON_UNESCAPED_UNICODE);
-        $conn->close();
-        exit;
-    }
-    
-    // Iniciar transacao
+    // Iniciar transação
+    $conn->begin_transaction();
     
     try {
         // Contar quantos registros de spin serão deletados
-        $stmt = $conn->prepare("
-            SELECT COUNT(*) as total 
-            FROM spin_history 
-            WHERE DATE(created_at) < ?
-        ");
-        
-        if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
-        }
-        
-        $yesterday = date('Y-m-d', strtotime('-1 day'));
-        $stmt->bind_param("s", $yesterday);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        $result = $conn->query("SELECT COUNT(*) as total FROM spin_history");
         $row = $result->fetch_assoc();
         $spinsDeleted = $row['total'] ?? 0;
-        $stmt->close();
         
-        // Deletar registros de spin anteriores a hoje
-        $stmt = $conn->prepare("
-            DELETE FROM spin_history 
-            WHERE DATE(created_at) < ?
-        ");
+        // Deletar TODOS os registros de spin (reset completo)
+        $deleteResult = $conn->query("DELETE FROM spin_history");
         
-        if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
+        if (!$deleteResult) {
+            throw new Exception("Delete failed: " . $conn->error);
         }
-        
-        $stmt->bind_param("s", $current_date);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Execute failed: " . $stmt->error);
-        }
-        
-        $stmt->close();
         
         // Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO spin_reset_logs 
-            (spins_deleted, reset_datetime) 
-            VALUES (?, NOW())
+            (spins_deleted, reset_datetime, triggered_by) 
+            VALUES (?, NOW(), 'api_roulette_scheduled')
         ");
         
         if ($stmt) {
@@ -188,11 +114,8 @@ try {
             'success' => true,
             'message' => 'Reset da rouleta executado com sucesso!',
             'data' => [
-                'reset_type' => 'roulette_scheduled',
-                'description' => 'Giros anteriores foram deletados',
-                'reset_time_configured' => $reset_time,
-                'is_reset_time' => $is_reset_time,
-                'current_time' => $current_time,
+                'reset_type' => 'roulette_immediate',
+                'description' => 'Todos os giros foram deletados',
                 'spins_deleted' => $spinsDeleted,
                 'reset_date' => $current_date,
                 'reset_datetime' => $current_datetime,
