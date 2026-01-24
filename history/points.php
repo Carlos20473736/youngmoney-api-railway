@@ -21,13 +21,11 @@ try {
     $user = getAuthenticatedUser($conn);
     if (!$user) { sendUnauthorizedError(); }
     
-    // Converter de UTC para Brasília adicionando 3 horas
-    // O banco está em UTC, então usamos DATE_ADD para adicionar 3 horas
+    // Retornar o horário formatado diretamente do banco
     $stmt = $conn->prepare("
         SELECT id, points, description, created_at,
-               DATE_FORMAT(DATE_ADD(created_at, INTERVAL 3 HOUR), '%d/%m/%Y %H:%i') as formatted_date,
-               DATE_FORMAT(DATE_ADD(created_at, INTERVAL 3 HOUR), '%H:%i') as time_only,
-               DATE_ADD(created_at, INTERVAL 3 HOUR) as date
+               DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') as formatted_date,
+               DATE_FORMAT(created_at, '%H:%i') as time_only
         FROM points_history 
         WHERE user_id = ?
         ORDER BY created_at DESC
@@ -43,8 +41,8 @@ try {
             'id' => (int)$row['id'],
             'points' => (int)$row['points'],
             'description' => $row['description'],
-            'created_at' => $row['date'],
-            'date' => $row['date'],
+            'created_at' => $row['created_at'],
+            'date' => $row['created_at'],
             'formatted_date' => $row['formatted_date'],
             'time_only' => $row['time_only']
         ];
