@@ -56,7 +56,7 @@ try {
             user_id INT NOT NULL,
             position INT NOT NULL COMMENT 'Posição no ranking quando ganhou',
             prize_amount DECIMAL(10,2) NOT NULL COMMENT 'Valor do prêmio recebido',
-            cooldown_days INT NOT NULL COMMENT 'Dias de cooldown (1 ou 2)',
+            cooldown_days INT NOT NULL COMMENT 'Horas de cooldown (24 ou 2)',
             cooldown_until DATETIME NOT NULL COMMENT 'Data/hora até quando está bloqueado',
             reset_date DATE NOT NULL COMMENT 'Data do reset que gerou o cooldown',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

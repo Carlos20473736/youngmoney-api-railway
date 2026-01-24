@@ -6,8 +6,8 @@
  * CORRIGIDO: Agora cria cooldowns para os vencedores
  * 
  * Sistema de Cooldown:
- * - Top 1, 2, 3: 2 dias de cooldown
- * - Top 4 a 10: 1 dia de cooldown
+ * - Top 1, 2, 3: 24 HORAS de cooldown
+ * - Top 4 a 10: 2 HORAS de cooldown
  */
 
 require_once __DIR__ . '/../../admin/cors.php';

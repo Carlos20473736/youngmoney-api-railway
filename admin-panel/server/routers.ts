@@ -219,6 +219,7 @@ export const appRouter = router({
 
   // ============= RANKING =============
   ranking: router({
+    // Lista todos os usuários (para visualização geral)
     list: adminProcedure
       .input(z.object({
         limit: z.number().optional().default(10000),
@@ -226,6 +227,23 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const ranking = await railwayDb.getRailwayRanking(input.limit);
         return ranking;
+      }),
+
+    // Lista ranking REAL (com filtro de cooldown) - para pagamentos
+    listWithCooldown: adminProcedure
+      .input(z.object({
+        limit: z.number().optional().default(10),
+      }))
+      .query(async ({ input }) => {
+        const ranking = await railwayDb.getRailwayRankingWithCooldown(input.limit);
+        return ranking;
+      }),
+
+    // Lista cooldowns ativos
+    activeCooldowns: adminProcedure
+      .query(async () => {
+        const cooldowns = await railwayDb.getActiveCooldowns();
+        return cooldowns;
       }),
 
     updateDailyPoints: adminProcedure

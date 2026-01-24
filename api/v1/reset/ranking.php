@@ -126,19 +126,19 @@ try {
             10 => 1.00
         ];
         
-        // Dias de cooldown por posição
-        // Top 1-3: 2 dias | Top 4-10: 1 dia
-        $cooldownDays = [
-            1 => 2,
-            2 => 2,
-            3 => 2,
-            4 => 1,
-            5 => 1,
-            6 => 1,
-            7 => 1,
-            8 => 1,
-            9 => 1,
-            10 => 1
+        // HORAS de cooldown por posição
+        // Top 1-3: 24 horas | Top 4-10: 2 horas
+        $cooldownHours = [
+            1 => 24,
+            2 => 24,
+            3 => 24,
+            4 => 2,
+            5 => 2,
+            6 => 2,
+            7 => 2,
+            8 => 2,
+            9 => 2,
+            10 => 2
         ];
         
         // Buscar top 10 do ranking com suas chaves PIX (agora na tabela users)
@@ -178,7 +178,7 @@ try {
         while ($row = $result->fetch_assoc()) {
             $user_id = $row['user_id'];
             $amount = $payment_values[$position] ?? 1.00;
-            $userCooldownDays = $cooldownDays[$position] ?? 1;
+            $userCooldownHours = $cooldownHours[$position] ?? 2;
             
             $top_10_users[] = [
                 'position' => $position,
@@ -189,7 +189,7 @@ try {
                 'pix_key_type' => $row['pix_key_type'],
                 'pix_key' => $row['pix_key'],
                 'payment_amount' => $amount,
-                'cooldown_days' => $userCooldownDays
+                'cooldown_hours' => $userCooldownHours
             ];
             
             // PASSO 2: Criar registro de pagamento pendente na tabela WITHDRAWALS
@@ -225,7 +225,8 @@ try {
             // ============================================
             // PASSO 3: REGISTRAR COOLDOWN PARA O VENCEDOR
             // ============================================
-            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownDays} days"));
+            // Cooldown em HORAS: Top 1-3 = 24h, Top 4-10 = 2h
+            $cooldownUntil = date('Y-m-d H:i:s', strtotime("+{$userCooldownHours} hours"));
             
             $stmt_cooldown = $conn->prepare("
                 INSERT INTO ranking_cooldowns 
@@ -241,7 +242,7 @@ try {
                 $user_id, 
                 $position, 
                 $amount, 
-                $userCooldownDays, 
+                $userCooldownHours, 
                 $cooldownUntil, 
                 $current_date
             );
@@ -256,7 +257,7 @@ try {
                 'user_id' => $user_id,
                 'name' => $row['name'],
                 'position' => $position,
-                'cooldown_days' => $userCooldownDays,
+                'cooldown_hours' => $userCooldownHours,
                 'cooldown_until' => $cooldownUntil
             ];
             

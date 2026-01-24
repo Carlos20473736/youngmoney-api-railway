@@ -221,6 +221,7 @@ export async function getRailwayReferrals(limit = 100) {
 
 // ============= RANKING =============
 
+// Buscar ranking SEM filtro de cooldown (para visualização no admin)
 export async function getRailwayRanking(limit = 10000) {
   try {
     const rows = await executeRawQuery(
@@ -233,6 +234,49 @@ export async function getRailwayRanking(limit = 10000) {
     return rows;
   } catch (error) {
     console.warn("[Railway DB] Error fetching ranking:", error);
+    return [];
+  }
+}
+
+// Buscar ranking COM filtro de cooldown (ranking real para pagamentos)
+// Exclui usuários em período de cooldown ativo
+export async function getRailwayRankingWithCooldown(limit = 10) {
+  try {
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const rows = await executeRawQuery(
+      `SELECT u.id, u.name, u.email, u.points, u.daily_points, u.balance, u.photo_url, u.profile_picture, u.pix_key, u.pix_key_type
+       FROM users u
+       LEFT JOIN ranking_cooldowns rc ON u.id = rc.user_id AND rc.cooldown_until > ?
+       WHERE u.daily_points > 0 
+         AND u.pix_key IS NOT NULL 
+         AND u.pix_key != ''
+         AND rc.id IS NULL
+       ORDER BY u.daily_points DESC, u.created_at ASC
+       LIMIT ?`,
+      [now, limit]
+    );
+    return rows;
+  } catch (error) {
+    console.warn("[Railway DB] Error fetching ranking with cooldown:", error);
+    return [];
+  }
+}
+
+// Verificar cooldowns ativos
+export async function getActiveCooldowns() {
+  try {
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const rows = await executeRawQuery(
+      `SELECT rc.*, u.name, u.email 
+       FROM ranking_cooldowns rc
+       JOIN users u ON rc.user_id = u.id
+       WHERE rc.cooldown_until > ?
+       ORDER BY rc.cooldown_until DESC`,
+      [now]
+    );
+    return rows;
+  } catch (error) {
+    console.warn("[Railway DB] Error fetching active cooldowns:", error);
     return [];
   }
 }
