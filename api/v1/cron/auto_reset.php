@@ -3,7 +3,7 @@
  * Endpoint de Reset Automático Diário - VERSÃO CORRIGIDA
  * 
  * Este endpoint é chamado pelo cron-job.org a cada minuto.
- * Reseta às 00:00 (meia-noite) horário de Brasília:
+ * Reseta às 23:50 horário de Brasília:
  * 
  * 1. Ranking (daily_points = 0) - APENAS TOP 10
  * 2. Spin (DELETE registros de HOJE)
@@ -52,11 +52,12 @@ try {
     $current_minute = (int)date('i');
     
     // ============================================
-    // HORÁRIO DE RESET: 00:00 - 00:05 (janela de 5 minutos)
+    // HORÁRIO DE RESET: 23:50 - 23:55 (janela de 5 minutos)
     // ============================================
-    $reset_hour = 0;      // meia-noite
-    $reset_window = 5;    // janela de 5 minutos (00:00 até 00:04)
-    $reset_time = '00:00';
+    $reset_hour = 23;     // 23 horas
+    $reset_window = 5;    // janela de 5 minutos (23:50 até 23:54)
+    $reset_minute_start = 50; // minuto inicial
+    $reset_time = '23:50';
     
     // Buscar último horário de reset
     $stmt = $mysqli->prepare("
@@ -74,7 +75,7 @@ try {
     // VERIFICAÇÃO DE HORÁRIO - CORRIGIDO v2.0
     // ============================================
     // Só executa o reset se:
-    // 1. Estiver dentro da janela de reset (00:00 - 00:05)
+    // 1. Estiver dentro da janela de reset (23:50 - 23:55)
     // 2. O último reset foi em um dia ANTERIOR ao atual
     
     $should_reset = false;
@@ -90,9 +91,9 @@ try {
     // Isso garante que o reset aconteça mesmo se o cron atrasar
     $already_reset_today = ($last_reset_date === $current_date);
     
-    // CORREÇÃO: Janela de tempo expandida (00:00 até 00:04)
+    // CORREÇÃO: Janela de tempo expandida (23:50 até 23:54)
     // Isso dá 5 minutos de margem para o cron executar
-    $is_reset_window = ($current_hour === $reset_hour && $current_minute < $reset_window);
+    $is_reset_window = ($current_hour === $reset_hour && $current_minute >= $reset_minute_start && $current_minute < ($reset_minute_start + $reset_window));
     
     // NOVA VERIFICAÇÃO: Se passou da meia-noite e ainda não resetou hoje
     // Isso cobre casos onde o cron falhou na janela normal
@@ -102,16 +103,16 @@ try {
         $should_reset = false;
         $reason = 'Reset já foi executado hoje às ' . date('H:i:s', strtotime($last_reset_time));
     } elseif ($is_reset_window) {
-        // Dentro da janela normal de reset (00:00 - 00:04)
+        // Dentro da janela normal de reset (23:50 - 23:54)
         $should_reset = true;
-        $reason = 'Dentro da janela de reset (00:00-00:05) e ainda não foi executado hoje';
-    } elseif ($missed_reset && $current_hour < 6) {
-        // Reset perdido - executar até às 06:00 como fallback
+        $reason = 'Dentro da janela de reset (23:50-23:55) e ainda não foi executado hoje';
+    } elseif ($missed_reset && ($current_hour >= 23 || $current_hour < 6)) {
+        // Reset perdido - executar como fallback (após 23h ou até 06:00)
         $should_reset = true;
         $reason = 'Reset de recuperação - último reset foi em ' . ($last_reset_date ?? 'nunca') . ', executando agora';
     } else {
         $should_reset = false;
-        $reason = 'Fora da janela de reset. Horário atual: ' . $current_time . '. Reset programado para: ' . $reset_time . ' (janela até 00:05 ou fallback até 06:00)';
+        $reason = 'Fora da janela de reset. Horário atual: ' . $current_time . '. Reset programado para: ' . $reset_time . ' (janela até 23:55 ou fallback até 06:00)';
     }
     
     // ============================================
