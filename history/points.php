@@ -15,16 +15,16 @@ date_default_timezone_set('America/Sao_Paulo');
 try {
     $conn = getDbConnection();
     
-    // Configurar timezone no MySQL também
+    // Configurar timezone no MySQL para Brasília
     $conn->query("SET time_zone = '-03:00'");
     
     $user = getAuthenticatedUser($conn);
     if (!$user) { sendUnauthorizedError(); }
     
+    // O banco já armazena em horário de Brasília, não precisa converter
     $stmt = $conn->prepare("
         SELECT id, points, description, created_at,
-               DATE_FORMAT(CONVERT_TZ(created_at, '+00:00', '-03:00'), '%d/%m/%Y %H:%i') as formatted_date,
-               CONVERT_TZ(created_at, '+00:00', '-03:00') as date
+               DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') as formatted_date
         FROM points_history 
         WHERE user_id = ?
         ORDER BY created_at DESC
@@ -40,8 +40,8 @@ try {
             'id' => (int)$row['id'],
             'points' => (int)$row['points'],
             'description' => $row['description'],
-            'created_at' => $row['date'],
-            'date' => $row['date'],
+            'created_at' => $row['created_at'],
+            'date' => $row['created_at'],
             'formatted_date' => $row['formatted_date']
         ];
     }
