@@ -269,7 +269,7 @@ try {
     }
     
     $results['monetag_local']['users_randomized'] = $users_randomized;
-    $results['monetag_local']['randomized_impressions_range' => '5-25';
+    $results['monetag_local']['randomized_impressions_range'] = '5-25';
     $results['monetag_local']['randomized_clicks_range'] = '1 (fixo)';
     $results['monetag_local']['randomized_sample'] = $randomized_details;
     
