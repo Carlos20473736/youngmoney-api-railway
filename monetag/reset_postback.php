@@ -203,7 +203,7 @@ try {
     }
     
     // ========================================
-    // 4. RANDOMIZAR IMPRESSÕES (5-10) E CLIQUES (1-3) NECESSÁRIOS POR USUÁRIO
+    // 4. RANDOMIZAR IMPRESSÕES (5-25) E CLIQUES (1-3) NECESSÁRIOS POR USUÁRIO
     // ========================================
     
     // Criar tabela user_required_impressions se não existir (com coluna required_clicks)
@@ -242,7 +242,7 @@ try {
     
     while ($user = $users_result->fetch_assoc()) {
         $user_id = $user['id'];
-        $random_impressions = rand(5, 10); // Aleatório entre 5 e 10 para impressões
+        $random_impressions = rand(5, 25); // Aleatório entre 5 e 25 para impressões
         $random_clicks = 1; // Fixo em 1 clique
         
         // Inserir ou atualizar impressões e cliques necessários do usuário
@@ -269,11 +269,11 @@ try {
     }
     
     $results['monetag_local']['users_randomized'] = $users_randomized;
-    $results['monetag_local']['randomized_impressions_range'] = '5-10';
+    $results['monetag_local']['randomized_impressions_range' => '5-25';
     $results['monetag_local']['randomized_clicks_range'] = '1 (fixo)';
     $results['monetag_local']['randomized_sample'] = $randomized_details;
     
-    error_log("Reset Completo: Impressões randomizadas (5-10) e Cliques fixos (1) para $users_randomized usuários");
+    error_log("Reset Completo: Impressões randomizadas (5-25) e Cliques fixos (1) para $users_randomized usuários");
     
     // ========================================
     // 5. RESETAR ROLETA (DELETAR TODOS OS SPINS)
