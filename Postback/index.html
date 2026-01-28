@@ -1600,15 +1600,44 @@
     }
 
     function goBack() {
-        console.log('[BACK] Botão voltar clicado');
-        if (window.Android && window.Android.closeActivity) {
-            window.Android.closeActivity();
-        } else if (window.history.length > 1) {
-            window.history.back();
-        } else {
-            console.log('[BACK] Nenhuma ação de voltar disponível');
-        }
+        console.log('[BACK] Botão voltar clicado - Redirecionando para o app');
+        
+        // Tentar abrir o app Young Money via intent
+        const appUrl = 'intent://youngmoney/#Intent;scheme=youngmoney;package=com.youngmoney2;end';
+        
+        // Primeiro tenta abrir via intent (funciona no Chrome Android)
+        window.location.href = appUrl;
+        
+        // Fallback: se não abrir em 500ms, tenta outras opções
+        setTimeout(() => {
+            if (window.Android && window.Android.closeActivity) {
+                window.Android.closeActivity();
+            } else if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                // Tenta fechar a aba/janela
+                window.close();
+            }
+        }, 500);
     }
+
+    // ========================================
+    // REFRESH AUTOMÁTICO AO VOLTAR PARA A TELA
+    // ========================================
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            console.log('[VISIBILITY] 🔄 Página ficou visível - Atualizando dados...');
+            fetchStats();
+            fetchRequiredImpressions();
+        }
+    });
+
+    // Também atualiza quando a janela ganha foco
+    window.addEventListener('focus', function() {
+        console.log('[FOCUS] 🔄 Janela ganhou foco - Atualizando dados...');
+        fetchStats();
+        fetchRequiredImpressions();
+    });
 
     function updateUI() {
         // Contadores (valores grandes nos boxes)
