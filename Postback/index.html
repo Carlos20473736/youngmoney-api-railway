@@ -1656,6 +1656,12 @@
     });
 
     function updateUI() {
+        // SÓ atualizar valores se a API já carregou
+        if (!TaskState.requiredImpressionsLoaded) {
+            // Manter spinners - não fazer nada
+            return;
+        }
+        
         // Contadores (valores grandes nos boxes)
         document.getElementById('statImpressions').textContent = TaskState.impressions;
         document.getElementById('statClicks').textContent = TaskState.clicks;
@@ -1690,6 +1696,7 @@
             showStatus('<i class="fas fa-check-circle"></i> Parabéns! Tarefa concluída. Volte para girar a roleta!', 'success');
         } else {
             hideStatus();
+            // Só mostrar botão se API já carregou
             button.style.display = 'flex';
             button.disabled = TaskState.isLoading || TaskState.isProcessing;
 
