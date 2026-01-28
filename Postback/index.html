@@ -1155,25 +1155,24 @@
     // ========================================
     // INTERCEPTADORES DE REDE DO MONETAG
     // Captura as requisições do SDK para detectar impressões e cliques
+    // Método: Interceptar postbacks que o Monetag envia para a URL configurada
     // ========================================
     
-    const MONETAG_DOMAINS = ['rtmark.net', 'ill3.com', 'libtl.com', 'monetag.com', 'adsco.re'];
-    
-    function isMonetag(url) {
-        return MONETAG_DOMAINS.some(domain => url.includes(domain));
-    }
-    
-    function detectPostbackType(url) {
-        const urlLower = url.toLowerCase();
-        // Detectar clique
-        if (urlLower.includes('click') || urlLower.includes('clk') || urlLower.includes('conversion')) {
+    // Função para detectar tipo de evento baseado na URL
+    function detectEventType(url) {
+        if (url.includes('event_type=click') || url.includes('event_type%3Dclick')) {
             return 'click';
         }
-        // Detectar impressão
-        if (urlLower.includes('impression') || urlLower.includes('imp') || urlLower.includes('view') || urlLower.includes('show')) {
+        if (url.includes('event_type=impression') || url.includes('event_type%3Dimpression')) {
             return 'impression';
         }
         return null;
+    }
+    
+    // Função para verificar se é um postback do Monetag (contém {ymid} não substituído)
+    function isMonetagPostback(url) {
+        return (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server')) && 
+               (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
     }
     
     async function sendPostbackToServer(type) {
@@ -1193,72 +1192,88 @@
         if (type === 'impression') TaskState.lastImpressionSent = now;
         if (type === 'click') TaskState.lastClickSent = now;
         
-        const url = `${YOUNGMONEY_API}/monetag/postback.php?type=${type}&user_id=${TaskState.userId}`;
+        console.log(`[INTERCEPTOR] 🎯 ${type.toUpperCase()} DETECTADO!`);
+        
+        // Enviar para o servidor de postback principal
+        const params = new URLSearchParams({
+            event_type: type,
+            zone_id: ZONE_ID,
+            ymid: TaskState.userId,
+            user_email: TaskState.userEmail || 'unknown',
+            estimated_price: type === 'click' ? '0.0045' : '0.0023'
+        });
+        
+        const url = `${POSTBACK_URL}?${params.toString()}`;
         console.log(`[INTERCEPTOR] 📤 Enviando ${type} para:`, url);
         
         try {
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
             const data = await response.json();
             console.log(`[INTERCEPTOR] ✅ ${type} registrado:`, data);
-            fetchStats();
+            setTimeout(() => fetchStats(), 500);
         } catch (err) {
             console.error(`[INTERCEPTOR] ❌ Erro ao enviar ${type}:`, err);
         }
     }
     
-    // Interceptar fetch
+    // Interceptar fetch - detectar postbacks do Monetag
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
         const url = args[0]?.url || args[0] || '';
-        if (isMonetag(url)) {
-            console.log('[INTERCEPTOR] Fetch Monetag detectado:', url);
-            const type = detectPostbackType(url);
-            if (type) {
-                sendPostbackToServer(type);
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] 🚫 Postback do Monetag interceptado:', url);
+            const eventType = detectEventType(url);
+            if (eventType) {
+                sendPostbackToServer(eventType);
             }
+            // Bloquear a requisição original e retornar sucesso
+            return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
         }
         return originalFetch.apply(this, args);
     };
     
-    // Interceptar XMLHttpRequest
+    // Interceptar XMLHttpRequest - detectar postbacks do Monetag
     const originalXHROpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-        if (isMonetag(url)) {
-            console.log('[INTERCEPTOR] XHR Monetag detectado:', url);
-            const type = detectPostbackType(url);
-            if (type) {
-                sendPostbackToServer(type);
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] 🚫 XHR Postback do Monetag interceptado:', url);
+            const eventType = detectEventType(url);
+            if (eventType) {
+                sendPostbackToServer(eventType);
             }
+            // Redirecionar para about:blank para bloquear
+            return originalXHROpen.call(this, method, 'about:blank', ...rest);
         }
         return originalXHROpen.call(this, method, url, ...rest);
     };
     
-    // Interceptar Image (pixel tracking)
+    // Interceptar Image (pixel tracking) - detectar postbacks do Monetag
     const originalImage = window.Image;
-    window.Image = function(...args) {
-        const img = new originalImage(...args);
-        const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-        
+    window.Image = function() {
+        const img = new originalImage();
+        const originalSrcSetter = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
         Object.defineProperty(img, 'src', {
             set: function(value) {
-                if (isMonetag(value)) {
-                    console.log('[INTERCEPTOR] Image Monetag detectado:', value);
-                    const type = detectPostbackType(value);
-                    if (type) {
-                        sendPostbackToServer(type);
+                if (typeof value === 'string' && isMonetagPostback(value)) {
+                    console.log('[INTERCEPTOR] 🚫 Image Postback do Monetag interceptado:', value);
+                    const eventType = detectEventType(value);
+                    if (eventType) {
+                        sendPostbackToServer(eventType);
                     }
+                    // Não definir o src para bloquear a requisição
+                    return;
                 }
-                originalSrcDescriptor.set.call(this, value);
+                originalSrcSetter.call(this, value);
             },
             get: function() {
-                return originalSrcDescriptor.get.call(this);
+                return this.getAttribute('src');
             }
         });
-        
         return img;
     };
     
-    console.log('[INTERCEPTOR] 🔍 Interceptadores de rede ativados');
+    console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
+    console.log('[INTERCEPTOR] Detectando requisições para youngmoney-api-railway com {ymid}');
 
     async function fetchRequiredImpressions() {
         try {
