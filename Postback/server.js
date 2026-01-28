@@ -36,27 +36,44 @@ const server = http.createServer((req, res) => {
     const fullPath = path.join(__dirname, filePath);
     console.log('Full path:', fullPath);
     
-    // Get file extension
-    const ext = path.extname(fullPath).toLowerCase();
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-    
-    // Check if file exists
+    // Check if path exists
     if (!fs.existsSync(fullPath)) {
         console.log('File not found:', fullPath);
         // Serve index.html for SPA routing
         const indexPath = path.join(__dirname, 'index.html');
-        console.log('Trying index.html at:', indexPath);
-        
         if (fs.existsSync(indexPath)) {
             const content = fs.readFileSync(indexPath);
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(content);
         } else {
             res.writeHead(404);
-            res.end('404 Not Found - index.html not found');
+            res.end('404 Not Found');
         }
         return;
     }
+    
+    // Check if it's a directory
+    const stats = fs.statSync(fullPath);
+    if (stats.isDirectory()) {
+        // Try to serve index.html from the directory
+        const indexInDir = path.join(fullPath, 'index.html');
+        if (fs.existsSync(indexInDir)) {
+            const content = fs.readFileSync(indexInDir);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(content);
+        } else {
+            // Serve main index.html
+            const mainIndex = path.join(__dirname, 'index.html');
+            const content = fs.readFileSync(mainIndex);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(content);
+        }
+        return;
+    }
+    
+    // Get file extension
+    const ext = path.extname(fullPath).toLowerCase();
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
     
     // Read and serve the file
     try {
