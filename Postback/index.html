@@ -1173,6 +1173,10 @@
                 from { opacity: 0; transform: scale(0.95); }
                 to { opacity: 1; transform: scale(1); }
             }
+            @keyframes marquee {
+                0% { transform: translateX(100%); }
+                100% { transform: translateX(-100%); }
+            }
         `;
         document.head.appendChild(style);
         
@@ -1263,53 +1267,27 @@
                     line-height: 1.6;
                 ">Esta página requer autenticação válida para ser acessada.</p>
                 
-                <!-- Divider -->
-                <div style="
-                    width: 100%;
-                    height: 1px;
-                    background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
-                    margin-bottom: 1.5rem;
-                "></div>
-                
-                <!-- Info box -->
-                <div style="
-                    background: rgba(139, 92, 246, 0.08);
-                    border: 1px solid rgba(139, 92, 246, 0.15);
-                    border-radius: 12px;
-                    padding: 1rem 1.25rem;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                ">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
-                        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#8b5cf6" stroke-width="2"/>
-                        <path d="M12 8V12" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"/>
-                        <circle cx="12" cy="16" r="1" fill="#8b5cf6"/>
-                    </svg>
-                    <p style="
-                        margin: 0;
-                        color: #94a3b8;
-                        font-size: 0.875rem;
-                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-                        text-align: left;
-                    ">Acesse pelo aplicativo <span style="color: #8b5cf6; font-weight: 500;">Young Money</span> para continuar</p>
-                </div>
             </div>
             
-            <!-- Logo/Branding -->
+            <!-- Texto animado marquee -->
             <div style="
-                margin-top: 2rem;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                opacity: 0.5;
+                position: absolute;
+                bottom: 40px;
+                left: 0;
+                width: 100%;
+                overflow: hidden;
+                white-space: nowrap;
             ">
-                <span style="
-                    color: #64748b;
-                    font-size: 0.8rem;
+                <div style="
+                    display: inline-block;
+                    animation: marquee 12s linear infinite;
+                    color: #8b5cf6;
+                    font-size: 0.9rem;
                     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-                    letter-spacing: 1px;
-                ">YOUNG MONEY</span>
+                    font-weight: 500;
+                    letter-spacing: 0.5px;
+                    padding: 0 20px;
+                ">⚠️ Esta página requer autenticação válida para ser acessada ⚠️</div>
             </div>
         `;
         
