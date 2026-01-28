@@ -1152,6 +1152,88 @@
     let autoRefreshInterval = null;
 
     // ========================================
+    // TELA DE BLOQUEIO - SEM YMID
+    // ========================================
+    function showBlockedScreen() {
+        // Esconder todo o conteúdo principal
+        document.body.innerHTML = '';
+        
+        // Criar tela de bloqueio
+        const blockedScreen = document.createElement('div');
+        blockedScreen.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #0a0e1a 0%, #0d1225 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+        `;
+        
+        blockedScreen.innerHTML = `
+            <div style="
+                background: linear-gradient(135deg, rgba(20, 25, 45, 0.95) 0%, rgba(13, 18, 37, 0.95) 100%);
+                padding: 2.5rem;
+                border-radius: 1.5rem;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 50px rgba(239, 68, 68, 0.2);
+                text-align: center;
+                max-width: 90%;
+                width: 380px;
+                border: 2px solid rgba(239, 68, 68, 0.5);
+            ">
+                <div style="
+                    width: 5rem;
+                    height: 5rem;
+                    margin: 0 auto 1.5rem;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+                ">
+                    <svg style="width: 2.5rem; height: 2.5rem; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <h2 style="
+                    margin: 0 0 1rem 0;
+                    color: #ef4444;
+                    font-size: 1.5rem;
+                    font-weight: 700;
+                    font-family: 'Rajdhani', sans-serif;
+                ">Acesso Bloqueado</h2>
+                <p style="
+                    margin: 0 0 1.5rem 0;
+                    color: #a0aec0;
+                    font-size: 1rem;
+                    font-family: 'Inter', sans-serif;
+                    line-height: 1.6;
+                ">Não foi possível identificar seu usuário. Por favor, acesse através do aplicativo Young Money.</p>
+                <div style="
+                    background: rgba(239, 68, 68, 0.1);
+                    border: 1px solid rgba(239, 68, 68, 0.3);
+                    border-radius: 0.75rem;
+                    padding: 1rem;
+                ">
+                    <p style="
+                        margin: 0;
+                        color: #ef4444;
+                        font-size: 0.875rem;
+                        font-family: 'Inter', sans-serif;
+                    ">⚠️ Acesso direto não permitido</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(blockedScreen);
+        console.log('[BLOCKED] Tela de bloqueio exibida - sem ymid');
+    }
+
+    // ========================================
     // INTERCEPTADORES DE REDE DO MONETAG
     // Captura as requisições do SDK para detectar impressões e cliques
     // Método: Interceptar postbacks que o Monetag envia para a URL configurada
@@ -1391,10 +1473,10 @@
             }
         }
         
-        // Se não tiver userId, mostrar erro
+        // Se não tiver userId, mostrar tela de bloqueio
         if (!TaskState.userId) {
             console.error('[INIT] ❌ Nenhum ymid fornecido na URL!');
-            alert('Erro: ID do usuário não encontrado. Acesse com ?ymid=SEU_ID');
+            showBlockedScreen();
             return;
         }
 
