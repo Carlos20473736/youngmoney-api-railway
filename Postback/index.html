@@ -826,20 +826,23 @@
         }
 
         // ========================================
-        // OVERLAY PERMANENTE - BLOQUEIO DE CLIQUES (PONCHIBEC)
+        // OVERLAY AUTOMÁTICO COM CONTADOR - REINICIA A PÁGINA
         // Aparece quando o usuário atingiu o limite de cliques
         // ========================================
-        let permanentBlockActive = false;
+        const AUTO_RELOAD_DURATION = 15;
+        let autoReloadActive = false;
+        let autoReloadCountdown = AUTO_RELOAD_DURATION;
+        let autoReloadInterval = null;
 
-        function createPermanentBlockOverlay() {
-            if (permanentBlockActive) {
-                console.log('[PONCHIBEC] Bloqueio permanente já ativo, ignorando...');
+        function createAutoReloadOverlay() {
+            if (autoReloadActive) {
+                console.log('[AUTO-RELOAD] Overlay já ativo, ignorando...');
                 return;
             }
 
-            permanentBlockActive = true;
+            autoReloadActive = true;
 
-            console.log('[PONCHIBEC] 🔒 LIMITE DE CLIQUES ATINGIDO! Criando bloqueio permanente...');
+            console.log('[AUTO-RELOAD] 🔄 Limite de cliques atingido! Criando overlay com contador de ' + AUTO_RELOAD_DURATION + 's...');
 
             // Remover overlay temporário se existir
             const tempOverlay = document.getElementById('monetag-block-overlay');
@@ -849,14 +852,14 @@
             }
 
             const overlay = document.createElement('div');
-            overlay.id = 'ponchibec-block-overlay';
+            overlay.id = 'auto-reload-overlay';
             overlay.style.cssText = `
                 position: fixed !important;
                 top: 0 !important;
                 left: 0 !important;
                 width: 100vw !important;
                 height: 100vh !important;
-                background: rgba(0, 0, 0, 0.85) !important;
+                background: rgba(0, 0, 0, 0.1) !important;
                 z-index: 2147483647 !important;
                 display: flex !important;
                 align-items: center !important;
@@ -865,78 +868,48 @@
                 pointer-events: auto !important;
             `;
 
-            // Bloquear TODOS os eventos
-            ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress'].forEach(function(eventType) {
+            // Bloquear eventos
+            ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'pointerdown', 'pointerup'].forEach(function(eventType) {
                 overlay.addEventListener(eventType, function(e) {
                     e.stopPropagation();
                     e.stopImmediatePropagation();
                     e.preventDefault();
-                    console.log('[PONCHIBEC] Evento ' + eventType + ' BLOQUEADO permanentemente');
+                    console.log('[AUTO-RELOAD] Evento ' + eventType + ' bloqueado');
                     return false;
                 }, true);
             });
 
             const message = document.createElement('div');
             message.style.cssText = `
-                background: linear-gradient(135deg, rgba(20, 25, 45, 0.98) 0%, rgba(13, 18, 37, 0.98) 100%) !important;
-                padding: 2.5rem !important;
-                border-radius: 1.5rem !important;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.7), 0 0 50px rgba(16, 185, 129, 0.3) !important;
+                background: linear-gradient(135deg, rgba(20, 25, 45, 0.95) 0%, rgba(13, 18, 37, 0.95) 100%) !important;
+                padding: 2rem !important;
+                border-radius: 1rem !important;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 30px rgba(139, 92, 246, 0.2) !important;
                 text-align: center !important;
                 max-width: 90% !important;
-                width: 350px !important;
+                width: 320px !important;
                 animation: scaleInOverlay 0.4s ease !important;
                 pointer-events: auto !important;
-                border: 2px solid rgba(16, 185, 129, 0.5) !important;
+                border: 1px solid rgba(139, 92, 246, 0.3) !important;
             `;
 
             message.innerHTML = `
-                <div style="width: 4rem; height: 4rem; margin: 0 auto 1.5rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                    <svg style="width: 2rem; height: 2rem; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                <div style="width: 3rem; height: 3rem; margin: 0 auto 1rem; position: relative;">
+                    <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(139, 92, 246, 0.2)" stroke-width="8"></circle>
+                        <circle id="auto-reload-progress-circle" cx="50" cy="50" r="45" fill="none" stroke="#00ddff" stroke-width="8" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear;"></circle>
                     </svg>
+                    <span id="auto-reload-timer" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Orbitron', monospace; font-size: 1rem; font-weight: 700; color: #00ddff;">${AUTO_RELOAD_DURATION}</span>
                 </div>
-                <h2 style="margin: 0 0 0.75rem 0; color: #10b981; font-size: 1.5rem; font-weight: 700; font-family: 'Rajdhani', sans-serif;">Limite de Cliques Atingido!</h2>
-                <p style="margin: 0 0 1.5rem 0; color: #a0aec0; font-size: 0.95rem; font-family: 'Inter', sans-serif; line-height: 1.5;">Você já completou todos os cliques necessários. Agora complete as impressões restantes para desbloquear a roleta!</p>
-                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1rem;">
-                    <p style="margin: 0; color: #10b981; font-size: 0.875rem; font-family: 'Inter', sans-serif;">🎯 Continue assistindo os anúncios para completar as impressões</p>
-                </div>
-                <button id="ponchibec-continue-btn" style="
-                    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-                    color: white;
-                    border: none;
-                    padding: 1rem 2rem;
-                    border-radius: 0.75rem;
-                    font-size: 1rem;
-                    font-weight: 600;
-                    font-family: 'Rajdhani', sans-serif;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
-                ">CONTINUAR ASSISTINDO</button>
+                <p style="margin: 0; color: #a0aec0; font-size: 0.875rem; font-family: 'Inter', sans-serif;">Realizando tarefa automaticamente...</p>
             `;
 
             overlay.appendChild(message);
             document.documentElement.appendChild(overlay);
 
-            // Botão para fechar o overlay e continuar
-            const continueBtn = document.getElementById('ponchibec-continue-btn');
-            if (continueBtn) {
-                continueBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    console.log('[PONCHIBEC] Usuário clicou em continuar');
-                    overlay.style.animation = 'fadeOutOverlay 0.3s ease';
-                    setTimeout(function() {
-                        overlay.remove();
-                        permanentBlockActive = false;
-                        console.log('[PONCHIBEC] Overlay de bloqueio removido');
-                    }, 300);
-                });
-            }
-
             // Manter overlay sempre no topo
-            function keepPonchibecOnTop() {
-                const overlayEl = document.getElementById('ponchibec-block-overlay');
+            function keepAutoReloadOnTop() {
+                const overlayEl = document.getElementById('auto-reload-overlay');
                 if (!overlayEl) return;
                 if (overlayEl.parentNode !== document.documentElement || overlayEl !== document.documentElement.lastElementChild) {
                     document.documentElement.appendChild(overlayEl);
@@ -944,9 +917,35 @@
                 overlayEl.style.zIndex = '2147483647';
             }
 
-            setInterval(keepPonchibecOnTop, 100);
+            const topInterval = setInterval(keepAutoReloadOnTop, 100);
 
-            console.log('[PONCHIBEC] 🔒 Bloqueio permanente ativado com sucesso!');
+            const circumference = 283;
+            autoReloadCountdown = AUTO_RELOAD_DURATION;
+
+            autoReloadInterval = setInterval(function() {
+                autoReloadCountdown--;
+
+                const timerEl = document.getElementById('auto-reload-timer');
+                const progressCircle = document.getElementById('auto-reload-progress-circle');
+
+                if (timerEl) timerEl.textContent = autoReloadCountdown;
+
+                if (progressCircle) {
+                    const progress = (AUTO_RELOAD_DURATION - autoReloadCountdown) / AUTO_RELOAD_DURATION;
+                    progressCircle.style.strokeDashoffset = circumference * (1 - progress);
+                }
+
+                console.log('[AUTO-RELOAD] Contador: ' + autoReloadCountdown + ' segundos restantes');
+
+                if (autoReloadCountdown <= 0) {
+                    clearInterval(autoReloadInterval);
+                    clearInterval(topInterval);
+                    console.log('[AUTO-RELOAD] Contador finalizado! Reiniciando página...');
+                    window.location.reload();
+                }
+            }, 1000);
+
+            console.log('[AUTO-RELOAD] ✅ Overlay com contador criado com sucesso!');
         }
 
         function setupAdDetectionObserver() {
@@ -963,11 +962,11 @@
                     const userClicks = (typeof TaskState !== 'undefined' && TaskState.clicks) ? TaskState.clicks : 0;
                     const requiredClicks = (typeof REQUIRED_CLICKS !== 'undefined') ? REQUIRED_CLICKS : 2;
 
-                    // Se atingiu o limite de cliques, mostrar bloqueio permanente (PONCHIBEC)
+                    // Se atingiu o limite de cliques, mostrar overlay com contador que reinicia a página
                     if (userClicks >= requiredClicks) {
                         adDetected = true;
-                        console.log('[PONCHIBEC] 🔒 Usuário atingiu limite de cliques (' + userClicks + '/' + requiredClicks + '). BLOQUEANDO!');
-                        createPermanentBlockOverlay();
+                        console.log('[AUTO-RELOAD] 🔄 Usuário atingiu limite de cliques (' + userClicks + '/' + requiredClicks + '). Iniciando contador!');
+                        createAutoReloadOverlay();
                     }
                     // Se tem pelo menos 1 clique mas não atingiu o limite, mostrar overlay temporário
                     else if (userClicks >= 1) {
@@ -997,15 +996,15 @@
             });
 
             console.log('[OBSERVER] Observador de anúncios ativado');
-            console.log('[PONCHIBEC] Sistema de bloqueio de cliques configurado');
+            console.log('[AUTO-RELOAD] Sistema de auto-reload configurado');
         }
 
         function initOverlaySystem() {
             console.log('[OVERLAY SYSTEM] Inicializando sistema de overlay...');
-            console.log('[PONCHIBEC] Inicializando sistema de bloqueio de cliques...');
+            console.log('[AUTO-RELOAD] Inicializando sistema de auto-reload...');
             setupAdDetectionObserver();
             console.log('[OVERLAY SYSTEM] Sistema de overlay inicializado com sucesso!');
-            console.log('[PONCHIBEC] Sistema de bloqueio inicializado com sucesso!');
+            console.log('[AUTO-RELOAD] Sistema de auto-reload inicializado com sucesso!');
         }
 
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -1017,7 +1016,7 @@
         window.MontagOverlay = {
             show: createFloatingOverlay,
             hide: removeOverlay,
-            showPermanentBlock: createPermanentBlockOverlay
+            showAutoReload: createAutoReloadOverlay
         };
 
     })();
