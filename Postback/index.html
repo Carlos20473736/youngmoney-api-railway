@@ -577,15 +577,15 @@
         <div class="task-description">
             Complete a tarefa abaixo para desbloquear a roleta e ganhar prêmios!
             <br><br>
-            • Assista <strong id="requiredImpressionsText">20 anúncios</strong> (impressões)
-            <br>• Clique em <strong id="requiredClicksText">2 anúncios</strong>
+            • Assista <strong id="requiredImpressionsText"><i class="fas fa-spinner fa-spin"></i></strong> (impressões)
+            <br>• Clique em <strong id="requiredClicksText"><i class="fas fa-spinner fa-spin"></i></strong>
         </div>
 
         <div class="progress-section">
             <div class="progress-item">
                 <div class="progress-label">
                     <span><i class="fas fa-eye"></i> Anúncios Assistidos</span>
-                    <span id="impressionCount">0/20</span>
+                    <span id="impressionCount"><i class="fas fa-spinner fa-spin"></i></span>
                 </div>
                 <div class="progress-bar-container">
                     <div class="progress-bar" id="impressionBar" style="width: 0%"></div>
@@ -595,7 +595,7 @@
             <div class="progress-item">
                 <div class="progress-label">
                     <span><i class="fas fa-hand-pointer"></i> Cliques Realizados</span>
-                    <span id="clickCount">0/2</span>
+                    <span id="clickCount"><i class="fas fa-spinner fa-spin"></i></span>
                 </div>
                 <div class="progress-bar-container">
                     <div class="progress-bar" id="clickBar" style="width: 0%"></div>
@@ -607,20 +607,20 @@
     <!-- Stats Grid (FORA do card) -->
     <div class="stats-grid">
         <div class="stat-box">
-            <div class="stat-value" id="statImpressions">0</div>
+            <div class="stat-value" id="statImpressions"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-label">Impressões</div>
         </div>
         <div class="stat-box">
-            <div class="stat-value" id="statClicks">0</div>
+            <div class="stat-value" id="statClicks"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-label">Cliques</div>
         </div>
     </div>
 
     <!-- Botões (FORA do card) -->
     <div class="button-container">
-        <!-- Botão ASSISTIR ANÚNCIO -->
-        <button class="ad-button" id="adButton" onclick="handleAdClick()" style="display: flex;">
-            <i class="fas fa-play"></i> ASSISTIR ANÚNCIO
+        <!-- Botão ASSISTIR ANÚCIO - Oculto até carregar API -->
+        <button class="ad-button" id="adButton" onclick="handleAdClick()" style="display: none;">
+            <i class="fas fa-play"></i> ASSISTIR ANÚCIO
         </button>
 
         <!-- Botão GIRAR ROLETA (aparece quando tarefa é concluída) -->
@@ -1433,15 +1433,48 @@
                     reqClickText.textContent = REQUIRED_CLICKS + (REQUIRED_CLICKS === 1 ? ' anúncio' : ' anúncios');
                 }
 
+                // Revelar o botão Assistir Anúncio após carregar API
+                const adButton = document.getElementById('adButton');
+                if (adButton) {
+                    adButton.style.display = 'flex';
+                    console.log('[REQUIREMENTS] ✅ Botão Assistir Anúncio revelado');
+                }
+
                 updateUI();
             } else {
                 console.warn('[REQUIREMENTS] ⚠️ Usando valores padrão');
                 TaskState.requiredImpressionsLoaded = true;
+                
+                // Mesmo com valores padrão, revelar o botão
+                const adButton = document.getElementById('adButton');
+                if (adButton) {
+                    adButton.style.display = 'flex';
+                }
+                
+                // Atualizar textos com valores padrão
+                const reqImpText = document.getElementById('requiredImpressionsText');
+                const reqClickText = document.getElementById('requiredClicksText');
+                if (reqImpText) reqImpText.textContent = REQUIRED_IMPRESSIONS + ' anúncios';
+                if (reqClickText) reqClickText.textContent = REQUIRED_CLICKS + ' anúncios';
+                
                 updateUI();
             }
         } catch (error) {
             console.error('[REQUIREMENTS] ❌ Erro ao buscar requisitos:', error);
             TaskState.requiredImpressionsLoaded = true;
+            
+            // Mesmo com erro, revelar o botão com valores padrão
+            const adButton = document.getElementById('adButton');
+            if (adButton) {
+                adButton.style.display = 'flex';
+            }
+            
+            // Atualizar textos com valores padrão
+            const reqImpText = document.getElementById('requiredImpressionsText');
+            const reqClickText = document.getElementById('requiredClicksText');
+            if (reqImpText) reqImpText.textContent = REQUIRED_IMPRESSIONS + ' anúncios';
+            if (reqClickText) reqClickText.textContent = REQUIRED_CLICKS + ' anúncios';
+            
             updateUI();
         }
     }
