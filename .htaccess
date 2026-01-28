@@ -8,30 +8,28 @@ php_value auto_prepend_file "/app/security_middleware_v3.php"
 
 # Headers de Segurança
 <IfModule mod_headers.c>
-    # CORS - Permitir requisições do painel administrativo
-    Header set Access-Control-Allow-Origin "https://satisfied-connection-production-deb1.up.railway.app"
-    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Device-ID, X-Timestamp, X-Signature, X-Proof-Of-Work, X-Challenge, X-Response, X-Request-ID, X-Client-Nonce, X-App-Version, X-Platform, X-Platform-Version, X-Device-Model, X-Session-ID, X-Device-Fingerprint, X-Body-Hash, X-Headers-Hash, X-Full-Request-Hash, X-Encryption-Version, X-Key-Window, X-Security-Level, X-Cipher-Algorithm, X-HMAC-Algorithm, X-API-Version, X-Client-Type, X-User-Agent-Hash, X-Origin-Validation, X-Access-Token-Hash, X-Request-Window, X-Nonce-Signature, X-Rate-Limit-Key, X-Request-Priority, X-Challenge-Response, X-Request-Sequence, X-Request-Timestamp"
-    Header set Access-Control-Allow-Credentials "true"
-    Header set Access-Control-Max-Age "86400"
+    # CORS - Permitir requisições de qualquer origem (necessário para múltiplos domínios Railway)
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Device-ID, X-Timestamp, X-Signature, X-Proof-Of-Work, X-Challenge, X-Response, X-Request-ID, X-Client-Nonce, X-App-Version, X-Platform, X-Platform-Version, X-Device-Model, X-Session-ID, X-Device-Fingerprint, X-Body-Hash, X-Headers-Hash, X-Full-Request-Hash, X-Encryption-Version, X-Key-Window, X-Security-Level, X-Cipher-Algorithm, X-HMAC-Algorithm, X-API-Version, X-Client-Type, X-User-Agent-Hash, X-Origin-Validation, X-Access-Token-Hash, X-Request-Window, X-Nonce-Signature, X-Rate-Limit-Key, X-Request-Priority, X-Challenge-Response, X-Request-Sequence, X-Request-Timestamp, X-Req"
+    Header always set Access-Control-Max-Age "86400"
     
     # Headers de Segurança Adicionais
-    Header set X-Content-Type-Options "nosniff"
-    Header set X-Frame-Options "DENY"
-    Header set X-XSS-Protection "1; mode=block"
-    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    Header set Referrer-Policy "strict-origin-when-cross-origin"
-    Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
-    
-    # Responder a requisições OPTIONS (preflight)
-    RewriteEngine On
-    RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule ^(.*)$ $1 [R=200,L]
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
 </IfModule>
 
-# Configuração de Rewrite
+# Configuração de Rewrite para OPTIONS (preflight)
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    
+    # Responder a requisições OPTIONS (preflight) com 200 OK
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
     
     # Permitir acesso direto a arquivos na pasta /api/
     RewriteCond %{REQUEST_URI} ^/api/
@@ -48,6 +46,13 @@ php_value auto_prepend_file "/app/security_middleware_v3.php"
     # Permitir acesso direto a arquivos na pasta /pix/
     RewriteCond %{REQUEST_URI} ^/pix/
     RewriteRule ^ - [L]
+    
+    # Permitir acesso direto a arquivos na pasta /user/
+    RewriteCond %{REQUEST_URI} ^/user/
+    RewriteRule ^ - [L]
+    
+    # Rota /profile -> user/profile.php
+    RewriteRule ^profile$ user/profile.php [L,QSA]
 </IfModule>
 
 # Desabilitar listagem de diretórios

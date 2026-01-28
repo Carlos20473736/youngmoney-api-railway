@@ -65,7 +65,10 @@ $versionExemptEndpoints = [
     '/admin/',
     '/health',
     '/ping',
-    '/index.php'
+    '/index.php',
+    '/profile.php',                     // Endpoint de perfil (web)
+    '/user/profile.php',                // Endpoint de perfil (web)
+    '/monetag/'                         // Endpoints de monetag (web)
 ];
 
 // Verificar se é endpoint isento de manutenção
@@ -391,7 +394,10 @@ $publicEndpoints = [
 $basicAuthEndpoints = [
     '/api/v1/user/profile.php',
     '/api/v1/user/balance.php',
-    '/api/v1/ranking/list.php'
+    '/api/v1/ranking/list.php',
+    '/profile.php',                     // Endpoint de perfil (web)
+    '/user/profile.php',                // Endpoint de perfil (web)
+    '/monetag/'                         // Endpoints de monetag (web)
 ];
 
 $isPublicEndpoint = false;

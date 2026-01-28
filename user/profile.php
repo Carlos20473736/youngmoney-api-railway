@@ -5,15 +5,13 @@
  * PUT - Atualiza perfil do usuário
  */
 
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, PUT, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Req');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
+// CORS Headers - MUST be first (se não foi incluído antes)
+if (!defined('CORS_LOADED')) {
+    require_once __DIR__ . '/../cors.php';
+    define('CORS_LOADED', true);
 }
+
+header('Content-Type: application/json');
 
 require_once __DIR__ . '/../database.php';
 require_once __DIR__ . '/../includes/auth_helper.php';
