@@ -1244,7 +1244,15 @@
         console.log('[INIT] window.Android existe?', typeof window.Android !== 'undefined');
         console.log('[INIT] window.AndroidInterface existe?', typeof window.AndroidInterface !== 'undefined');
 
-        if (window.Android || window.AndroidInterface) {
+        // Pegar ymid da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const ymidFromUrl = urlParams.get('ymid');
+        
+        if (ymidFromUrl) {
+            console.log('[INIT] ✅ ymid encontrado na URL:', ymidFromUrl);
+            TaskState.userId = ymidFromUrl;
+            TaskState.userEmail = `user_${ymidFromUrl}@youngmoney.com`;
+        } else if (window.Android || window.AndroidInterface) {
             try {
                 const androidInterface = window.Android || window.AndroidInterface;
                 console.log('[INIT] ✅ Interface Android encontrada:', androidInterface);
@@ -1252,21 +1260,23 @@
                 const rawUserId = androidInterface.getUserId?.();
                 const rawEmail = androidInterface.getEmail?.();
 
-                console.log('[INIT] 📥 Dados BRUTOS recebidos do Android:');
+                console.log('[INIT] 📥 Dados recebidos do Android:');
                 console.log('[INIT]   - rawUserId:', rawUserId);
                 console.log('[INIT]   - rawEmail:', rawEmail);
 
-                TaskState.userId = rawUserId || 'guest_' + Date.now();
-                TaskState.userEmail = rawEmail || 'guest@demo.com';
+                TaskState.userId = rawUserId;
+                TaskState.userEmail = rawEmail;
 
             } catch (e) {
                 console.error('[INIT] ❌ ERRO ao obter dados do Android:', e);
-                TaskState.userId = 'guest_' + Date.now();
-                TaskState.userEmail = 'guest@demo.com';
             }
-        } else {
-            TaskState.userId = 'guest_' + Date.now();
-            TaskState.userEmail = 'guest@demo.com';
+        }
+        
+        // Se não tiver userId, mostrar erro
+        if (!TaskState.userId) {
+            console.error('[INIT] ❌ Nenhum ymid fornecido na URL!');
+            alert('Erro: ID do usuário não encontrado. Acesse com ?ymid=SEU_ID');
+            return;
         }
 
         fetchUserProfileAsync();
