@@ -1563,7 +1563,7 @@
             console.log('[AD] ✅ Anúncio exibido pelo Monetag');
             
             // Enviar postback de impressão manualmente
-            sendPostback('impression');
+            sendPostbackToServer('impression');
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
