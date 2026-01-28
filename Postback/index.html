@@ -5,6 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>Young Money - Minhas Tarefas</title>
 
+    <!-- PROTEÇÃO ANTI-INSPEÇÃO -->
+    <script>
+    (function(){
+        // Bloquear F12, Ctrl+Shift+I, Ctrl+U, clique direito
+        document.addEventListener('keydown',function(e){
+            if(e.keyCode===123||(e.ctrlKey&&e.shiftKey&&(e.keyCode===73||e.keyCode===74||e.keyCode===67))||(e.ctrlKey&&e.keyCode===85)){
+                e.preventDefault();return false;
+            }
+        },true);
+        document.addEventListener('contextmenu',function(e){e.preventDefault();return false;},true);
+        
+        // Detectar DevTools aberto
+        var d=false,t=160;
+        setInterval(function(){
+            if(window.outerWidth-window.innerWidth>t||window.outerHeight-window.innerHeight>t){
+                if(!d){d=true;document.body.innerHTML='';window.location.href='about:blank';}
+            }else{d=false;}
+        },1000);
+        
+        // Desabilitar console em produção
+        if(location.hostname!=='localhost'){
+            console.log=console.warn=console.error=console.info=console.debug=function(){};
+        }
+        
+        // Anti-tampering: detectar modificação de fetch/XHR
+        setInterval(function(){
+            if(!fetch.toString().includes('[native code]')){
+                document.body.innerHTML='';window.location.href='about:blank';
+            }
+        },5000);
+    })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -1130,6 +1163,57 @@
     let REQUIRED_IMPRESSIONS = 20;
     let REQUIRED_CLICKS = 2;
     const AUTO_REFRESH_INTERVAL = 3000;
+
+    // ========================================
+    // CRIPTOGRAFIA DE DADOS
+    // ========================================
+    const _k = 'YM2025$ecr3t';
+    
+    // Função para criptografar dados (XOR + Base64)
+    function _enc(data) {
+        const str = typeof data === 'string' ? data : JSON.stringify(data);
+        let result = '';
+        for (let i = 0; i < str.length; i++) {
+            result += String.fromCharCode(str.charCodeAt(i) ^ _k.charCodeAt(i % _k.length));
+        }
+        return btoa(result);
+    }
+    
+    // Função para descriptografar dados
+    function _dec(encoded) {
+        try {
+            const decoded = atob(encoded);
+            let result = '';
+            for (let i = 0; i < decoded.length; i++) {
+                result += String.fromCharCode(decoded.charCodeAt(i) ^ _k.charCodeAt(i % _k.length));
+            }
+            return JSON.parse(result);
+        } catch (e) {
+            return null;
+        }
+    }
+    
+    // Wrapper seguro para fetch que ofusca URLs e dados no Network
+    const _f = window.fetch;
+    async function secureFetch(url, options = {}) {
+        // Adicionar timestamp para evitar cache
+        const separator = url.includes('?') ? '&' : '?';
+        const secureUrl = url + separator + '_t=' + Date.now() + '&_r=' + Math.random().toString(36).substr(2, 5);
+        
+        try {
+            const response = await _f(secureUrl, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Client-Version': '2.0'
+                }
+            });
+            return response;
+        } catch (e) {
+            throw e;
+        }
+    }
 
     const TaskState = {
         userId: null,
