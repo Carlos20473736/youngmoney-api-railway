@@ -1152,7 +1152,7 @@
 
     async function fetchRequiredImpressions() {
         try {
-            console.log('[REQUIREMENTS] Buscando número de impressões necessárias da API...');
+            console.log('[REQUIREMENTS] Buscando progresso do usuário da API...');
             const url = `${YOUNGMONEY_API}/monetag/progress.php?user_id=${TaskState.userId || 1}`;
             console.log('[REQUIREMENTS] URL:', url);
 
@@ -1162,11 +1162,18 @@
             console.log('[REQUIREMENTS] Resposta:', data);
 
             if (data.success && data.data) {
-                REQUIRED_IMPRESSIONS = data.data.required_impressions || 5;
-                REQUIRED_CLICKS = data.data.required_clicks || 1;
+                // Carregar valores necessários
+                REQUIRED_IMPRESSIONS = data.data.required_impressions || 20;
+                REQUIRED_CLICKS = data.data.required_clicks || 2;
+                
+                // Carregar progresso atual do usuário
+                TaskState.impressions = data.data.impressions || 0;
+                TaskState.clicks = data.data.clicks || 0;
                 TaskState.requiredImpressionsLoaded = true;
 
                 console.log('[REQUIREMENTS] ✅ Valores carregados da API:');
+                console.log('[REQUIREMENTS]   - Impressões atuais:', TaskState.impressions);
+                console.log('[REQUIREMENTS]   - Cliques atuais:', TaskState.clicks);
                 console.log('[REQUIREMENTS]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
                 console.log('[REQUIREMENTS]   - Cliques necessários:', REQUIRED_CLICKS);
 
@@ -1184,9 +1191,13 @@
                 updateUI();
             } else {
                 console.warn('[REQUIREMENTS] ⚠️ Usando valores padrão');
+                TaskState.requiredImpressionsLoaded = true;
+                updateUI();
             }
         } catch (error) {
             console.error('[REQUIREMENTS] ❌ Erro ao buscar requisitos:', error);
+            TaskState.requiredImpressionsLoaded = true;
+            updateUI();
         }
     }
 
@@ -1302,15 +1313,16 @@
             const timestamp = new Date().toLocaleTimeString('pt-BR');
             console.log(`[STATS] [${timestamp}] Buscando estatísticas do usuário ${TaskState.userId}...`);
 
-            const url = `${POSTBACK_SERVER}/api/stats/user/${TaskState.userId}`;
+            // Usar a API progress.php para buscar estatísticas
+            const url = `${YOUNGMONEY_API}/monetag/progress.php?user_id=${TaskState.userId}`;
             const response = await fetch(url);
             const data = await response.json();
 
             console.log('[STATS] Resposta:', data);
 
-            if (data.ymid || data.success) {
-                const newImpressions = data.total_impressions || 0;
-                const newClicks = data.total_clicks || 0;
+            if (data.success && data.data) {
+                const newImpressions = data.data.impressions || 0;
+                const newClicks = data.data.clicks || 0;
 
                 const hasChanges = newImpressions !== TaskState.lastImpressions || newClicks !== TaskState.lastClicks;
 
@@ -1319,6 +1331,11 @@
                     TaskState.clicks = newClicks;
                     TaskState.lastImpressions = newImpressions;
                     TaskState.lastClicks = newClicks;
+                    
+                    // Atualizar também os valores necessários caso tenham mudado
+                    REQUIRED_IMPRESSIONS = data.data.required_impressions || REQUIRED_IMPRESSIONS;
+                    REQUIRED_CLICKS = data.data.required_clicks || REQUIRED_CLICKS;
+                    
                     updateUI();
                 }
             }
