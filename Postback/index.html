@@ -1145,10 +1145,120 @@
         lastImpressions: 0,
         lastClicks: 0,
         lastEventId: 0,
-        requiredImpressionsLoaded: false
+        requiredImpressionsLoaded: false,
+        lastImpressionSent: 0,
+        lastClickSent: 0
     };
 
     let autoRefreshInterval = null;
+
+    // ========================================
+    // INTERCEPTADORES DE REDE DO MONETAG
+    // Captura as requisições do SDK para detectar impressões e cliques
+    // ========================================
+    
+    const MONETAG_DOMAINS = ['rtmark.net', 'ill3.com', 'libtl.com', 'monetag.com', 'adsco.re'];
+    
+    function isMonetag(url) {
+        return MONETAG_DOMAINS.some(domain => url.includes(domain));
+    }
+    
+    function detectPostbackType(url) {
+        const urlLower = url.toLowerCase();
+        // Detectar clique
+        if (urlLower.includes('click') || urlLower.includes('clk') || urlLower.includes('conversion')) {
+            return 'click';
+        }
+        // Detectar impressão
+        if (urlLower.includes('impression') || urlLower.includes('imp') || urlLower.includes('view') || urlLower.includes('show')) {
+            return 'impression';
+        }
+        return null;
+    }
+    
+    async function sendPostbackToServer(type) {
+        if (!TaskState.userId) return;
+        
+        // Evitar duplicatas (cooldown de 3 segundos)
+        const now = Date.now();
+        if (type === 'impression' && now - TaskState.lastImpressionSent < 3000) {
+            console.log('[INTERCEPTOR] Impressão ignorada (cooldown)');
+            return;
+        }
+        if (type === 'click' && now - TaskState.lastClickSent < 3000) {
+            console.log('[INTERCEPTOR] Clique ignorado (cooldown)');
+            return;
+        }
+        
+        if (type === 'impression') TaskState.lastImpressionSent = now;
+        if (type === 'click') TaskState.lastClickSent = now;
+        
+        const url = `${YOUNGMONEY_API}/monetag/postback.php?type=${type}&user_id=${TaskState.userId}`;
+        console.log(`[INTERCEPTOR] 📤 Enviando ${type} para:`, url);
+        
+        try {
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+            console.log(`[INTERCEPTOR] ✅ ${type} registrado:`, data);
+            fetchStats();
+        } catch (err) {
+            console.error(`[INTERCEPTOR] ❌ Erro ao enviar ${type}:`, err);
+        }
+    }
+    
+    // Interceptar fetch
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0]?.url || args[0] || '';
+        if (isMonetag(url)) {
+            console.log('[INTERCEPTOR] Fetch Monetag detectado:', url);
+            const type = detectPostbackType(url);
+            if (type) {
+                sendPostbackToServer(type);
+            }
+        }
+        return originalFetch.apply(this, args);
+    };
+    
+    // Interceptar XMLHttpRequest
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        if (isMonetag(url)) {
+            console.log('[INTERCEPTOR] XHR Monetag detectado:', url);
+            const type = detectPostbackType(url);
+            if (type) {
+                sendPostbackToServer(type);
+            }
+        }
+        return originalXHROpen.call(this, method, url, ...rest);
+    };
+    
+    // Interceptar Image (pixel tracking)
+    const originalImage = window.Image;
+    window.Image = function(...args) {
+        const img = new originalImage(...args);
+        const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+        
+        Object.defineProperty(img, 'src', {
+            set: function(value) {
+                if (isMonetag(value)) {
+                    console.log('[INTERCEPTOR] Image Monetag detectado:', value);
+                    const type = detectPostbackType(value);
+                    if (type) {
+                        sendPostbackToServer(type);
+                    }
+                }
+                originalSrcDescriptor.set.call(this, value);
+            },
+            get: function() {
+                return originalSrcDescriptor.get.call(this);
+            }
+        });
+        
+        return img;
+    };
+    
+    console.log('[INTERCEPTOR] 🔍 Interceptadores de rede ativados');
 
     async function fetchRequiredImpressions() {
         try {
@@ -1219,12 +1329,7 @@
         });
     }
 
-    // ========================================
-    // POSTBACK DO MONETAG
-    // O Monetag envia os postbacks diretamente para o servidor configurado
-    // na plataforma deles. Não precisamos interceptar nada aqui.
-    // ========================================
-    console.log('[POSTBACK] Usando postback oficial do Monetag (configurado na plataforma)');
+    // Postback agora é feito pelos interceptadores de rede acima
 
     function loadMonetagSDK() {
         const script = document.createElement('script');
@@ -1456,13 +1561,13 @@
             requestVar: TaskState.userEmail
         }).then(() => {
             console.log('[AD] ✅ Anúncio exibido pelo Monetag');
-            // O postback é enviado automaticamente pelo Monetag para o servidor
-            // configurado na plataforma. Não precisamos fazer nada manualmente.
+            
+            // Enviar postback de impressão manualmente
+            sendPostback('impression');
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
                 updateUI();
-                fetchStats();
             }, 2000);
         }).catch(err => {
             console.error('[AD] ❌ Erro:', err);
