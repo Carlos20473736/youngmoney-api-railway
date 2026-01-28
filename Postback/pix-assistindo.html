@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pix Assistindo Manager</title>
+    <link rel="stylesheet" href="pix-style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <meta name="description" content="Gerenciador de saldo e missões para o sistema Pix Assistindo">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%2310b981'/%3E%3Ctext x='50' y='60' text-anchor='middle' fill='white' font-size='40' font-family='Arial'%3EP%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">💰</div>
+                    <h1>Pix Assistindo Manager</h1>
+                </div>
+                <div class="status-indicator">
+                    <div id="statusDot" class="status-dot stopped"></div>
+                    <span id="statusText" class="status-text">Parado</span>
+                </div>
+                <div class="timer-display" style="background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 12px; margin-left: 16px;">
+                    <span style="font-size: 14px; opacity: 0.8;">Tempo de Uso:</span>
+                    <span id="sessionTimer" style="font-size: 18px; font-weight: bold; margin-left: 8px;">00:00:00</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Configuration Panel -->
+            <section class="config-panel">
+                <h2>Configuração</h2>
+                <div class="form-group">
+                    <label for="email">E-mail do Usuário:</label>
+                    <input type="email" id="email" placeholder="Ex: usuario@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="tipoAnuncio">Tipo de Anúncio:</label>
+                    <select id="tipoAnuncio" class="select-input">
+                        <option value="rewarded">Anúncio Recompensado</option>
+                        <option value="interstitial">Anúncio Intersticial</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="interval">Intervalo (segundos):</label>
+                    <div class="slider-container">
+                        <input type="range" id="interval" min="60" max="300" value="60" step="10">
+                        <span id="intervalValue" class="slider-value">60</span>
+                    </div>
+                </div>
+                <div class="control-buttons">
+                    <button id="startBtn" class="btn btn-primary">
+                        <span class="btn-icon">▶️</span>
+                        Iniciar Simulação
+                    </button>
+                    <button id="stopBtn" class="btn btn-secondary" disabled>
+                        <span class="btn-icon">⏹️</span>
+                        Parar
+                    </button>
+                    <button id="clearBtn" class="btn btn-outline">
+                        <span class="btn-icon">🗑️</span>
+                        Limpar Log
+                    </button>
+
+                </div>
+            </section>
+
+            <!-- Stats Panel -->
+            <section class="stats-panel">
+                <h2>Estatísticas</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="requestCount">0</div>
+                            <div class="stat-label">Anúncios Assistidos</div>
+                        </div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="successCount">0</div>
+                            <div class="stat-label">Sucessos</div>
+                        </div>
+                    </div>
+                    <div class="stat-card error">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="errorCount">0</div>
+                            <div class="stat-label">Erros</div>
+                        </div>
+                    </div>
+                    <div class="stat-card money">
+                        <div class="stat-icon">💵</div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="totalEarnings">R$ 0,00</div>
+                            <div class="stat-label">Total Ganho</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- User Info Panel -->
+            <section class="user-info-panel">
+                <h2>Informações do Usuário</h2>
+                <div id="userInfoContainer" class="user-info-container">
+                    <div class="user-info-empty">
+                        <span class="empty-icon">👤</span>
+                        <p>Execute uma consulta para ver as informações do usuário</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Mission Progress Panel -->
+            <section class="mission-panel">
+                <h2>Progresso da Missão</h2>
+                <div id="missionContainer" class="mission-container">
+                    <div class="mission-empty">
+                        <span class="empty-icon">🎯</span>
+                        <p>Dados da missão aparecerão aqui após a primeira consulta</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Rewards Config Panel -->
+            <section class="rewards-panel">
+                <h2>Configurações de Recompensa</h2>
+                <div id="rewardsContainer" class="rewards-container">
+                    <div class="rewards-empty">
+                        <span class="empty-icon">⚙️</span>
+                        <p>Carregando configurações de recompensa...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Log Panel -->
+            <section class="log-panel">
+                <div class="log-header">
+                    <h2>Log de Atividades</h2>
+                    <button id="autoScrollBtn" class="btn btn-small active">Auto Scroll</button>
+                </div>
+                <div id="logContainer" class="log-container">
+                    <div class="log-empty">
+                        <span class="log-empty-icon">📝</span>
+                        <p>Clique em "Iniciar Simulação" para começar a assistir anúncios</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="session-security.js"></script>
+    <script src="pix-script.js"></script>
+</body>
+</html>
+
