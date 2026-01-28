@@ -1602,23 +1602,28 @@
     function goBack() {
         console.log('[BACK] Botão voltar clicado - Redirecionando para o app');
         
-        // Tentar abrir o app Young Money via intent
-        const appUrl = 'intent://youngmoney/#Intent;scheme=youngmoney;package=com.youngmoney2;end';
+        // Abrir o app diretamente via intent (sem fallback para Play Store)
+        // S_FLAG_ACTIVITY_NEW_TASK = 0x10000000
+        // S_FLAG_ACTIVITY_CLEAR_TOP = 0x04000000
+        const appIntent = 'intent:#Intent;' +
+            'action=android.intent.action.MAIN;' +
+            'category=android.intent.category.LAUNCHER;' +
+            'component=com.youngmoney2/.MainActivity;' +
+            'S.browser_fallback_url=;' +  // URL vazia para não ir para Play Store
+            'end';
         
-        // Primeiro tenta abrir via intent (funciona no Chrome Android)
-        window.location.href = appUrl;
+        window.location.href = appIntent;
         
-        // Fallback: se não abrir em 500ms, tenta outras opções
+        // Fallback: se não abrir em 300ms, apenas fecha a aba
         setTimeout(() => {
-            if (window.Android && window.Android.closeActivity) {
-                window.Android.closeActivity();
-            } else if (window.history.length > 1) {
+            // Tenta fechar a aba/janela do navegador
+            window.close();
+            
+            // Se não conseguir fechar, volta na história
+            if (window.history.length > 1) {
                 window.history.back();
-            } else {
-                // Tenta fechar a aba/janela
-                window.close();
             }
-        }, 500);
+        }, 300);
     }
 
     // ========================================
