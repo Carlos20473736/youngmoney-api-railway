@@ -20,7 +20,13 @@ const mimeTypes = {
     '.ttf': 'font/ttf'
 };
 
+console.log('Starting server...');
+console.log('__dirname:', __dirname);
+console.log('Files in directory:', fs.readdirSync(__dirname));
+
 const server = http.createServer((req, res) => {
+    console.log(`Request: ${req.method} ${req.url}`);
+    
     let filePath = req.url === '/' ? '/index.html' : req.url;
     
     // Remove query strings
@@ -28,34 +34,41 @@ const server = http.createServer((req, res) => {
     
     // Construct full path
     const fullPath = path.join(__dirname, filePath);
+    console.log('Full path:', fullPath);
     
     // Get file extension
     const ext = path.extname(fullPath).toLowerCase();
     const contentType = mimeTypes[ext] || 'application/octet-stream';
     
-    // Read and serve the file
-    fs.readFile(fullPath, (err, content) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                // File not found - serve index.html for SPA routing
-                fs.readFile(path.join(__dirname, 'index.html'), (err2, content2) => {
-                    if (err2) {
-                        res.writeHead(404);
-                        res.end('404 Not Found');
-                    } else {
-                        res.writeHead(200, { 'Content-Type': 'text/html' });
-                        res.end(content2);
-                    }
-                });
-            } else {
-                res.writeHead(500);
-                res.end('Server Error');
-            }
-        } else {
-            res.writeHead(200, { 'Content-Type': contentType });
+    // Check if file exists
+    if (!fs.existsSync(fullPath)) {
+        console.log('File not found:', fullPath);
+        // Serve index.html for SPA routing
+        const indexPath = path.join(__dirname, 'index.html');
+        console.log('Trying index.html at:', indexPath);
+        
+        if (fs.existsSync(indexPath)) {
+            const content = fs.readFileSync(indexPath);
+            res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(content);
+        } else {
+            res.writeHead(404);
+            res.end('404 Not Found - index.html not found');
         }
-    });
+        return;
+    }
+    
+    // Read and serve the file
+    try {
+        const content = fs.readFileSync(fullPath);
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content);
+        console.log('Served:', fullPath);
+    } catch (err) {
+        console.error('Error reading file:', err);
+        res.writeHead(500);
+        res.end('Server Error: ' + err.message);
+    }
 });
 
 server.listen(PORT, '0.0.0.0', () => {
