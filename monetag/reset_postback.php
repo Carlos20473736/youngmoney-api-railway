@@ -273,7 +273,7 @@ try {
     $results['monetag_local']['randomized_clicks_range'] = '1 (fixo)';
     $results['monetag_local']['randomized_sample'] = $randomized_details;
     
-    error_log("Reset Completo: Impressões randomizadas (5-25) e Cliques fixos (1) para $users_randomized usuários");
+    error_log("Reset Completo: Impressões randomizadas (5-12) e Cliques fixos (1) para $users_randomized usuários");
     
     // ========================================
     // 5. RESETAR ROLETA (DELETAR TODOS OS SPINS)
