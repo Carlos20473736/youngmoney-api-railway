@@ -18,7 +18,7 @@
 
 // Lista de emails de administradores que podem bypass manutenção e verificação de versão
 $ADMIN_EMAILS = [
-    'caekos62@gmail.com',
+    'soltacartatigri@gmail.com',
     'muriel25herrera@gmail.com',
     'gustavopramos97@gmail.com'
 ];
