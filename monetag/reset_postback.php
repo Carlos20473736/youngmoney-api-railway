@@ -242,7 +242,7 @@ try {
     
     while ($user = $users_result->fetch_assoc()) {
         $user_id = $user['id'];
-        $random_impressions = rand(5, 25); // Aleatório entre 5 e 25 para impressões
+        $random_impressions = rand(5, 12); // Aleatório entre 5 e 25 para impressões
         $random_clicks = 1; // Fixo em 1 clique
         
         // Inserir ou atualizar impressões e cliques necessários do usuário
