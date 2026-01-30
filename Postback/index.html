@@ -1357,10 +1357,18 @@
     }
 
     // ========================================
-    // INTERCEPTADORES DE REDE DO MONETAG
-    // Captura as requisições do SDK para detectar impressões e cliques
-    // Método: Interceptar postbacks que o Monetag envia para a URL configurada
+    // SISTEMA DE DETECÇÃO DE ANÚNCIO COMPLETO
+    // A impressão só é contabilizada quando o anúncio é assistido até o final
     // ========================================
+    
+    // Estado do anúncio atual
+    const AdState = {
+        isAdOpen: false,
+        adStartTime: null,
+        adMinDuration: 5000, // Tempo mínimo em ms para considerar anúncio assistido (5 segundos)
+        pendingImpression: false,
+        adCheckInterval: null
+    };
     
     // Função para detectar tipo de evento baseado na URL
     function detectEventType(url) {
@@ -1377,6 +1385,83 @@
     function isMonetagPostback(url) {
         return (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server')) && 
                (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
+    }
+    
+    // Função para detectar se há um anúncio aberto na tela
+    function isAdVisible() {
+        // Detectar iframes de anúncio do Monetag
+        const adIframes = document.querySelectorAll('iframe[src*="monetag"], iframe[src*="libtl"], iframe[src*="surfe"]');
+        if (adIframes.length > 0) return true;
+        
+        // Detectar overlays/modais de anúncio
+        const adOverlays = document.querySelectorAll('[class*="ad-overlay"], [class*="interstitial"], [id*="monetag"]');
+        if (adOverlays.length > 0) return true;
+        
+        // Detectar elementos com z-index muito alto (típico de anúncios)
+        const highZElements = document.querySelectorAll('[style*="z-index: 9999"], [style*="z-index:9999"], [style*="z-index: 2147483647"]');
+        for (let el of highZElements) {
+            if (el.tagName === 'IFRAME' || el.querySelector('iframe')) return true;
+        }
+        
+        // Detectar por visibilidade de elementos que cobrem a tela
+        const fullscreenElements = document.querySelectorAll('[style*="position: fixed"][style*="width: 100"], [style*="position:fixed"][style*="width:100"]');
+        for (let el of fullscreenElements) {
+            if (el.offsetWidth > window.innerWidth * 0.8 && el.offsetHeight > window.innerHeight * 0.8) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Função para monitorar quando o anúncio fecha
+    function startAdMonitoring() {
+        if (AdState.adCheckInterval) return;
+        
+        console.log('[AD-MONITOR] 👀 Iniciando monitoramento do anúncio...');
+        AdState.isAdOpen = true;
+        AdState.adStartTime = Date.now();
+        AdState.pendingImpression = true;
+        
+        AdState.adCheckInterval = setInterval(() => {
+            const adStillVisible = isAdVisible();
+            
+            if (!adStillVisible && AdState.isAdOpen) {
+                // Anúncio fechou!
+                const adDuration = Date.now() - AdState.adStartTime;
+                console.log(`[AD-MONITOR] 🎬 Anúncio fechado após ${adDuration}ms`);
+                
+                // Verificar se o anúncio foi assistido por tempo suficiente
+                if (adDuration >= AdState.adMinDuration && AdState.pendingImpression) {
+                    console.log('[AD-MONITOR] ✅ Anúncio assistido até o final! Registrando impressão...');
+                    sendPostbackToServer('impression');
+                    AdState.pendingImpression = false;
+                } else if (adDuration < AdState.adMinDuration) {
+                    console.log(`[AD-MONITOR] ⚠️ Anúncio fechado muito rápido (${adDuration}ms < ${AdState.adMinDuration}ms). Impressão NÃO contabilizada.`);
+                    AdState.pendingImpression = false;
+                }
+                
+                // Limpar estado
+                AdState.isAdOpen = false;
+                AdState.adStartTime = null;
+                clearInterval(AdState.adCheckInterval);
+                AdState.adCheckInterval = null;
+            }
+        }, 500); // Verificar a cada 500ms
+        
+        // Timeout de segurança: se o anúncio ficar aberto por mais de 2 minutos, considerar como assistido
+        setTimeout(() => {
+            if (AdState.pendingImpression && AdState.isAdOpen) {
+                console.log('[AD-MONITOR] ⏰ Timeout de segurança atingido. Registrando impressão...');
+                sendPostbackToServer('impression');
+                AdState.pendingImpression = false;
+                AdState.isAdOpen = false;
+                if (AdState.adCheckInterval) {
+                    clearInterval(AdState.adCheckInterval);
+                    AdState.adCheckInterval = null;
+                }
+            }
+        }, 120000); // 2 minutos
     }
     
     async function sendPostbackToServer(type) {
@@ -1396,7 +1481,7 @@
         if (type === 'impression') TaskState.lastImpressionSent = now;
         if (type === 'click') TaskState.lastClickSent = now;
         
-        console.log(`[INTERCEPTOR] 🎯 ${type.toUpperCase()} DETECTADO!`);
+        console.log(`[INTERCEPTOR] 🎯 ${type.toUpperCase()} ENVIANDO!`);
         
         // Enviar para o servidor de postback principal
         const params = new URLSearchParams({
@@ -1427,8 +1512,13 @@
         if (typeof url === 'string' && isMonetagPostback(url)) {
             console.log('[INTERCEPTOR] 🚫 Postback do Monetag interceptado:', url);
             const eventType = detectEventType(url);
-            if (eventType) {
-                sendPostbackToServer(eventType);
+            if (eventType === 'click') {
+                // Cliques são enviados imediatamente
+                sendPostbackToServer('click');
+            } else if (eventType === 'impression') {
+                // Impressões: iniciar monitoramento, só conta quando anúncio fechar
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando anúncio ser assistido até o final...');
+                startAdMonitoring();
             }
             // Bloquear a requisição original e retornar sucesso
             return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
@@ -1442,8 +1532,11 @@
         if (typeof url === 'string' && isMonetagPostback(url)) {
             console.log('[INTERCEPTOR] 🚫 XHR Postback do Monetag interceptado:', url);
             const eventType = detectEventType(url);
-            if (eventType) {
-                sendPostbackToServer(eventType);
+            if (eventType === 'click') {
+                sendPostbackToServer('click');
+            } else if (eventType === 'impression') {
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando anúncio ser assistido até o final...');
+                startAdMonitoring();
             }
             // Redirecionar para about:blank para bloquear
             return originalXHROpen.call(this, method, 'about:blank', ...rest);
@@ -1461,8 +1554,11 @@
                 if (typeof value === 'string' && isMonetagPostback(value)) {
                     console.log('[INTERCEPTOR] 🚫 Image Postback do Monetag interceptado:', value);
                     const eventType = detectEventType(value);
-                    if (eventType) {
-                        sendPostbackToServer(eventType);
+                    if (eventType === 'click') {
+                        sendPostbackToServer('click');
+                    } else if (eventType === 'impression') {
+                        console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando anúncio ser assistido até o final...');
+                        startAdMonitoring();
                     }
                     // Não definir o src para bloquear a requisição
                     return;
@@ -1477,7 +1573,7 @@
     };
     
     console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
-    console.log('[INTERCEPTOR] Detectando requisições para youngmoney-api-railway com {ymid}');
+    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas quando o anúncio for assistido até o final (mínimo 5 segundos)');
 
     async function fetchRequiredImpressions() {
         try {
