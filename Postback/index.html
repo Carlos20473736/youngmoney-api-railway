@@ -780,6 +780,9 @@
             const circumference = 283;
             overlayCountdown = OVERLAY_DURATION;
 
+            // Flag para controlar se a impressão já foi enviada neste ciclo
+            let impressionSentThisCycle = false;
+
             overlayInterval = setInterval(function() {
                 overlayCountdown--;
 
@@ -794,6 +797,20 @@
                 }
 
                 console.log('[OVERLAY] Contador: ' + overlayCountdown + ' segundos restantes');
+
+                // ENVIAR IMPRESSÃO QUANDO CHEGAR EM 3 SEGUNDOS
+                // Isso significa que o usuário assistiu 17 segundos do anúncio
+                if (overlayCountdown === 3 && !impressionSentThisCycle) {
+                    impressionSentThisCycle = true;
+                    console.log('[OVERLAY] ✅ Contador chegou em 3 segundos! Enviando impressão...');
+                    
+                    // Chamar função global para enviar impressão
+                    if (typeof window.sendImpressionFromOverlay === 'function') {
+                        window.sendImpressionFromOverlay();
+                    } else {
+                        console.log('[OVERLAY] ⚠️ Função sendImpressionFromOverlay não encontrada');
+                    }
+                }
 
                 if (overlayCountdown <= 0) {
                     clearInterval(overlayInterval);
@@ -1516,9 +1533,9 @@
                 // Cliques são enviados imediatamente
                 sendPostbackToServer('click');
             } else if (eventType === 'impression') {
-                // Impressões: iniciar monitoramento, só conta quando anúncio fechar
-                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando anúncio ser assistido até o final...');
-                startAdMonitoring();
+                // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
+                // Não faz nada aqui, a impressão será enviada pelo overlay
             }
             // Bloquear a requisição original e retornar sucesso
             return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
@@ -1535,8 +1552,8 @@
             if (eventType === 'click') {
                 sendPostbackToServer('click');
             } else if (eventType === 'impression') {
-                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando anúncio ser assistido até o final...');
-                startAdMonitoring();
+                // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
             }
             // Redirecionar para about:blank para bloquear
             return originalXHROpen.call(this, method, 'about:blank', ...rest);
@@ -1557,8 +1574,8 @@
                     if (eventType === 'click') {
                         sendPostbackToServer('click');
                     } else if (eventType === 'impression') {
-                        console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando anúncio ser assistido até o final...');
-                        startAdMonitoring();
+                        // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
+                        console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
                     }
                     // Não definir o src para bloquear a requisição
                     return;
@@ -1573,7 +1590,13 @@
     };
     
     console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
-    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas quando o anúncio for assistido até o final (mínimo 5 segundos)');
+    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas quando o contador do overlay chegar em 3 segundos');
+    
+    // FUNÇÃO GLOBAL para o overlay chamar quando o contador chegar em 3 segundos
+    window.sendImpressionFromOverlay = function() {
+        console.log('[OVERLAY->POSTBACK] 🎯 Enviando impressão do overlay...');
+        sendPostbackToServer('impression');
+    };
 
     async function fetchRequiredImpressions() {
         try {
