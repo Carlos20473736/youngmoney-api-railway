@@ -1,10 +1,18 @@
 <?php
 /**
- * MoniTag Progress Endpoint
+ * MoniTag Progress Endpoint (CORRIGIDO)
  * GET - Retorna progresso diário do usuário (SEM AUTENTICAÇÃO)
  * 
- * Agora cada usuário tem seu próprio número de impressões (5-10) e cliques (1-3) necessários
+ * Agora cada usuário tem seu próprio número de impressões (5-12) e cliques (1) necessários
+ * 
+ * CORREÇÕES APLICADAS:
+ * 1. Timezone padronizado para America/Sao_Paulo
+ * 2. Range de impressões corrigido para 5-12
+ * 3. Logs de debug melhorados
  */
+
+// DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
+date_default_timezone_set('America/Sao_Paulo');
 
 // CORS MUST be first
 require_once __DIR__ . '/../cors.php';
@@ -37,12 +45,14 @@ if (!$user_id || !is_numeric($user_id)) {
 
 $user_id = (int)$user_id;
 
+error_log("MoniTag Progress - user_id=$user_id, time=" . date('Y-m-d H:i:s'));
+
 try {
     $conn = getDbConnection();
     
     // Buscar número de impressões e cliques necessários DO USUÁRIO (randomizado por usuário)
     $required_impressions = 5; // valor padrão
-    $required_clicks = 1; // valor padrão
+    $required_clicks = 1; // valor padrão (FIXO)
     
     // Primeiro, tentar buscar da tabela user_required_impressions
     $user_settings_stmt = $conn->prepare("
@@ -58,9 +68,9 @@ try {
         $required_impressions = (int)$user_row['required_impressions'];
         $required_clicks = (int)($user_row['required_clicks'] ?? 1);
     } else {
-        // Usuário não tem valor ainda, criar um aleatório (impressões: 5-10, cliques: 1-3)
-        $required_impressions = rand(5, 10);
-        $required_clicks = 1; // Fixo em 1 clique
+        // Usuário não tem valor ainda, criar um aleatório (impressões: 5-12, cliques: 1)
+        $required_impressions = rand(5, 12); // CORRIGIDO: 5-12
+        $required_clicks = 1; // FIXO em 1 clique
         
         $insert_stmt = $conn->prepare("
             INSERT INTO user_required_impressions (user_id, required_impressions, required_clicks)
@@ -72,6 +82,8 @@ try {
         $insert_stmt->bind_param("iii", $user_id, $required_impressions, $required_clicks);
         $insert_stmt->execute();
         $insert_stmt->close();
+        
+        error_log("MoniTag Progress - Novo usuário: impressions=$required_impressions, clicks=$required_clicks");
     }
     $user_settings_stmt->close();
     
@@ -98,9 +110,12 @@ try {
         'required_clicks' => $required_clicks,
         'impressions_completed' => (int)$progress['impressions'] >= $required_impressions,
         'clicks_completed' => (int)$progress['clicks'] >= $required_clicks,
-        'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks
+        'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks,
+        'server_time' => date('Y-m-d H:i:s'),
+        'timezone' => 'America/Sao_Paulo'
     ];
     
+    error_log("MoniTag Progress - Response: " . json_encode($response));
     sendSuccess($response);
     
 } catch (Exception $e) {

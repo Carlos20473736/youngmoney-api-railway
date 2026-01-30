@@ -1,14 +1,22 @@
 <?php
 /**
- * Endpoint para randomizar o número de impressões e cliques necessários
+ * Endpoint para randomizar o número de impressões e cliques necessários (CORRIGIDO)
  * Deve ser chamado quando o ranking é resetado
  * 
  * GET /monetag/randomize_impressions.php
  * 
  * Randomiza:
- * - Impressões: 5 a 10
- * - Cliques: 1 a 3
+ * - Impressões: 5 a 12 (CORRIGIDO)
+ * - Cliques: 1 (FIXO)
+ * 
+ * CORREÇÕES APLICADAS:
+ * 1. Timezone padronizado para America/Sao_Paulo
+ * 2. Range de impressões corrigido para 5-12
+ * 3. Logs de debug melhorados
  */
+
+// DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
+date_default_timezone_set('America/Sao_Paulo');
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -33,12 +41,16 @@ function sendError($message, $code = 400) {
     exit;
 }
 
+error_log("MoniTag Randomize - Iniciando randomização - Time: " . date('Y-m-d H:i:s'));
+
 try {
     $conn = getDbConnection();
     
     // Gerar números aleatórios
-    $random_impressions = rand(5, 10); // Entre 5 e 10 impressões
-    $random_clicks = 1; // Fixo em 1 clique
+    $random_impressions = rand(5, 12); // CORRIGIDO: Entre 5 e 12 impressões
+    $random_clicks = 1; // FIXO em 1 clique
+    
+    error_log("MoniTag Randomize - Valores gerados: impressions=$random_impressions, clicks=$random_clicks");
     
     // Atualizar configuração global de impressões
     $check_stmt = $conn->prepare("
@@ -98,13 +110,14 @@ try {
     
     $conn->close();
     
-    error_log("MoniTag - Impressões randomizadas para: $random_impressions, Cliques randomizados para: $random_clicks");
+    error_log("MoniTag Randomize - Sucesso: impressions=$random_impressions, clicks=$random_clicks");
     
     sendSuccess([
         'required_impressions' => $random_impressions,
         'required_clicks' => $random_clicks,
         'message' => 'Número de impressões e cliques randomizado com sucesso',
-        'timestamp' => date('Y-m-d H:i:s')
+        'timestamp' => date('Y-m-d H:i:s'),
+        'timezone' => 'America/Sao_Paulo'
     ]);
     
 } catch (Exception $e) {

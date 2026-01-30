@@ -1,6 +1,6 @@
 <?php
 /**
- * API ÚNICA DE RESET COMPLETO - POSTBACK MONETAG + ROLETA
+ * API ÚNICA DE RESET COMPLETO - POSTBACK MONETAG + ROLETA (CORRIGIDO)
  * 
  * Endpoint: GET /monetag/reset_postback.php
  * 
@@ -8,14 +8,23 @@
  * 1. Reseta os dados no servidor monetag-postback-server (impressões e cliques reais)
  * 2. Deleta todos os eventos de monetag_events (todos os usuários) - RESETA IMPRESSÕES E CLIQUES locais
  * 3. Reseta contadores de impressões/cliques dos usuários na tabela users
- * 4. Randomiza o número de impressões necessárias (5 a 10) E cliques necessários (1 a 3)
+ * 4. Randomiza o número de impressões necessárias (5 a 12) E cliques necessários (1 FIXO)
  * 5. Reseta os giros da roleta (deleta spin_history)
  * 
  * Usar no CronJob para resetar TUDO junto
+ * 
+ * CORREÇÕES APLICADAS:
+ * 1. Timezone padronizado para America/Sao_Paulo
+ * 2. Range de impressões corrigido para 5-12
+ * 3. Cliques fixo em 1
+ * 4. Logs de debug melhorados
  */
 
 error_reporting(0);
 ini_set('display_errors', '0');
+
+// DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
+date_default_timezone_set('America/Sao_Paulo');
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -26,9 +35,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
-
-// Configurar timezone
-date_default_timezone_set('America/Sao_Paulo');
 
 require_once __DIR__ . '/../database.php';
 
@@ -94,6 +100,8 @@ function resetMonetagPostbackServer() {
         'http_code' => $httpCode
     ];
 }
+
+error_log("Reset Completo - Iniciando - Time: " . date('Y-m-d H:i:s') . " - Timezone: America/Sao_Paulo");
 
 try {
     $conn = getDbConnection();
@@ -203,7 +211,7 @@ try {
     }
     
     // ========================================
-    // 4. RANDOMIZAR IMPRESSÕES (5-25) E CLIQUES (1-3) NECESSÁRIOS POR USUÁRIO
+    // 4. RANDOMIZAR IMPRESSÕES (5-12) E CLIQUES (1 FIXO) NECESSÁRIOS POR USUÁRIO
     // ========================================
     
     // Criar tabela user_required_impressions se não existir (com coluna required_clicks)
@@ -242,8 +250,8 @@ try {
     
     while ($user = $users_result->fetch_assoc()) {
         $user_id = $user['id'];
-        $random_impressions = rand(5, 12); // Aleatório entre 5 e 25 para impressões
-        $random_clicks = 1; // Fixo em 1 clique
+        $random_impressions = rand(5, 12); // CORRIGIDO: Aleatório entre 5 e 12 para impressões
+        $random_clicks = 1; // FIXO em 1 clique
         
         // Inserir ou atualizar impressões e cliques necessários do usuário
         $stmt = $conn->prepare("
@@ -269,7 +277,7 @@ try {
     }
     
     $results['monetag_local']['users_randomized'] = $users_randomized;
-    $results['monetag_local']['randomized_impressions_range'] = '5-12';
+    $results['monetag_local']['randomized_impressions_range'] = '5-12'; // CORRIGIDO
     $results['monetag_local']['randomized_clicks_range'] = '1 (fixo)';
     $results['monetag_local']['randomized_sample'] = $randomized_details;
     
@@ -304,6 +312,8 @@ try {
     // Commit da transação
     $conn->commit();
     $conn->close();
+    
+    error_log("Reset Completo: SUCESSO - " . json_encode($results));
     
     // Retornar sucesso
     sendSuccess($results);

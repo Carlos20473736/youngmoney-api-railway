@@ -1,12 +1,20 @@
 <?php
 /**
- * MoniTag Postback Endpoint (Simplificado)
+ * MoniTag Postback Endpoint (CORRIGIDO)
  * Recebe postbacks do frontend via GET
  * URL: /monetag/postback.php?type={type}&user_id={user_id}
  * 
  * type: 'impression' ou 'click'
  * user_id: ID do usuário
+ * 
+ * CORREÇÕES APLICADAS:
+ * 1. Timezone padronizado para America/Sao_Paulo
+ * 2. Validação de limite diário ANTES de inserir
+ * 3. Logs de debug melhorados
  */
+
+// DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
+date_default_timezone_set('America/Sao_Paulo');
 
 // CORS MUST be first
 require_once __DIR__ . '/../cors.php';
@@ -27,14 +35,14 @@ function sendError($message, $code = 400) {
 }
 
 // Log para debug
-error_log("MoniTag Postback Simple - Method: " . $_SERVER['REQUEST_METHOD']);
-error_log("MoniTag Postback Simple - GET params: " . json_encode($_GET));
+error_log("MoniTag Postback - Method: " . $_SERVER['REQUEST_METHOD'] . " - Time: " . date('Y-m-d H:i:s'));
+error_log("MoniTag Postback - GET params: " . json_encode($_GET));
 
 // Aceitar GET ou POST
 $type = $_GET['type'] ?? $_POST['type'] ?? null;
 $user_id = $_GET['user_id'] ?? $_POST['user_id'] ?? null;
 
-error_log("MoniTag Postback Simple - Parsed: type=$type, user_id=$user_id");
+error_log("MoniTag Postback - Parsed: type=$type, user_id=$user_id");
 
 // Validar type
 if (!$type) {
@@ -58,19 +66,9 @@ $session_id = 'web_' . uniqid() . '_' . time();
 try {
     $conn = getDbConnection();
     
-    // Inserir evento
-    $stmt = $conn->prepare("
-        INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
-        VALUES (?, ?, ?, 0, NOW())
-    ");
-    $stmt->bind_param("iss", $user_id, $type, $session_id);
-    $stmt->execute();
-    $event_id = $stmt->insert_id;
-    $stmt->close();
-    
-    error_log("MoniTag Postback Simple - Event registered: ID=$event_id, user_id=$user_id, type=$type");
-    
-    // Buscar número de impressões e cliques necessários DO USUÁRIO
+    // ========================================
+    // BUSCAR LIMITES DO USUÁRIO
+    // ========================================
     $required_impressions = 5;
     $required_clicks = 1;
     
@@ -88,8 +86,75 @@ try {
     }
     $user_settings_stmt->close();
     
-    // Buscar progresso atualizado do dia
+    // ========================================
+    // VERIFICAR LIMITE DIÁRIO ANTES DE INSERIR
+    // ========================================
     $today = date('Y-m-d');
+    
+    $check_limit_stmt = $conn->prepare("
+        SELECT COUNT(*) as total FROM monetag_events 
+        WHERE user_id = ? AND event_type = ? AND DATE(created_at) = ?
+    ");
+    $check_limit_stmt->bind_param("iss", $user_id, $type, $today);
+    $check_limit_stmt->execute();
+    $limit_result = $check_limit_stmt->get_result();
+    $current_count = (int)$limit_result->fetch_assoc()['total'];
+    $check_limit_stmt->close();
+    
+    // Definir limite baseado no tipo
+    $limit = ($type === 'click') ? $required_clicks : $required_impressions;
+    
+    // Se já atingiu o limite, retornar sucesso mas sem registrar
+    if ($current_count >= $limit) {
+        error_log("MoniTag Postback - Limite diário atingido: user_id=$user_id, type=$type, count=$current_count, limit=$limit");
+        
+        // Buscar progresso atual para retornar
+        $stmt = $conn->prepare("
+            SELECT 
+                COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
+                COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
+            FROM monetag_events
+            WHERE user_id = ? AND DATE(created_at) = ?
+        ");
+        $stmt->bind_param("is", $user_id, $today);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $progress = $result->fetch_assoc();
+        $stmt->close();
+        $conn->close();
+        
+        sendSuccess([
+            'event_registered' => false,
+            'message' => 'Limite diário já atingido para ' . $type,
+            'event_type' => $type,
+            'user_id' => $user_id,
+            'progress' => [
+                'impressions' => (int)$progress['impressions'],
+                'clicks' => (int)$progress['clicks'],
+                'required_impressions' => $required_impressions,
+                'required_clicks' => $required_clicks,
+                'impressions_completed' => (int)$progress['impressions'] >= $required_impressions,
+                'clicks_completed' => (int)$progress['clicks'] >= $required_clicks,
+                'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks
+            ]
+        ]);
+    }
+    
+    // ========================================
+    // INSERIR EVENTO (LIMITE NÃO ATINGIDO)
+    // ========================================
+    $stmt = $conn->prepare("
+        INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
+        VALUES (?, ?, ?, 0, NOW())
+    ");
+    $stmt->bind_param("iss", $user_id, $type, $session_id);
+    $stmt->execute();
+    $event_id = $stmt->insert_id;
+    $stmt->close();
+    
+    error_log("MoniTag Postback - Event registered: ID=$event_id, user_id=$user_id, type=$type, time=" . date('Y-m-d H:i:s'));
+    
+    // Buscar progresso atualizado do dia
     $stmt = $conn->prepare("
         SELECT 
             COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
@@ -121,11 +186,11 @@ try {
         ]
     ];
     
-    error_log("MoniTag Postback Simple - Success: " . json_encode($response));
+    error_log("MoniTag Postback - Success: " . json_encode($response));
     sendSuccess($response);
     
 } catch (Exception $e) {
-    error_log("MoniTag Postback Simple Error: " . $e->getMessage());
+    error_log("MoniTag Postback Error: " . $e->getMessage());
     sendError('Erro ao registrar evento: ' . $e->getMessage(), 500);
 }
 ?>
