@@ -1374,18 +1374,10 @@
     }
 
     // ========================================
-    // SISTEMA DE DETECÇÃO DE ANÚNCIO COMPLETO
-    // A impressão só é contabilizada quando o anúncio é assistido até o final
+    // SISTEMA DE POSTBACK - IMPRESSÃO SÓ VIA OVERLAY
+    // A impressão SÓ é enviada quando o overlay chegar em 3 segundos
+    // NÃO envia impressão automaticamente quando anúncio abre/fecha
     // ========================================
-    
-    // Estado do anúncio atual
-    const AdState = {
-        isAdOpen: false,
-        adStartTime: null,
-        adMinDuration: 5000, // Tempo mínimo em ms para considerar anúncio assistido (5 segundos)
-        pendingImpression: false,
-        adCheckInterval: null
-    };
     
     // Função para detectar tipo de evento baseado na URL
     function detectEventType(url) {
@@ -1402,83 +1394,6 @@
     function isMonetagPostback(url) {
         return (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server')) && 
                (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
-    }
-    
-    // Função para detectar se há um anúncio aberto na tela
-    function isAdVisible() {
-        // Detectar iframes de anúncio do Monetag
-        const adIframes = document.querySelectorAll('iframe[src*="monetag"], iframe[src*="libtl"], iframe[src*="surfe"]');
-        if (adIframes.length > 0) return true;
-        
-        // Detectar overlays/modais de anúncio
-        const adOverlays = document.querySelectorAll('[class*="ad-overlay"], [class*="interstitial"], [id*="monetag"]');
-        if (adOverlays.length > 0) return true;
-        
-        // Detectar elementos com z-index muito alto (típico de anúncios)
-        const highZElements = document.querySelectorAll('[style*="z-index: 9999"], [style*="z-index:9999"], [style*="z-index: 2147483647"]');
-        for (let el of highZElements) {
-            if (el.tagName === 'IFRAME' || el.querySelector('iframe')) return true;
-        }
-        
-        // Detectar por visibilidade de elementos que cobrem a tela
-        const fullscreenElements = document.querySelectorAll('[style*="position: fixed"][style*="width: 100"], [style*="position:fixed"][style*="width:100"]');
-        for (let el of fullscreenElements) {
-            if (el.offsetWidth > window.innerWidth * 0.8 && el.offsetHeight > window.innerHeight * 0.8) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    // Função para monitorar quando o anúncio fecha
-    function startAdMonitoring() {
-        if (AdState.adCheckInterval) return;
-        
-        console.log('[AD-MONITOR] 👀 Iniciando monitoramento do anúncio...');
-        AdState.isAdOpen = true;
-        AdState.adStartTime = Date.now();
-        AdState.pendingImpression = true;
-        
-        AdState.adCheckInterval = setInterval(() => {
-            const adStillVisible = isAdVisible();
-            
-            if (!adStillVisible && AdState.isAdOpen) {
-                // Anúncio fechou!
-                const adDuration = Date.now() - AdState.adStartTime;
-                console.log(`[AD-MONITOR] 🎬 Anúncio fechado após ${adDuration}ms`);
-                
-                // Verificar se o anúncio foi assistido por tempo suficiente
-                if (adDuration >= AdState.adMinDuration && AdState.pendingImpression) {
-                    console.log('[AD-MONITOR] ✅ Anúncio assistido até o final! Registrando impressão...');
-                    sendPostbackToServer('impression');
-                    AdState.pendingImpression = false;
-                } else if (adDuration < AdState.adMinDuration) {
-                    console.log(`[AD-MONITOR] ⚠️ Anúncio fechado muito rápido (${adDuration}ms < ${AdState.adMinDuration}ms). Impressão NÃO contabilizada.`);
-                    AdState.pendingImpression = false;
-                }
-                
-                // Limpar estado
-                AdState.isAdOpen = false;
-                AdState.adStartTime = null;
-                clearInterval(AdState.adCheckInterval);
-                AdState.adCheckInterval = null;
-            }
-        }, 500); // Verificar a cada 500ms
-        
-        // Timeout de segurança: se o anúncio ficar aberto por mais de 2 minutos, considerar como assistido
-        setTimeout(() => {
-            if (AdState.pendingImpression && AdState.isAdOpen) {
-                console.log('[AD-MONITOR] ⏰ Timeout de segurança atingido. Registrando impressão...');
-                sendPostbackToServer('impression');
-                AdState.pendingImpression = false;
-                AdState.isAdOpen = false;
-                if (AdState.adCheckInterval) {
-                    clearInterval(AdState.adCheckInterval);
-                    AdState.adCheckInterval = null;
-                }
-            }
-        }, 120000); // 2 minutos
     }
     
     async function sendPostbackToServer(type) {
