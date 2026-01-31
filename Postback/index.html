@@ -2481,12 +2481,35 @@
     window.addEventListener('DOMContentLoaded', function() {
         // VERIFICAR MANUTENÇÃO NOTURNA PRIMEIRO
         if (window.isNightMaintenance) {
-            console.log('[NIGHT MAINTENANCE] 🌙 Sistema em manutenção noturna - bloqueando init');
-            // Esconder elementos principais
-            const header = document.querySelector('.header');
-            const mainContent = document.querySelector('.main-content');
-            if (header) header.style.display = 'none';
-            if (mainContent) mainContent.style.display = 'none';
+            console.log('[NIGHT MAINTENANCE] 🌙 Sistema em manutenção noturna - modificando botão');
+            
+            // Modificar o botão ASSISTIR ANÚCIO para mostrar VOLTAMOS À MEIA-NOITE
+            const adButton = document.getElementById('adButton');
+            if (adButton) {
+                adButton.innerHTML = '<i class="fas fa-moon"></i> VOLTAMOS À MEIA-NOITE';
+                adButton.style.display = 'flex';
+                adButton.disabled = true;
+                adButton.style.background = 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)';
+                adButton.style.cursor = 'not-allowed';
+                adButton.style.opacity = '0.8';
+            }
+            
+            // Atualizar textos de loading para valores padrão
+            const reqImpText = document.getElementById('requiredImpressionsText');
+            const reqClickText = document.getElementById('requiredClicksText');
+            if (reqImpText) reqImpText.textContent = '9 anúncios';
+            if (reqClickText) reqClickText.textContent = '1 anúncio';
+            
+            // Atualizar contadores
+            const impressionCount = document.getElementById('impressionCount');
+            const clickCount = document.getElementById('clickCount');
+            const statImpressions = document.getElementById('statImpressions');
+            const statClicks = document.getElementById('statClicks');
+            if (impressionCount) impressionCount.textContent = '0/9';
+            if (clickCount) clickCount.textContent = '0/1';
+            if (statImpressions) statImpressions.textContent = '0';
+            if (statClicks) statClicks.textContent = '0';
+            
             return; // NÃO executar init durante manutenção
         }
         init();
