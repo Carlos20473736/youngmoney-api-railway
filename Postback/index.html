@@ -936,18 +936,45 @@
         if (countdownSeconds) countdownSeconds.textContent = String(time.seconds).padStart(2, '0');
     }
 
+    function hideMainContent() {
+        // Esconder header, main-content e todos os elementos principais
+        const header = document.querySelector('.header');
+        const mainContent = document.querySelector('.main-content');
+        const starsBackground = document.querySelector('.stars-background');
+        
+        if (header) header.style.display = 'none';
+        if (mainContent) mainContent.style.display = 'none';
+        // Manter o fundo de estrelas visível
+    }
+
+    function showMainContent() {
+        const header = document.querySelector('.header');
+        const mainContent = document.querySelector('.main-content');
+        
+        if (header) header.style.display = '';
+        if (mainContent) mainContent.style.display = '';
+    }
+
     function checkNightMaintenance() {
         if (isNightMaintenanceTime()) {
             if (nightOverlay) nightOverlay.classList.add('active');
+            hideMainContent();
             updateCountdown();
             return true;
         } else {
             if (nightOverlay) nightOverlay.classList.remove('active');
+            showMainContent();
             return false;
         }
     }
 
+    // Verificar imediatamente ao carregar
     window.isNightMaintenance = checkNightMaintenance();
+    
+    // Também verificar quando o DOM estiver pronto
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkNightMaintenance);
+    }
 
     setInterval(() => {
         const wasMaintenance = window.isNightMaintenance;
