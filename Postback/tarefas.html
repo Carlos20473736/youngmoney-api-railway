@@ -1145,10 +1145,41 @@
         lastImpressions: 0,
         lastClicks: 0,
         lastEventId: 0,
-        requiredImpressionsLoaded: false
+        requiredImpressionsLoaded: false,
+        adScheduleBlocked: false,
+        adScheduleMessage: ''
     };
 
     let autoRefreshInterval = null;
+
+    // ========================================
+    // VERIFICAÇÃO DE HORÁRIO PARA ANÚNCIOS
+    // Bloqueia anúncios entre 9h e meia-noite
+    // ========================================
+    async function checkAdSchedule() {
+        try {
+            console.log('[AD_SCHEDULE] Verificando disponibilidade de horário...');
+            const url = `${YOUNGMONEY_API}/api/ad_schedule.php`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            console.log('[AD_SCHEDULE] Resposta:', data);
+
+            if (data.success && data.data) {
+                TaskState.adScheduleBlocked = !data.data.is_available;
+                TaskState.adScheduleMessage = data.data.message || '';
+                
+                console.log('[AD_SCHEDULE] Bloqueado:', TaskState.adScheduleBlocked);
+                console.log('[AD_SCHEDULE] Mensagem:', TaskState.adScheduleMessage);
+                
+                updateUI();
+            }
+        } catch (error) {
+            console.error('[AD_SCHEDULE] ❌ Erro ao verificar horário:', error);
+            // Em caso de erro, não bloqueia (permite anúncios)
+            TaskState.adScheduleBlocked = false;
+        }
+    }
 
     async function fetchRequiredImpressions() {
         try {
@@ -1271,6 +1302,7 @@
 
         fetchUserProfileAsync();
         fetchRequiredImpressions();
+        checkAdSchedule(); // Verificar horário de anúncios
         updateUI();
         loadMonetagSDK();
         fetchStats();
@@ -1391,10 +1423,22 @@
         if (taskCompleted) {
             button.style.display = 'none';
             showStatus('<i class="fas fa-check-circle"></i> Parabéns! Tarefa concluída. Volte para girar a roleta!', 'success');
+        } else if (TaskState.adScheduleBlocked) {
+            // Horário bloqueado (9h - meia-noite)
+            button.style.display = 'flex';
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-moon"></i> VOLTAMOS À MEIA-NOITE';
+            button.style.background = 'linear-gradient(135deg, #4a5568 0%, #2d3748 100%)';
+            button.style.cursor = 'not-allowed';
+            button.style.opacity = '0.8';
+            showStatus('<i class="fas fa-clock"></i> Anúncios disponíveis das 00h às 09h. Volte à meia-noite!', 'warning');
         } else {
             hideStatus();
             button.style.display = 'flex';
             button.disabled = TaskState.isLoading || TaskState.isProcessing;
+            button.style.background = '';
+            button.style.cursor = '';
+            button.style.opacity = '';
 
             if (TaskState.isLoading) {
                 button.innerHTML = '<span class="spinner"></span> CARREGANDO DADOS...';
@@ -1424,6 +1468,12 @@
     }
 
     function handleAdClick() {
+        // Verificar se está no horário bloqueado
+        if (TaskState.adScheduleBlocked) {
+            showStatus('<i class="fas fa-clock"></i> Anúncios disponíveis das 00h às 09h. Volte à meia-noite!', 'warning');
+            return;
+        }
+
         if (TaskState.isProcessing) return;
 
         TaskState.isProcessing = true;
