@@ -75,6 +75,9 @@ try {
         )",
         
         // 6. Criar tabela monetag_events
+        // CORREÇÃO: Removida a restrição de chave estrangeira (FOREIGN KEY) para evitar erros        // 6. Criar tabela monetag_events
+        // CORREÇÃO: Removida a restrição de chave estrangeira (FOREIGN KEY) para evitar erros
+        // quando o user_id não existe na tabela users (ex: usuários novos ou temporários)
         "CREATE TABLE IF NOT EXISTS monetag_events (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -82,11 +85,8 @@ try {
             session_id VARCHAR(255),
             ip_address VARCHAR(45),
             user_agent TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )",
-        
-        // 7. Criar tabela active_sessions
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )",Criar tabela active_sessions
         "CREATE TABLE IF NOT EXISTS active_sessions (
             id INT AUTO_INCREMENT PRIMARY KEY,
             session_id VARCHAR(255) UNIQUE NOT NULL,

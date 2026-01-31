@@ -5,18 +5,20 @@
  */
 
 if (!headers_sent()) {
-    // Allow all origins (including WebView with origin 'null')
+    // CORREÇÃO CORS: Garantir que o header Access-Control-Allow-Origin seja envif (!headers_sent()) {
+    // CORREÇÃO CORS: Garantir que o header Access-Control-Allow-Origin seja enviado corretamente
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
     
-    // Se a origem for 'null' (WebView) ou qualquer HTTP/HTTPS, permitir
-    if ($origin === 'null' || $origin === '*' || strpos($origin, 'http') === 0) {
+    // Permitir explicitamente a origem do frontend ou qualquer origem segura
+    if ($origin !== '*') {
         header("Access-Control-Allow-Origin: $origin");
+        header('Vary: Origin');
     } else {
         header('Access-Control-Allow-Origin: *');
     }
     
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Req, X-Device-ID, X-Timestamp, X-Signature, X-App-Version, X-Platform, X-Platform-Version, X-Device-Model, X-Session-ID, X-Device-Fingerprint, Accept, Origin');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Req, X-Device-ID, X-Timestamp, X-Signature, X-App-Version, X-Platform, X-Platform-Version, X-Device-Model, X-Session-ID, X-Device-Fingerprint, Accept, Origin, X-New-Req');
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Max-Age: 86400');
     header('Access-Control-Expose-Headers: X-New-Req');
@@ -27,4 +29,3 @@ if (!headers_sent()) {
         exit(0);
     }
 }
-?>

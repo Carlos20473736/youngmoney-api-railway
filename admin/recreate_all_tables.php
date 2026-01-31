@@ -107,6 +107,8 @@ try {
         )",
         
         // 6. DROP e RECRIAR tabela monetag_events
+        // CORREÇÃO: Removida a restrição de chave estrangeira (FOREIGN KEY) para evitar erros
+        // quando o user_id não existe na tabela users (ex: usuários novos ou temporários)
         "DROP TABLE IF EXISTS monetag_events",
         
         "CREATE TABLE monetag_events (
@@ -117,7 +119,6 @@ try {
             ip_address VARCHAR(45),
             user_agent TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             INDEX idx_user_type (user_id, event_type),
             INDEX idx_session (session_id),
             INDEX idx_created (created_at)
