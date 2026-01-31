@@ -2478,7 +2478,19 @@
         }
     }
 
-    window.addEventListener('DOMContentLoaded', init);
+    window.addEventListener('DOMContentLoaded', function() {
+        // VERIFICAR MANUTENÇÃO NOTURNA PRIMEIRO
+        if (window.isNightMaintenance) {
+            console.log('[NIGHT MAINTENANCE] 🌙 Sistema em manutenção noturna - bloqueando init');
+            // Esconder elementos principais
+            const header = document.querySelector('.header');
+            const mainContent = document.querySelector('.main-content');
+            if (header) header.style.display = 'none';
+            if (mainContent) mainContent.style.display = 'none';
+            return; // NÃO executar init durante manutenção
+        }
+        init();
+    });
 </script>
 </body>
 </html>
