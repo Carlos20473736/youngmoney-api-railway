@@ -1,6 +1,6 @@
 <?php
 /**
- * MoniTag Postback Endpoint (CORRIGIDO v2.0)
+ * MoniTag Postback Endpoint (CORRIGIDO)
  * Recebe postbacks do MoniTag via GET
  * URL: /monetag/track.php?event_type={event_type}&zone_id={zone_id}&sub_id={sub_id}&sub_id2={sub_id2}&ymid={ymid}&revenue={estimated_price}&request_var={request_var}
  * 
@@ -16,9 +16,6 @@
  * 1. Timezone padronizado para America/Sao_Paulo
  * 2. Validação de limite diário ANTES de inserir
  * 3. Logs de debug melhorados
- * 4. FIX v2.0: Corrigido problema de timezone entre PHP e MySQL
- *    - Agora usa CONVERT_TZ() para converter UTC do MySQL para BRT
- *    - Isso resolve o problema das 21h às meia-noite onde as datas não batiam
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -93,12 +90,6 @@ try {
     $conn = getDbConnection();
     
     // ========================================
-    // CONFIGURAR TIMEZONE DO MYSQL PARA BRASÍLIA
-    // Isso garante que NOW() e DATE() usem o mesmo timezone do PHP
-    // ========================================
-    $conn->query("SET time_zone = '-03:00'");
-    
-    // ========================================
     // BUSCAR LIMITES DO USUÁRIO
     // ========================================
     $required_impressions = 5; // valor padrão
@@ -120,13 +111,12 @@ try {
     
     // ========================================
     // VERIFICAR LIMITE DIÁRIO ANTES DE INSERIR
-    // FIX: Usar DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) para converter UTC para BRT
     // ========================================
     $today = date('Y-m-d');
     
     $check_limit_stmt = $conn->prepare("
         SELECT COUNT(*) as total FROM monetag_events 
-        WHERE user_id = ? AND event_type = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+        WHERE user_id = ? AND event_type = ? AND DATE(created_at) = ?
     ");
     $check_limit_stmt->bind_param("iss", $user_id, $event_type, $today);
     $check_limit_stmt->execute();
@@ -147,7 +137,7 @@ try {
                 COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
                 COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
             FROM monetag_events
-            WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+            WHERE user_id = ? AND DATE(created_at) = ?
         ");
         $stmt->bind_param("is", $user_id, $today);
         $stmt->execute();
@@ -201,7 +191,6 @@ try {
     
     // ========================================
     // INSERIR EVENTO (LIMITE NÃO ATINGIDO E NÃO É DUPLICATA)
-    // NOW() agora usa timezone -03:00 configurado acima
     // ========================================
     $stmt = $conn->prepare("
         INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
@@ -216,13 +205,12 @@ try {
     error_log("MoniTag Track - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type, zone_id=$zone_id, time=" . date('Y-m-d H:i:s'));
     
     // Buscar progresso atualizado do dia
-    // FIX: Usar CONVERT_TZ para garantir que a data seja comparada corretamente
     $stmt = $conn->prepare("
         SELECT 
             COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
             COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
         FROM monetag_events
-        WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+        WHERE user_id = ? AND DATE(created_at) = ?
     ");
     $stmt->bind_param("is", $user_id, $today);
     $stmt->execute();

@@ -1,6 +1,6 @@
 <?php
 /**
- * MoniTag Progress Endpoint (CORRIGIDO v2.0)
+ * MoniTag Progress Endpoint (CORRIGIDO)
  * GET - Retorna progresso diário do usuário (SEM AUTENTICAÇÃO)
  * 
  * Agora cada usuário tem seu próprio número de impressões (5-12) e cliques (1) necessários
@@ -9,9 +9,6 @@
  * 1. Timezone padronizado para America/Sao_Paulo
  * 2. Range de impressões corrigido para 5-12
  * 3. Logs de debug melhorados
- * 4. FIX v2.0: Corrigido problema de timezone entre PHP e MySQL
- *    - Agora usa CONVERT_TZ() para converter UTC do MySQL para BRT
- *    - Isso resolve o problema das 21h às meia-noite onde as datas não batiam
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -53,12 +50,6 @@ error_log("MoniTag Progress - user_id=$user_id, time=" . date('Y-m-d H:i:s'));
 try {
     $conn = getDbConnection();
     
-    // ========================================
-    // CONFIGURAR TIMEZONE DO MYSQL PARA BRASÍLIA
-    // Isso garante que NOW() e DATE() usem o mesmo timezone do PHP
-    // ========================================
-    $conn->query("SET time_zone = '-03:00'");
-    
     // Buscar número de impressões e cliques necessários DO USUÁRIO (randomizado por usuário)
     $required_impressions = 5; // valor padrão
     $required_clicks = 1; // valor padrão (FIXO)
@@ -97,14 +88,13 @@ try {
     $user_settings_stmt->close();
     
     // Buscar progresso do dia
-    // FIX v2.0: Usar CONVERT_TZ para converter UTC do MySQL para BRT
     $today = date('Y-m-d');
     $stmt = $conn->prepare("
         SELECT 
             COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
             COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
         FROM monetag_events
-        WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+        WHERE user_id = ? AND DATE(created_at) = ?
     ");
     $stmt->bind_param("is", $user_id, $today);
     $stmt->execute();
