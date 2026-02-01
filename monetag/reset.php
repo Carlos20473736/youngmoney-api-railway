@@ -3,7 +3,14 @@
  * Endpoint para resetar dados de MoniTag de um usuário
  * 
  * Uso: GET /monetag/reset.php?user_id=2&admin_key=your_secret_key
+ * 
+ * CORREÇÃO DE TIMEZONE APLICADA:
+ * - Define timezone de Brasília
+ * - Configura timezone na conexão MySQL
  */
+
+// DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
+date_default_timezone_set('America/Sao_Paulo');
 
 header('Content-Type: application/json');
 
@@ -41,6 +48,9 @@ try {
             PDO::ATTR_EMULATE_PREPARES => false,
         ]
     );
+    
+    // CORREÇÃO: Definir timezone na conexão MySQL
+    $pdo->exec("SET time_zone = '-03:00'");
 
     // Iniciar transação
     $pdo->beginTransaction();
@@ -80,7 +90,8 @@ try {
         'data' => [
             'user_id' => $user_id,
             'deleted_events' => $deleted_events,
-            'timestamp' => date('Y-m-d H:i:s')
+            'timestamp' => date('Y-m-d H:i:s'),
+            'timezone' => 'America/Sao_Paulo'
         ]
     ]);
 

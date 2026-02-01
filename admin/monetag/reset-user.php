@@ -2,7 +2,13 @@
 /**
  * Reset User Progress - MoniTag Missions
  * POST - Reseta contadores diários de um usuário específico
+ * 
+ * CORREÇÃO DE TIMEZONE APLICADA:
+ * - Usa CONVERT_TZ para converter datas UTC para Brasília
  */
+
+// DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
+date_default_timezone_set('America/Sao_Paulo');
 
 require_once __DIR__ . '/../cors.php';
 header('Content-Type: application/json');
@@ -19,14 +25,18 @@ try {
     
     $conn = getDbConnection();
     
+    // Data de hoje no timezone de Brasília
+    $today = date('Y-m-d');
+    
     // Deletar eventos de hoje do usuário
+    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
     $stmt = $conn->prepare("
         DELETE FROM monetag_events 
         WHERE user_id = ? 
-        AND DATE(created_at) = CURDATE()
+        AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
     ");
     
-    $stmt->bind_param('i', $userId);
+    $stmt->bind_param('is', $userId, $today);
     $stmt->execute();
     
     $deleted = $stmt->affected_rows;
@@ -39,7 +49,9 @@ try {
         'data' => [
             'user_id' => $userId,
             'events_deleted' => $deleted,
-            'message' => 'Progresso diário resetado com sucesso'
+            'message' => 'Progresso diário resetado com sucesso',
+            'server_time' => date('Y-m-d H:i:s'),
+            'timezone' => 'America/Sao_Paulo'
         ]
     ]);
     

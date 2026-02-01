@@ -156,7 +156,9 @@ try {
         }
         
         // 3. Deletar registros de spin de hoje
-        $stmt = $conn->prepare("DELETE FROM spin_history WHERE DATE(created_at) = CURDATE()");
+        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+        $stmt = $conn->prepare("DELETE FROM spin_history WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?");
+        $stmt->bind_param("s", $current_date);
         $stmt->execute();
         
         // 4. Atualizar last_reset_datetime (para liberar check-in)

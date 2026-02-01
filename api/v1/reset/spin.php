@@ -73,6 +73,9 @@ try {
     
     $conn->set_charset("utf8mb4");
     
+    // CORREÇÃO: Definir timezone na conexão MySQL
+    $conn->query("SET time_zone = '-03:00'");
+    
     // Obter data atual
     $current_date = date('Y-m-d');
     $current_datetime = date('Y-m-d H:i:s');
@@ -82,10 +85,11 @@ try {
     
     try {
         // Contar quantos registros de spin serão deletados
+        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
         $stmt = $conn->prepare("
             SELECT COUNT(*) as total 
             FROM spin_history 
-            WHERE DATE(created_at) = ?
+            WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
         ");
         
         if (!$stmt) {
@@ -100,9 +104,10 @@ try {
         $stmt->close();
         
         // Deletar registros de spin de hoje
+        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
         $stmt = $conn->prepare("
             DELETE FROM spin_history 
-            WHERE DATE(created_at) = ?
+            WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
         ");
         
         if (!$stmt) {

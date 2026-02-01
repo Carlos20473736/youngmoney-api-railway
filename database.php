@@ -1,5 +1,14 @@
 <?php
-// Arquivo de Conexão com o Banco de Dados
+/**
+ * Arquivo de Conexão com o Banco de Dados
+ * 
+ * CORREÇÃO DE TIMEZONE APLICADA:
+ * - Define timezone de Brasília (America/Sao_Paulo) na conexão MySQL
+ * - Garante que NOW(), CURDATE() e outras funções de data usem o horário correto
+ */
+
+// Definir timezone do PHP para Brasília
+date_default_timezone_set('America/Sao_Paulo');
 
 function getDbConnection() {
     try {
@@ -32,7 +41,15 @@ function getDbConnection() {
             throw new Exception("Connection failed: " . $conn->connect_error);
         }
         
-        error_log("Database connection successful!");
+        // ========================================
+        // CORREÇÃO DE TIMEZONE - DEFINIR TIMEZONE NA CONEXÃO MYSQL
+        // ========================================
+        // Define o timezone da sessão MySQL para Brasília (-03:00)
+        // Isso garante que NOW(), CURDATE(), e outras funções de data
+        // usem o horário de Brasília ao invés de UTC
+        $conn->query("SET time_zone = '-03:00'");
+        
+        error_log("Database connection successful! Timezone set to America/Sao_Paulo (-03:00)");
         return $conn;
     } catch (Exception $e) {
         // Em um ambiente de produção, você pode querer logar o erro em vez de exibi-lo

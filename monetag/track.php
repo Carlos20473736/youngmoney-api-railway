@@ -16,6 +16,7 @@
  * 1. Timezone padronizado para America/Sao_Paulo
  * 2. Validação de limite diário ANTES de inserir
  * 3. Logs de debug melhorados
+ * 4. Queries SQL convertidas para usar timezone de Brasília
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -111,12 +112,13 @@ try {
     
     // ========================================
     // VERIFICAR LIMITE DIÁRIO ANTES DE INSERIR
+    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
     // ========================================
     $today = date('Y-m-d');
     
     $check_limit_stmt = $conn->prepare("
         SELECT COUNT(*) as total FROM monetag_events 
-        WHERE user_id = ? AND event_type = ? AND DATE(created_at) = ?
+        WHERE user_id = ? AND event_type = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
     ");
     $check_limit_stmt->bind_param("iss", $user_id, $event_type, $today);
     $check_limit_stmt->execute();
@@ -132,12 +134,13 @@ try {
         error_log("MoniTag Track - Limite diário atingido: user_id=$user_id, event_type=$event_type, count=$current_count, limit=$limit");
         
         // Buscar progresso atual para retornar
+        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
         $stmt = $conn->prepare("
             SELECT 
                 COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
                 COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
             FROM monetag_events
-            WHERE user_id = ? AND DATE(created_at) = ?
+            WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
         ");
         $stmt->bind_param("is", $user_id, $today);
         $stmt->execute();
@@ -205,12 +208,13 @@ try {
     error_log("MoniTag Track - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type, zone_id=$zone_id, time=" . date('Y-m-d H:i:s'));
     
     // Buscar progresso atualizado do dia
+    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
     $stmt = $conn->prepare("
         SELECT 
             COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
             COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
         FROM monetag_events
-        WHERE user_id = ? AND DATE(created_at) = ?
+        WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
     ");
     $stmt->bind_param("is", $user_id, $today);
     $stmt->execute();

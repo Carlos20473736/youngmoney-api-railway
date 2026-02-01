@@ -2,7 +2,13 @@
 /**
  * Daily Progress Endpoint - MoniTag Missions
  * GET - Retorna progresso diário de todos os usuários
+ * 
+ * CORREÇÃO DE TIMEZONE APLICADA:
+ * - Usa CONVERT_TZ para converter datas UTC para Brasília
  */
+
+// DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
+date_default_timezone_set('America/Sao_Paulo');
 
 require_once __DIR__ . '/../cors.php';
 header('Content-Type: application/json');
@@ -16,16 +22,20 @@ try {
     $REQUIRED_IMPRESSIONS = 5;
     $REQUIRED_CLICKS = 1;
     
+    // Data de hoje no timezone de Brasília
+    $today = date('Y-m-d');
+    
     // Buscar progresso diário de cada usuário
+    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
     $stmt = $conn->prepare("
         SELECT 
             u.id as user_id,
             u.name as user_name,
             u.email,
             u.points,
-            COALESCE(SUM(CASE WHEN m.event_type = 'impression' AND DATE(m.created_at) = CURDATE() THEN 1 ELSE 0 END), 0) as impressions_today,
-            COALESCE(SUM(CASE WHEN m.event_type = 'click' AND DATE(m.created_at) = CURDATE() THEN 1 ELSE 0 END), 0) as clicks_today,
-            MAX(CASE WHEN DATE(m.created_at) = CURDATE() THEN m.created_at END) as last_activity
+            COALESCE(SUM(CASE WHEN m.event_type = 'impression' AND DATE(CONVERT_TZ(m.created_at, '+00:00', '-03:00')) = ? THEN 1 ELSE 0 END), 0) as impressions_today,
+            COALESCE(SUM(CASE WHEN m.event_type = 'click' AND DATE(CONVERT_TZ(m.created_at, '+00:00', '-03:00')) = ? THEN 1 ELSE 0 END), 0) as clicks_today,
+            MAX(CASE WHEN DATE(CONVERT_TZ(m.created_at, '+00:00', '-03:00')) = ? THEN m.created_at END) as last_activity
         FROM users u
         LEFT JOIN monetag_events m ON u.id = m.user_id
         GROUP BY u.id, u.name, u.email, u.points
@@ -33,6 +43,7 @@ try {
         LIMIT 100
     ");
     
+    $stmt->bind_param("sss", $today, $today, $today);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -83,7 +94,9 @@ try {
             'stats' => [
                 'completed_today' => count(array_filter($users, fn($u) => $u['mission_completed'])),
                 'active_today' => count(array_filter($users, fn($u) => $u['last_activity'] !== null))
-            ]
+            ],
+            'server_time' => date('Y-m-d H:i:s'),
+            'timezone' => 'America/Sao_Paulo'
         ]
     ]);
     

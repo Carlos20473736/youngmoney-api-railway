@@ -107,10 +107,11 @@ try {
     $currentDateTime = date('Y-m-d H:i:s');
     
     // Verificar giros do usuário HOJE (data real)
+    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
     $stmt = $conn->prepare("
         SELECT COUNT(*) as spins_today 
         FROM spin_history 
-        WHERE user_id = ? AND DATE(created_at) = ?
+        WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
     ");
     $stmt->bind_param("is", $userId, $currentDate);
     $stmt->execute();

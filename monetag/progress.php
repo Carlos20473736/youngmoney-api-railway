@@ -9,6 +9,7 @@
  * 1. Timezone padronizado para America/Sao_Paulo
  * 2. Range de impressões corrigido para 5-12
  * 3. Logs de debug melhorados
+ * 4. Queries SQL convertidas para usar timezone de Brasília
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -88,13 +89,14 @@ try {
     $user_settings_stmt->close();
     
     // Buscar progresso do dia
+    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
     $today = date('Y-m-d');
     $stmt = $conn->prepare("
         SELECT 
             COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
             COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
         FROM monetag_events
-        WHERE user_id = ? AND DATE(created_at) = ?
+        WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
     ");
     $stmt->bind_param("is", $user_id, $today);
     $stmt->execute();
