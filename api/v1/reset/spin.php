@@ -85,11 +85,11 @@ try {
     
     try {
         // Contar quantos registros de spin serão deletados
-        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+        // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
         $stmt = $conn->prepare("
             SELECT COUNT(*) as total 
             FROM spin_history 
-            WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+            WHERE DATE(created_at) = ?
         ");
         
         if (!$stmt) {
@@ -104,10 +104,10 @@ try {
         $stmt->close();
         
         // Deletar registros de spin de hoje
-        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+        // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
         $stmt = $conn->prepare("
             DELETE FROM spin_history 
-            WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+            WHERE DATE(created_at) = ?
         ");
         
         if (!$stmt) {

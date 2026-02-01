@@ -156,8 +156,8 @@ try {
         }
         
         // 3. Deletar registros de spin de hoje
-        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
-        $stmt = $conn->prepare("DELETE FROM spin_history WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?");
+        // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
+        $stmt = $conn->prepare("DELETE FROM spin_history WHERE DATE(created_at) = ?");
         $stmt->bind_param("s", $current_date);
         $stmt->execute();
         

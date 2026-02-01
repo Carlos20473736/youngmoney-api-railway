@@ -3,8 +3,9 @@
  * Daily Progress Endpoint - MoniTag Missions
  * GET - Retorna progresso diário de todos os usuários
  * 
- * CORREÇÃO DE TIMEZONE APLICADA:
- * - Usa CONVERT_TZ para converter datas UTC para Brasília
+ * CORREÇÃO DE TIMEZONE v2:
+ * - Removido CONVERT_TZ pois MySQL já está configurado para Brasília (-03:00)
+ * - NOW() já insere em horário de Brasília, então DATE(created_at) já é correto
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -26,16 +27,16 @@ try {
     $today = date('Y-m-d');
     
     // Buscar progresso diário de cada usuário
-    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
     $stmt = $conn->prepare("
         SELECT 
             u.id as user_id,
             u.name as user_name,
             u.email,
             u.points,
-            COALESCE(SUM(CASE WHEN m.event_type = 'impression' AND DATE(CONVERT_TZ(m.created_at, '+00:00', '-03:00')) = ? THEN 1 ELSE 0 END), 0) as impressions_today,
-            COALESCE(SUM(CASE WHEN m.event_type = 'click' AND DATE(CONVERT_TZ(m.created_at, '+00:00', '-03:00')) = ? THEN 1 ELSE 0 END), 0) as clicks_today,
-            MAX(CASE WHEN DATE(CONVERT_TZ(m.created_at, '+00:00', '-03:00')) = ? THEN m.created_at END) as last_activity
+            COALESCE(SUM(CASE WHEN m.event_type = 'impression' AND DATE(m.created_at) = ? THEN 1 ELSE 0 END), 0) as impressions_today,
+            COALESCE(SUM(CASE WHEN m.event_type = 'click' AND DATE(m.created_at) = ? THEN 1 ELSE 0 END), 0) as clicks_today,
+            MAX(CASE WHEN DATE(m.created_at) = ? THEN m.created_at END) as last_activity
         FROM users u
         LEFT JOIN monetag_events m ON u.id = m.user_id
         GROUP BY u.id, u.name, u.email, u.points

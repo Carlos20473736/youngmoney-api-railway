@@ -3,8 +3,9 @@
  * Reset All Users Progress - MoniTag Missions
  * POST - Reseta contadores diários de TODOS os usuários
  * 
- * CORREÇÃO DE TIMEZONE APLICADA:
- * - Usa CONVERT_TZ para converter datas UTC para Brasília
+ * CORREÇÃO DE TIMEZONE v2:
+ * - Removido CONVERT_TZ pois MySQL já está configurado para Brasília (-03:00)
+ * - NOW() já insere em horário de Brasília, então DATE(created_at) já é correto
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -22,10 +23,10 @@ try {
     $today = date('Y-m-d');
     
     // Deletar TODOS os eventos de hoje
-    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
     $stmt = $conn->prepare("
         DELETE FROM monetag_events 
-        WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+        WHERE DATE(created_at) = ?
     ");
     
     $stmt->bind_param("s", $today);
@@ -38,7 +39,7 @@ try {
     $stmt2 = $conn->prepare("
         SELECT COUNT(DISTINCT user_id) as affected_users
         FROM (
-            SELECT user_id FROM monetag_events WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+            SELECT user_id FROM monetag_events WHERE DATE(created_at) = ?
         ) as yesterday_users
     ");
     

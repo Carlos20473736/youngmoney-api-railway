@@ -332,8 +332,8 @@ try {
     $usersKeptPoints = $totalUsersWithPoints - $usersAffected;
     
     // 2. SPIN - Deletar registros de HOJE
-    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
-    $spinsDeleted = $mysqli->query("DELETE FROM spin_history WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = '$current_date'");
+    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
+    $spinsDeleted = $mysqli->query("DELETE FROM spin_history WHERE DATE(created_at) = '$current_date'");
     $spinsDeletedCount = $mysqli->affected_rows;
     
     // 3. CHECK-IN - Atualizar last_reset_datetime (histórico preservado)

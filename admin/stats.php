@@ -2,9 +2,10 @@
 /**
  * Admin Stats Endpoint
  * 
- * CORREÇÃO DE TIMEZONE APLICADA:
+ * CORREÇÃO DE TIMEZONE v2:
  * - Define timezone de Brasília
- * - Usa CONVERT_TZ para converter datas UTC para Brasília
+ * - Removido CONVERT_TZ pois MySQL já está configurado para Brasília (-03:00)
+ * - NOW() já insere em horário de Brasília, então DATE(created_at) já é correto
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -27,11 +28,11 @@ try {
     $totalUsers = $stmt->get_result()->fetch_assoc()['total'];
     
     // Pontos distribuídos hoje
-    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
     $stmt = $conn->prepare("
         SELECT COALESCE(SUM(points), 0) as total 
         FROM points_history 
-        WHERE DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+        WHERE DATE(created_at) = ?
     ");
     $stmt->bind_param("s", $today);
     $stmt->execute();

@@ -1,6 +1,6 @@
 <?php
 /**
- * MoniTag Postback Endpoint (CORRIGIDO)
+ * MoniTag Postback Endpoint (CORRIGIDO v2)
  * Recebe postbacks do MoniTag via GET
  * URL: /monetag/track.php?event_type={event_type}&zone_id={zone_id}&sub_id={sub_id}&sub_id2={sub_id2}&ymid={ymid}&revenue={estimated_price}&request_var={request_var}
  * 
@@ -16,7 +16,8 @@
  * 1. Timezone padronizado para America/Sao_Paulo
  * 2. Validação de limite diário ANTES de inserir
  * 3. Logs de debug melhorados
- * 4. Queries SQL convertidas para usar timezone de Brasília
+ * 4. Removido CONVERT_TZ pois MySQL já está configurado para Brasília (-03:00)
+ *    NOW() já insere em horário de Brasília, então DATE(created_at) já é correto
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -112,13 +113,14 @@ try {
     
     // ========================================
     // VERIFICAR LIMITE DIÁRIO ANTES DE INSERIR
-    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
+    // NOW() insere em horário de Brasília, DATE(created_at) já é correto
     // ========================================
     $today = date('Y-m-d');
     
     $check_limit_stmt = $conn->prepare("
         SELECT COUNT(*) as total FROM monetag_events 
-        WHERE user_id = ? AND event_type = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+        WHERE user_id = ? AND event_type = ? AND DATE(created_at) = ?
     ");
     $check_limit_stmt->bind_param("iss", $user_id, $event_type, $today);
     $check_limit_stmt->execute();
@@ -134,13 +136,13 @@ try {
         error_log("MoniTag Track - Limite diário atingido: user_id=$user_id, event_type=$event_type, count=$current_count, limit=$limit");
         
         // Buscar progresso atual para retornar
-        // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+        // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília
         $stmt = $conn->prepare("
             SELECT 
                 COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
                 COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
             FROM monetag_events
-            WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+            WHERE user_id = ? AND DATE(created_at) = ?
         ");
         $stmt->bind_param("is", $user_id, $today);
         $stmt->execute();
@@ -208,13 +210,13 @@ try {
     error_log("MoniTag Track - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type, zone_id=$zone_id, time=" . date('Y-m-d H:i:s'));
     
     // Buscar progresso atualizado do dia
-    // CORREÇÃO: Usar DATE(CONVERT_TZ()) para converter UTC para Brasília
+    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília
     $stmt = $conn->prepare("
         SELECT 
             COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
             COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
         FROM monetag_events
-        WHERE user_id = ? AND DATE(CONVERT_TZ(created_at, '+00:00', '-03:00')) = ?
+        WHERE user_id = ? AND DATE(created_at) = ?
     ");
     $stmt->bind_param("is", $user_id, $today);
     $stmt->execute();
