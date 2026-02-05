@@ -4,6 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pix Assistindo Manager</title>
+
+    <!-- Telegram Web App SDK - OFICIAL -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- VERIFICAÇÃO EXCLUSIVA DO TELEGRAM -->
+    <script>
+    (function() {
+        'use strict';
+
+        function isTelegramWebApp() {
+            if (!window.Telegram || !window.Telegram.WebApp) return false;
+            var tg = window.Telegram.WebApp;
+            if (!tg.initData || tg.initData.length === 0) return false;
+            if (!tg.initDataUnsafe || !tg.initDataUnsafe.user || !tg.initDataUnsafe.user.id) return false;
+            var validPlatforms = ['android', 'ios', 'tdesktop', 'web', 'weba', 'webk', 'unigram', 'unknown'];
+            if (!tg.platform || validPlatforms.indexOf(tg.platform) === -1) return false;
+            if (!tg.initDataUnsafe.hash || tg.initDataUnsafe.hash.length < 32) return false;
+            var authDate = tg.initDataUnsafe.auth_date;
+            var now = Math.floor(Date.now() / 1000);
+            if (!authDate || (now - authDate) > 86400) return false;
+            if (tg.initDataUnsafe.hash === 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890') return false;
+            return true;
+        }
+
+        function showBlockScreen() {
+            document.documentElement.innerHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso Bloqueado</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,-apple-system,sans-serif;background:linear-gradient(135deg,#0a0e1a 0%,#0d1225 100%);color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.container{max-width:380px;text-align:center;animation:fadeIn .6s ease}.icon{width:100px;height:100px;margin:0 auto 25px;background:linear-gradient(135deg,#0088cc,#00a8e8);border-radius:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 40px rgba(0,136,204,.3)}.icon svg{width:60px;height:60px;fill:#fff}h1{font-size:1.5rem;margin-bottom:12px;font-weight:700}p{color:#a0aec0;margin-bottom:30px;line-height:1.6}.card{background:rgba(20,25,45,.9);border:1px solid rgba(139,92,246,.3);border-radius:16px;padding:25px;margin-bottom:20px;text-align:left}.step{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;color:#a0aec0;font-size:.95rem;line-height:1.5}.step:last-child{margin-bottom:0}.num{min-width:28px;height:28px;background:linear-gradient(135deg,#8b5cf6,#00ddff);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.85rem;color:#fff}.warn{display:flex;align-items:center;justify-content:center;gap:10px;padding:15px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.9rem}.warn svg{width:20px;height:20px;fill:currentColor;flex-shrink:0}@keyframes fadeIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg></div><h1>Acesso Exclusivo</h1><p>Este aplicativo só funciona dentro do Telegram</p><div class="card"><div class="step"><span class="num">1</span><span>Abra o <strong>Telegram</strong> no seu celular</span></div><div class="step"><span class="num">2</span><span>Acesse o <strong>bot oficial</strong> do YoungMoney</span></div><div class="step"><span class="num">3</span><span>Clique no botão para abrir o <strong>Mini App</strong></span></div></div><div class="warn"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg><span>Navegadores comuns não são suportados</span></div></div></body></html>';
+        }
+
+        setTimeout(function() {
+            if (!isTelegramWebApp()) {
+                showBlockScreen();
+            } else {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+            }
+        }, 300);
+    })();
+    </script>
     <link rel="stylesheet" href="pix-style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#10b981">

@@ -18,108 +18,295 @@
     <!-- Telegram Web App SDK - OFICIAL -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <script>
-        // Criar simulação se o SDK oficial não funcionar
-        window.addEventListener('DOMContentLoaded', function() {
-            const now = Math.floor(Date.now() / 1000);
-            const userId = 1000000000 + Math.floor(Math.random() * 1000000000);
-
-            // Verificar se o Telegram.WebApp foi carregado corretamente
-            if (!window.Telegram || !window.Telegram.WebApp || !window.Telegram.WebApp.initDataUnsafe || !window.Telegram.WebApp.initDataUnsafe.user) {
-                console.log('⚠️ SDK oficial do Telegram não forneceu dados, criando simulação...');
-
-                // Criar objeto Telegram se não existir
-                if (!window.Telegram) {
-                    window.Telegram = {};
-                }
-
-                // Criar ou completar WebApp
-                window.Telegram.WebApp = {
-                    initData: `query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=%7B%22id%22%3A${userId}%2C%22first_name%22%3A%22User%22%2C%22last_name%22%3A%22Test%22%2C%22username%22%3A%22testuser%22%2C%22language_code%22%3A%22pt%22%2C%22allows_write_to_pm%22%3Atrue%7D&auth_date=${now}&hash=abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890`,
-                    initDataUnsafe: {
-                        query_id: 'AAHdF6IQAAAAAN0XohDhrOrc',
-                        user: {
-                            id: userId,
-                            first_name: 'User',
-                            last_name: 'Test',
-                            username: 'testuser',
-                            language_code: 'pt',
-                            allows_write_to_pm: true,
-                            is_premium: false
-                        },
-                        auth_date: now,
-                        hash: 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
-                    },
-                    version: '7.0',
-                    platform: 'android',
-                    colorScheme: 'light',
-                    themeParams: {
-                        bg_color: '#ffffff',
-                        text_color: '#000000',
-                        hint_color: '#999999',
-                        link_color: '#2481cc',
-                        button_color: '#2481cc',
-                        button_text_color: '#ffffff',
-                        secondary_bg_color: '#f1f1f1'
-                    },
-                    isExpanded: true,
-                    viewportHeight: window.innerHeight,
-                    viewportStableHeight: window.innerHeight,
-                    headerColor: '#ffffff',
-                    backgroundColor: '#ffffff',
-                    isClosingConfirmationEnabled: false,
-                    ready: function() {
-                        console.log('✅ Telegram.WebApp.ready()');
-                    },
-                    expand: function() {
-                        console.log('✅ Telegram.WebApp.expand()');
-                    },
-                    close: function() {
-                        console.log('✅ Telegram.WebApp.close()');
-                    },
-                    MainButton: {
-                        text: 'CONTINUAR',
-                        color: '#2481cc',
-                        textColor: '#ffffff',
-                        isVisible: false,
-                        isActive: true,
-                        setText: function(text) { this.text = text; },
-                        onClick: function(callback) { },
-                        show: function() { this.isVisible = true; },
-                        hide: function() { this.isVisible = false; }
-                    },
-                    BackButton: {
-                        isVisible: false,
-                        show: function() { this.isVisible = true; },
-                        hide: function() { this.isVisible = false; }
-                    },
-                    HapticFeedback: {
-                        impactOccurred: function(style) { },
-                        notificationOccurred: function(type) { },
-                        selectionChanged: function() { }
-                    },
-                    sendData: function(data) {
-                        console.log('Telegram.WebApp.sendData:', data);
-                    }
-                };
-
-                console.log('✅ Ambiente Telegram simulado criado');
-            } else {
-                console.log('✅ SDK oficial do Telegram funcionando');
-            }
-
-            console.log('User ID:', window.Telegram.WebApp.initDataUnsafe.user.id);
-        });
-    </script>
-    
     <style>
       /* Font families */
       :root {
         --font-display: 'Space Grotesk', sans-serif;
         --font-body: 'Inter', sans-serif;
         --font-mono: 'JetBrains Mono', monospace;
+        --bg-primary: #0a0e1a;
+        --bg-secondary: #0d1225;
+        --text-primary: #ffffff;
+        --text-secondary: #a0aec0;
+        --purple-neon: #8b5cf6;
+        --cyan-neon: #00ddff;
+        --red-neon: #ef4444;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      /* Tela de bloqueio para navegadores não-Telegram */
+      .telegram-block-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+        z-index: 999999;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        font-family: var(--font-body);
+      }
+
+      .telegram-block-overlay.active {
+        display: flex;
+      }
+
+      .block-container {
+        max-width: 380px;
+        width: 100%;
+        text-align: center;
+        animation: fadeInUp 0.6s ease-out;
+      }
+
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .block-icon {
+        width: 100px;
+        height: 100px;
+        margin: 0 auto 25px;
+        background: linear-gradient(135deg, #0088cc 0%, #00a8e8 100%);
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 40px rgba(0, 136, 204, 0.3);
+      }
+
+      .block-icon svg {
+        width: 60px;
+        height: 60px;
+        fill: white;
+      }
+
+      .block-title {
+        font-family: var(--font-display);
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 12px;
+        letter-spacing: 0.5px;
+      }
+
+      .block-subtitle {
+        font-size: 1rem;
+        color: var(--text-secondary);
+        margin-bottom: 30px;
+        line-height: 1.6;
+      }
+
+      .block-card {
+        background: rgba(20, 25, 45, 0.9);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        border-radius: 16px;
+        padding: 25px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+      }
+
+      .block-steps {
+        text-align: left;
+      }
+
+      .block-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+
+      .block-step:last-child {
+        margin-bottom: 0;
+      }
+
+      .step-number {
+        min-width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, var(--purple-neon) 0%, var(--cyan-neon) 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: white;
+      }
+
+      .block-warning {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 15px;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 12px;
+        color: var(--red-neon);
+        font-size: 0.9rem;
+      }
+
+      .block-warning svg {
+        width: 20px;
+        height: 20px;
+        fill: currentColor;
+        flex-shrink: 0;
+      }
+
+      /* Esconder conteúdo principal quando bloqueado */
+      body.blocked #root {
+        display: none !important;
       }
     </style>
+
+    <script>
+      // ============================================
+      // VERIFICAÇÃO EXCLUSIVA DO TELEGRAM WEBAPP
+      // ============================================
+      (function() {
+        'use strict';
+
+        // Função para verificar se está no Telegram WebApp REAL
+        function isTelegramWebApp() {
+          // Verificar se o SDK do Telegram está carregado
+          if (!window.Telegram || !window.Telegram.WebApp) {
+            return false;
+          }
+
+          const tg = window.Telegram.WebApp;
+
+          // Verificar se tem initData (string não vazia)
+          if (!tg.initData || tg.initData.length === 0) {
+            return false;
+          }
+
+          // Verificar se tem dados do usuário
+          if (!tg.initDataUnsafe || !tg.initDataUnsafe.user || !tg.initDataUnsafe.user.id) {
+            return false;
+          }
+
+          // Verificar se a plataforma é válida (android, ios, tdesktop, web, etc)
+          const validPlatforms = ['android', 'ios', 'tdesktop', 'web', 'weba', 'webk', 'unigram', 'unknown'];
+          if (!tg.platform || !validPlatforms.includes(tg.platform)) {
+            return false;
+          }
+
+          // Verificar se tem hash de autenticação (indica que veio do Telegram)
+          if (!tg.initDataUnsafe.hash || tg.initDataUnsafe.hash.length < 32) {
+            return false;
+          }
+
+          // Verificar se auth_date é recente (últimas 24 horas)
+          const authDate = tg.initDataUnsafe.auth_date;
+          const now = Math.floor(Date.now() / 1000);
+          if (!authDate || (now - authDate) > 86400) {
+            return false;
+          }
+
+          // Verificar se não é uma simulação (hash não pode ser placeholder)
+          const hash = tg.initDataUnsafe.hash;
+          if (hash === 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890') {
+            return false;
+          }
+
+          // Verificar User-Agent para sinais do Telegram
+          const ua = navigator.userAgent.toLowerCase();
+          const isTelegramUA = ua.includes('telegram') || 
+                              ua.includes('tdesktop') || 
+                              ua.includes('webview') ||
+                              ua.includes('mobile');
+
+          // Se passou todas as verificações básicas, é provavelmente Telegram
+          return true;
+        }
+
+        // Função para mostrar tela de bloqueio
+        function showBlockScreen() {
+          document.body.classList.add('blocked');
+          
+          // Criar overlay de bloqueio
+          const overlay = document.createElement('div');
+          overlay.className = 'telegram-block-overlay active';
+          overlay.innerHTML = `
+            <div class="block-container">
+              <div class="block-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                </svg>
+              </div>
+              
+              <h1 class="block-title">Acesso Exclusivo</h1>
+              <p class="block-subtitle">Este aplicativo só funciona dentro do Telegram</p>
+              
+              <div class="block-card">
+                <div class="block-steps">
+                  <div class="block-step">
+                    <span class="step-number">1</span>
+                    <span>Abra o <strong>Telegram</strong> no seu celular</span>
+                  </div>
+                  <div class="block-step">
+                    <span class="step-number">2</span>
+                    <span>Acesse o <strong>bot oficial</strong> do YoungMoney</span>
+                  </div>
+                  <div class="block-step">
+                    <span class="step-number">3</span>
+                    <span>Clique no botão para abrir o <strong>Mini App</strong></span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="block-warning">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <span>Navegadores comuns não são suportados</span>
+              </div>
+            </div>
+          `;
+          
+          document.body.appendChild(overlay);
+        }
+
+        // Executar verificação quando o DOM estiver pronto
+        function checkAccess() {
+          // Pequeno delay para garantir que o SDK do Telegram carregou
+          setTimeout(function() {
+            if (!isTelegramWebApp()) {
+              console.log('❌ Acesso bloqueado: não está no Telegram WebApp');
+              showBlockScreen();
+            } else {
+              console.log('✅ Acesso permitido: Telegram WebApp detectado');
+              // Inicializar o Telegram WebApp
+              if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+              }
+            }
+          }, 500);
+        }
+
+        // Verificar quando a página carregar
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', checkAccess);
+        } else {
+          checkAccess();
+        }
+      })();
+    </script>
+    
     <script type="module" crossorigin src="/assets/index-BDlnO05v.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-DJyrT2Qm.css">
   </head>
