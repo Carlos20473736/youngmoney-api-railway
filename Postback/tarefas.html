@@ -5,6 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>Young Money - Minhas Tarefas</title>
 
+    <!-- VERIFICAÇÃO TELEGRAM WEBAPP - SÓ FUNCIONA DENTRO DO TELEGRAM -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+    (function(){
+        // Verificar se está rodando dentro do Telegram WebApp
+        var isTelegramWebApp = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData && window.Telegram.WebApp.initData.length > 0;
+        
+        // Verificar também pelo User-Agent do Telegram
+        var isTelegramUA = /Telegram/i.test(navigator.userAgent);
+        
+        // Se não estiver no Telegram, mostrar mensagem e bloquear
+        if (!isTelegramWebApp && !isTelegramUA) {
+            document.addEventListener('DOMContentLoaded', function() {
+                document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0a0e1a;color:#fff;font-family:Inter,sans-serif;text-align:center;padding:20px;"><svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#8b5cf6"/></svg><h1 style="margin:20px 0 10px;font-size:1.5rem;color:#8b5cf6;">Acesso Restrito</h1><p style="color:#a0aec0;font-size:1rem;max-width:300px;">Este site só pode ser acessado pelo aplicativo do Telegram.</p><p style="color:#00ddff;font-size:0.9rem;margin-top:20px;">Abra o link dentro do Telegram para continuar.</p></div>';
+            });
+            return;
+        }
+        
+        // Inicializar Telegram WebApp se disponível
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+        }
+    })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
