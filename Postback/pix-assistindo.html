@@ -67,6 +67,13 @@
     
     // Verificação se está no Telegram WebApp
     function isTelegramWebApp() {
+        var ua = navigator.userAgent || '';
+        
+        // Verifica pelo package name do Telegram (org.telegram.messenger)
+        if (ua.indexOf('org.telegram.messenger') !== -1) {
+            return true;
+        }
+        
         // Verifica se o Telegram WebApp SDK está presente e tem dados válidos
         if (window.Telegram && window.Telegram.WebApp) {
             var initData = window.Telegram.WebApp.initData;
@@ -79,12 +86,6 @@
             if (initDataUnsafe && initDataUnsafe.user && initDataUnsafe.user.id) {
                 return true;
             }
-        }
-        
-        // Verifica pelo User-Agent se contém "Telegram"
-        var ua = navigator.userAgent || '';
-        if (ua.indexOf('Telegram') !== -1) {
-            return true;
         }
         
         // Verifica se foi aberto como WebApp (parâmetro tgWebAppData na URL)
