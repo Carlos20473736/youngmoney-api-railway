@@ -9,24 +9,33 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
     (function(){
-        // Verificar se está rodando dentro do Telegram WebApp
-        var isTelegramWebApp = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData && window.Telegram.WebApp.initData.length > 0;
-        
-        // Verificar também pelo User-Agent do Telegram
-        var isTelegramUA = /Telegram/i.test(navigator.userAgent);
-        
-        // Se não estiver no Telegram, mostrar mensagem e bloquear
-        if (!isTelegramWebApp && !isTelegramUA) {
-            document.addEventListener('DOMContentLoaded', function() {
-                document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0a0e1a;color:#fff;font-family:Inter,sans-serif;text-align:center;padding:20px;"><svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#8b5cf6"/></svg><h1 style="margin:20px 0 10px;font-size:1.5rem;color:#8b5cf6;">Acesso Restrito</h1><p style="color:#a0aec0;font-size:1rem;max-width:300px;">Este site só pode ser acessado pelo aplicativo do Telegram.</p><p style="color:#00ddff;font-size:0.9rem;margin-top:20px;">Abra o link dentro do Telegram para continuar.</p></div>';
-            });
-            return; // Bloquear execução do restante do script
+        // Função para bloquear acesso
+        function bloquearAcesso() {
+            document.documentElement.innerHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso Restrito</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;background:#0a0e1a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}.container{text-align:center;padding:40px 20px;max-width:400px}.icon{width:100px;height:100px;margin:0 auto 30px;background:linear-gradient(135deg,#8b5cf6,#6366f1);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(139,92,246,0.4)}.icon svg{width:50px;height:50px;fill:#fff}h1{font-size:1.8rem;color:#8b5cf6;margin-bottom:15px;font-weight:700}p{color:#a0aec0;font-size:1rem;line-height:1.6;margin-bottom:10px}.telegram-link{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#0088cc,#00a8e8);color:#fff;padding:15px 30px;border-radius:12px;text-decoration:none;font-weight:600;margin-top:25px;transition:transform 0.2s,box-shadow 0.2s}.telegram-link:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,136,204,0.4)}.telegram-link svg{width:24px;height:24px;fill:#fff}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></div><h1>Acesso Restrito</h1><p>Este site só pode ser acessado através do aplicativo do <strong>Telegram</strong>.</p><p style="color:#00ddff;font-size:0.9rem;">Abra o link dentro do Telegram para continuar.</p><a href="https://t.me" class="telegram-link" target="_blank"><svg viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>Abrir Telegram</a></div></body></html>';
         }
         
-        // Inicializar Telegram WebApp se disponível
-        if (window.Telegram && window.Telegram.WebApp) {
-            window.Telegram.WebApp.ready();
-            window.Telegram.WebApp.expand();
+        // Verificação RIGOROSA: SÓ permite se tiver initData válido do Telegram
+        // O initData só existe quando o site é aberto como WebApp dentro do Telegram
+        var tg = window.Telegram && window.Telegram.WebApp;
+        var hasValidInitData = tg && tg.initData && tg.initData.length > 0;
+        var hasInitDataUnsafe = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+        
+        // SÓ permite acesso se tiver dados válidos do Telegram WebApp
+        if (!hasValidInitData && !hasInitDataUnsafe) {
+            // Bloquear imediatamente
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', bloquearAcesso);
+            } else {
+                bloquearAcesso();
+            }
+            // Parar execução
+            throw new Error('Acesso bloqueado: Não está no Telegram WebApp');
+        }
+        
+        // Se chegou aqui, está no Telegram - inicializar WebApp
+        if (tg) {
+            tg.ready();
+            tg.expand();
         }
     })();
     </script>
