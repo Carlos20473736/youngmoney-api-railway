@@ -11,6 +11,127 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%2310b981'/%3E%3Ctext x='50' y='60' text-anchor='middle' fill='white' font-size='40' font-family='Arial'%3EP%3C/text%3E%3C/svg%3E">
 </head>
 <body>
+
+<!-- ========================================
+     VERIFICAÇÃO DE TELEGRAM WEBAPP
+     ======================================== -->
+<div id="telegramBlockOverlay" style="
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0a0e1a 0%, #1a1f35 50%, #0d1225 100%);
+    z-index: 99999;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    font-family: 'Rajdhani', sans-serif;
+">
+    <div style="text-align: center; padding: 2rem;">
+        <div style="font-size: 80px; margin-bottom: 20px;">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#0088cc"/>
+            </svg>
+        </div>
+        <h1 style="color: #ffffff; font-size: 28px; margin-bottom: 15px; font-weight: 700;">Acesso Restrito</h1>
+        <p style="color: #a0aec0; font-size: 16px; margin-bottom: 30px; line-height: 1.6;">
+            Este site só pode ser acessado<br>pelo aplicativo do <span style="color: #0088cc; font-weight: 600;">Telegram</span>
+        </p>
+        <a href="https://t.me/" style="
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #0088cc 0%, #0077b5 100%);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        " onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(0, 136, 204, 0.5)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(0, 136, 204, 0.4)';">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-1.96 1.25-5.54 3.67-.52.36-1 .53-1.42.52-.47-.01-1.37-.26-2.03-.48-.82-.27-1.47-.42-1.42-.88.03-.24.37-.49 1.02-.74 3.98-1.73 6.64-2.87 7.97-3.43 3.79-1.58 4.58-1.86 5.09-1.87.11 0 .37.03.54.17.14.12.18.28.2.45-.01.06.01.24 0 .38z"/>
+            </svg>
+            Abrir Telegram
+        </a>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    // Verificação se está no Telegram WebApp
+    function isTelegramWebApp() {
+        // Verifica se o Telegram WebApp SDK está presente e tem dados válidos
+        if (window.Telegram && window.Telegram.WebApp) {
+            var initData = window.Telegram.WebApp.initData;
+            var initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
+            
+            // Verifica se tem initData (string não vazia) ou user data
+            if (initData && initData.length > 0) {
+                return true;
+            }
+            if (initDataUnsafe && initDataUnsafe.user && initDataUnsafe.user.id) {
+                return true;
+            }
+        }
+        
+        // Verifica pelo User-Agent se contém "Telegram"
+        var ua = navigator.userAgent || '';
+        if (ua.indexOf('Telegram') !== -1) {
+            return true;
+        }
+        
+        // Verifica se foi aberto como WebApp (parâmetro tgWebAppData na URL)
+        var urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('tgWebAppData') || urlParams.has('tgWebAppStartParam')) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Carrega o SDK do Telegram e verifica
+    var script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-web-app.js';
+    script.onload = function() {
+        setTimeout(function() {
+            if (!isTelegramWebApp()) {
+                // Não está no Telegram - bloqueia acesso
+                var overlay = document.getElementById('telegramBlockOverlay');
+                if (overlay) {
+                    overlay.style.display = 'flex';
+                }
+                // Esconde todo o conteúdo principal
+                var mainContent = document.querySelector('.container');
+                if (mainContent) mainContent.style.display = 'none';
+            } else {
+                // Está no Telegram - inicializa o WebApp
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+            }
+        }, 100);
+    };
+    script.onerror = function() {
+        // Se falhar ao carregar o SDK, verifica pelo User-Agent
+        if (!isTelegramWebApp()) {
+            var overlay = document.getElementById('telegramBlockOverlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+            }
+        }
+    };
+    document.head.appendChild(script);
+})();
+</script>
+
     <div class="container">
         <!-- Header -->
         <header class="header">
