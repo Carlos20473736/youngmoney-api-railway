@@ -65,71 +65,51 @@
 (function() {
     'use strict';
     
-    // Verificação se está no Telegram WebApp
+    // Verificação RIGOROSA se está no Telegram WebApp
+    // SÓ aceita se o User-Agent contiver o package name do Telegram
     function isTelegramWebApp() {
         var ua = navigator.userAgent || '';
         
-        // Verifica pelo package name do Telegram (org.telegram.messenger)
+        // VERIFICAÇÃO PRINCIPAL: package name do Telegram no User-Agent
+        // Quando aberto dentro do Telegram, o User-Agent contém "org.telegram.messenger"
         if (ua.indexOf('org.telegram.messenger') !== -1) {
             return true;
         }
         
-        // Verifica se o Telegram WebApp SDK está presente e tem dados válidos
-        if (window.Telegram && window.Telegram.WebApp) {
-            var initData = window.Telegram.WebApp.initData;
-            var initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
-            
-            // Verifica se tem initData (string não vazia) ou user data
-            if (initData && initData.length > 0) {
-                return true;
-            }
-            if (initDataUnsafe && initDataUnsafe.user && initDataUnsafe.user.id) {
-                return true;
-            }
+        // Verifica também por outros clientes Telegram
+        if (ua.indexOf('org.telegram.plus') !== -1) {
+            return true;
         }
-        
-        // Verifica se foi aberto como WebApp (parâmetro tgWebAppData na URL)
-        var urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('tgWebAppData') || urlParams.has('tgWebAppStartParam')) {
+        if (ua.indexOf('org.thunderdog.challegram') !== -1) {
+            return true;
+        }
+        if (ua.indexOf('Telegram') !== -1 && ua.indexOf('Android') !== -1) {
+            return true;
+        }
+        if (ua.indexOf('Telegram') !== -1 && ua.indexOf('iPhone') !== -1) {
+            return true;
+        }
+        if (ua.indexOf('Telegram') !== -1 && ua.indexOf('iPad') !== -1) {
             return true;
         }
         
+        // NÃO aceita SDK simulado - apenas User-Agent real
         return false;
     }
     
-    // Carrega o SDK do Telegram e verifica
-    var script = document.createElement('script');
-    script.src = 'https://telegram.org/js/telegram-web-app.js';
-    script.onload = function() {
-        setTimeout(function() {
-            if (!isTelegramWebApp()) {
-                // Não está no Telegram - bloqueia acesso
-                var overlay = document.getElementById('telegramBlockOverlay');
-                if (overlay) {
-                    overlay.style.display = 'flex';
-                }
-                // Esconde todo o conteúdo principal
-                var mainContent = document.querySelector('.container');
-                if (mainContent) mainContent.style.display = 'none';
-            } else {
-                // Está no Telegram - inicializa o WebApp
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.ready();
-                    window.Telegram.WebApp.expand();
-                }
-            }
-        }, 100);
-    };
-    script.onerror = function() {
-        // Se falhar ao carregar o SDK, verifica pelo User-Agent
-        if (!isTelegramWebApp()) {
-            var overlay = document.getElementById('telegramBlockOverlay');
-            if (overlay) {
-                overlay.style.display = 'flex';
-            }
+    // Verifica imediatamente (sem esperar SDK)
+    if (!isTelegramWebApp()) {
+        // Não está no Telegram - bloqueia acesso
+        var overlay = document.getElementById('telegramBlockOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
         }
-    };
-    document.head.appendChild(script);
+        // Esconde todo o conteúdo principal
+        document.addEventListener('DOMContentLoaded', function() {
+            var mainContent = document.querySelector('.container');
+            if (mainContent) mainContent.style.display = 'none';
+        });
+    }
 })();
 </script>
 
