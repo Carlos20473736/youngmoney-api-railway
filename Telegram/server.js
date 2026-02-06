@@ -166,7 +166,7 @@ const server = http.createServer((req, res) => {
         }
         
         // Consultar a API real do Railway (progress.php)
-        const realApiUrl = `https://youngmoney-api-railway-production-561a.up.railway.app/telegramyoung2/monetag/progress.php?user_id=${userId}`;
+        const realApiUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
         console.log(`[API] Proxy -> ${realApiUrl}`);
         
         https.get(realApiUrl, (apiRes) => {
