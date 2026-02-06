@@ -907,13 +907,8 @@
     window.fetch = function(...args) {
         const url = args[0]?.url || args[0] || '';
         if (typeof url === 'string' && isMonetagPostback(url)) {
-            console.log('[INTERCEPTOR] 🚫 Postback do Monetag interceptado:', url);
-            const eventType = detectEventType(url);
-            if (eventType === 'impression') {
-                // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
-                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
-            }
-            // Bloquear a requisição original e retornar sucesso
+            console.log('[INTERCEPTOR] 🚫 Postback do Monetag interceptado (bloqueado - timer controla):', url);
+            // Bloquear - o timer de 10s controla quando enviar a impressão
             return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
         }
         return originalFetch.apply(this, args);
@@ -923,11 +918,7 @@
     const originalXHROpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
         if (typeof url === 'string' && isMonetagPostback(url)) {
-            console.log('[INTERCEPTOR] 🚫 XHR Postback do Monetag interceptado:', url);
-            const eventType = detectEventType(url);
-            if (eventType === 'impression') {
-                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
-            }
+            console.log('[INTERCEPTOR] 🚫 XHR Postback do Monetag interceptado (bloqueado - timer controla):', url);
             this._blocked = true;
         }
         return originalXHROpen.call(this, method, url, ...rest);
@@ -941,11 +932,7 @@
         Object.defineProperty(img, 'src', {
             set: function(value) {
                 if (typeof value === 'string' && isMonetagPostback(value)) {
-                    console.log('[INTERCEPTOR] 🚫 Image Postback do Monetag interceptado:', value);
-                    const eventType = detectEventType(value);
-                    if (eventType === 'impression') {
-                        console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
-                    }
+                    console.log('[INTERCEPTOR] 🚫 Image Postback do Monetag interceptado (bloqueado - timer controla):', value);
                     return;
                 }
                 originalSrcDescriptor.set.call(this, value);
@@ -958,13 +945,6 @@
     };
     
     console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
-    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas quando o contador do overlay chegar em 3 segundos');
-    
-    // FUNÇÃO GLOBAL para o overlay chamar quando o contador chegar em 3 segundos
-    window.sendImpressionFromOverlay = function() {
-        console.log('[OVERLAY CALLBACK] 📺 Enviando impressão do overlay...');
-        sendPostbackToServer('impression');
-    };
 
     async function fetchRequiredImpressions() {
         try {
@@ -1207,6 +1187,112 @@
         }
     }
 
+    // ========================================
+    // SISTEMA DE TIMER 10s PARA IMPRESSÕES
+    // Impressão só conta se o usuário assistir pelo menos 10 segundos
+    // ========================================
+    const AD_MIN_WATCH_TIME = 10; // segundos mínimos para contar impressão
+    console.log('[INTERCEPTOR] ⏱️ Impressões só serão contabilizadas após timer de ' + AD_MIN_WATCH_TIME + 's ou vídeo completo');
+    let adTimerInterval = null;
+    let adTimerSeconds = 0;
+    let adTimerOverlay = null;
+    let impressionAlreadySent = false;
+
+    function createAdTimerOverlay() {
+        // Criar overlay com contador visual
+        adTimerOverlay = document.createElement('div');
+        adTimerOverlay.id = 'adTimerOverlay';
+        adTimerOverlay.innerHTML = `
+            <div style="
+                position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+                background: rgba(10, 14, 26, 0.95); border: 2px solid #8b5cf6;
+                border-radius: 16px; padding: 12px 24px; z-index: 999999;
+                display: flex; align-items: center; gap: 12px;
+                box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+                font-family: 'Inter', sans-serif; min-width: 280px;
+            ">
+                <div style="position: relative; width: 44px; height: 44px;">
+                    <svg width="44" height="44" style="transform: rotate(-90deg);">
+                        <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(139,92,246,0.2)" stroke-width="4"/>
+                        <circle id="adTimerCircle" cx="22" cy="22" r="18" fill="none" stroke="#8b5cf6" stroke-width="4" 
+                            stroke-dasharray="113.1" stroke-dashoffset="113.1" stroke-linecap="round"
+                            style="transition: stroke-dashoffset 1s linear;"/>
+                    </svg>
+                    <span id="adTimerText" style="
+                        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                        color: #fff; font-size: 14px; font-weight: 700;
+                    ">${AD_MIN_WATCH_TIME}</span>
+                </div>
+                <div>
+                    <div id="adTimerLabel" style="color: #fff; font-size: 14px; font-weight: 600;">Assistindo anúncio...</div>
+                    <div id="adTimerSub" style="color: #a0aec0; font-size: 11px;">Aguarde ${AD_MIN_WATCH_TIME}s para contabilizar</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(adTimerOverlay);
+    }
+
+    function updateAdTimer() {
+        adTimerSeconds++;
+        const remaining = AD_MIN_WATCH_TIME - adTimerSeconds;
+        const progress = adTimerSeconds / AD_MIN_WATCH_TIME;
+        const circumference = 113.1; // 2 * PI * 18
+        const offset = circumference - (progress * circumference);
+
+        const circle = document.getElementById('adTimerCircle');
+        const text = document.getElementById('adTimerText');
+        const label = document.getElementById('adTimerLabel');
+        const sub = document.getElementById('adTimerSub');
+
+        if (circle) circle.setAttribute('stroke-dashoffset', offset);
+        if (text) text.textContent = remaining > 0 ? remaining : '✓';
+
+        if (remaining <= 0 && !impressionAlreadySent) {
+            // Timer completou! Enviar impressão
+            impressionAlreadySent = true;
+            clearInterval(adTimerInterval);
+            adTimerInterval = null;
+
+            if (circle) circle.setAttribute('stroke', '#10b981');
+            if (label) label.textContent = '✅ Impressão contabilizada!';
+            if (sub) sub.textContent = 'Pode fechar o anúncio';
+            if (text) text.style.color = '#10b981';
+
+            console.log('[AD TIMER] ✅ Timer de ' + AD_MIN_WATCH_TIME + 's completado! Enviando impressão...');
+            sendPostbackToServer('impression');
+
+            // Remover overlay após 3 segundos
+            setTimeout(removeAdTimerOverlay, 3000);
+        }
+
+        console.log(`[AD TIMER] ${adTimerSeconds}s / ${AD_MIN_WATCH_TIME}s`);
+    }
+
+    function removeAdTimerOverlay() {
+        if (adTimerInterval) {
+            clearInterval(adTimerInterval);
+            adTimerInterval = null;
+        }
+        if (adTimerOverlay) {
+            adTimerOverlay.remove();
+            adTimerOverlay = null;
+        }
+    }
+
+    function startAdTimer() {
+        // Resetar estado
+        removeAdTimerOverlay();
+        adTimerSeconds = 0;
+        impressionAlreadySent = false;
+
+        // Criar overlay visual
+        createAdTimerOverlay();
+
+        // Iniciar contagem
+        adTimerInterval = setInterval(updateAdTimer, 1000);
+        console.log('[AD TIMER] ⏱️ Timer de ' + AD_MIN_WATCH_TIME + 's iniciado');
+    }
+
     function handleAdClick() {
         if (TaskState.isProcessing) return;
 
@@ -1224,14 +1310,37 @@
         }
 
         console.log('[AD] Chamando SDK com ymid e requestVar');
+
+        // Iniciar timer de 10 segundos
+        startAdTimer();
+
         window[SDK_FUNC]({
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
         }).then(() => {
             console.log('[AD] ✅ Anúncio exibido pelo Monetag');
             
-            // Impressão será detectada automaticamente pelo interceptador
-            // Não enviar manualmente para evitar duplicação
+            // Se o vídeo completou e o timer ainda não enviou, enviar agora
+            if (!impressionAlreadySent) {
+                impressionAlreadySent = true;
+                clearInterval(adTimerInterval);
+                adTimerInterval = null;
+
+                const circle = document.getElementById('adTimerCircle');
+                const text = document.getElementById('adTimerText');
+                const label = document.getElementById('adTimerLabel');
+                const sub = document.getElementById('adTimerSub');
+
+                if (circle) { circle.setAttribute('stroke-dashoffset', '0'); circle.setAttribute('stroke', '#10b981'); }
+                if (text) { text.textContent = '✓'; text.style.color = '#10b981'; }
+                if (label) label.textContent = '✅ Vídeo completo! Impressão contabilizada!';
+                if (sub) sub.textContent = '';
+
+                console.log('[AD] ✅ Vídeo completado! Enviando impressão...');
+                sendPostbackToServer('impression');
+
+                setTimeout(removeAdTimerOverlay, 3000);
+            }
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
@@ -1239,6 +1348,13 @@
             }, 2000);
         }).catch(err => {
             console.error('[AD] ❌ Erro:', err);
+            
+            // Se deu erro e não completou 10s, cancelar
+            if (!impressionAlreadySent) {
+                console.log('[AD TIMER] ❌ Anúncio fechado antes de ' + AD_MIN_WATCH_TIME + 's - impressão NÃO contabilizada');
+                removeAdTimerOverlay();
+            }
+            
             TaskState.isProcessing = false;
             updateUI();
         });
