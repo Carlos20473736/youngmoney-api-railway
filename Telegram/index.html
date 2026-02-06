@@ -1,0 +1,1432 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Young Money - Minhas Tarefas</title>
+
+    <!-- Telegram Web App SDK - OFICIAL -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- VERIFICAÇÃO DO USER_ID NA URL -->
+    <script>
+    (function() {
+        'use strict';
+
+        // Função para obter parâmetro da URL
+        function getUrlParam(param) {
+            var urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        // Verificar se user_id está presente na URL
+        function hasValidUserId() {
+            var userId = getUrlParam('user_id');
+            // user_id deve existir e ser um número válido (ID do Telegram)
+            return userId && userId.length > 0 && /^[0-9]+$/.test(userId);
+        }
+
+        // Armazenar user_id globalmente para uso posterior
+        window.TELEGRAM_USER_ID = getUrlParam('user_id');
+
+        function showBlockScreen() {
+            document.documentElement.innerHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso Bloqueado</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,-apple-system,sans-serif;background:linear-gradient(135deg,#0a0e1a 0%,#0d1225 100%);color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.container{max-width:380px;text-align:center;animation:fadeIn .6s ease}.icon{width:100px;height:100px;margin:0 auto 25px;background:linear-gradient(135deg,#0088cc,#00a8e8);border-radius:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 40px rgba(0,136,204,.3)}.icon svg{width:60px;height:60px;fill:#fff}h1{font-size:1.5rem;margin-bottom:12px;font-weight:700}p{color:#a0aec0;margin-bottom:30px;line-height:1.6}.card{background:rgba(20,25,45,.9);border:1px solid rgba(139,92,246,.3);border-radius:16px;padding:25px;margin-bottom:20px;text-align:left}.step{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;color:#a0aec0;font-size:.95rem;line-height:1.5}.step:last-child{margin-bottom:0}.num{min-width:28px;height:28px;background:linear-gradient(135deg,#8b5cf6,#00ddff);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.85rem;color:#fff}.warn{display:flex;align-items:center;justify-content:center;gap:10px;padding:15px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.9rem}.warn svg{width:20px;height:20px;fill:currentColor;flex-shrink:0}@keyframes fadeIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg></div><h1>Acesso Exclusivo</h1><p>Entre pelo Telegram</p><div class="card"><div class="step"><span class="num">1</span><span>Abra o <strong>Telegram</strong> no seu celular</span></div><div class="step"><span class="num">2</span><span>Acesse o <strong>bot oficial</strong> do YoungMoney</span></div><div class="step"><span class="num">3</span><span>Clique no botão para abrir o <strong>Mini App</strong></span></div></div><div class="warn"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg><span>Acesso requer user_id válido na URL</span></div></div></body></html>';
+        }
+
+        // Verificar imediatamente se user_id está presente
+        if (!hasValidUserId()) {
+            showBlockScreen();
+        }
+    })();
+    </script>
+
+
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Rajdhani:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        /* === RESET E CORREÇÕES GLOBAIS === */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            overflow-x: hidden;
+            max-width: 100vw;
+            width: 100%;
+            height: 100%;
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #0d1225;
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --purple-neon: #8b5cf6;
+            --cyan-neon: #00ddff;
+            --green-neon: #10b981;
+            --yellow-neon: #fbbf24;
+            --card-bg: rgba(20, 25, 45, 0.85);
+            --card-border: rgba(139, 92, 246, 0.4);
+            --orange-neon: #f97316;
+        }
+
+        /* === FUNDO ESPACIAL COM ESTRELAS === */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Container do fundo de estrelas */
+        .stars-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            background: linear-gradient(180deg, #0a0e1a 0%, #0d1225 50%, #0a0e1a 100%);
+        }
+
+        /* Estrelas pequenas */
+        .stars-small {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(1px 1px at 10% 20%, rgba(255, 255, 255, 0.8) 0%, transparent 100%),
+                radial-gradient(1px 1px at 25% 35%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+                radial-gradient(1px 1px at 40% 15%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+                radial-gradient(1px 1px at 55% 45%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 70% 25%, rgba(255, 255, 255, 0.8) 0%, transparent 100%),
+                radial-gradient(1px 1px at 85% 55%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+                radial-gradient(1px 1px at 15% 65%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+                radial-gradient(1px 1px at 30% 80%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 45% 70%, rgba(255, 255, 255, 0.8) 0%, transparent 100%),
+                radial-gradient(1px 1px at 60% 85%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+                radial-gradient(1px 1px at 75% 75%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+                radial-gradient(1px 1px at 90% 90%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 5% 40%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+                radial-gradient(1px 1px at 20% 50%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+                radial-gradient(1px 1px at 35% 30%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 50% 60%, rgba(255, 255, 255, 0.8) 0%, transparent 100%),
+                radial-gradient(1px 1px at 65% 40%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+                radial-gradient(1px 1px at 80% 10%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+                radial-gradient(1px 1px at 95% 30%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 8% 85%, rgba(255, 255, 255, 0.8) 0%, transparent 100%);
+            animation: twinkle 4s ease-in-out infinite;
+        }
+
+        /* Estrelas médias */
+        .stars-medium {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(2px 2px at 12% 28%, rgba(0, 221, 255, 0.6) 0%, transparent 100%),
+                radial-gradient(2px 2px at 28% 42%, rgba(139, 92, 246, 0.5) 0%, transparent 100%),
+                radial-gradient(2px 2px at 42% 18%, rgba(255, 255, 255, 0.7) 0%, transparent 100%),
+                radial-gradient(2px 2px at 58% 52%, rgba(0, 221, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(2px 2px at 72% 32%, rgba(139, 92, 246, 0.6) 0%, transparent 100%),
+                radial-gradient(2px 2px at 88% 62%, rgba(255, 255, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(2px 2px at 18% 72%, rgba(0, 221, 255, 0.7) 0%, transparent 100%),
+                radial-gradient(2px 2px at 32% 88%, rgba(139, 92, 246, 0.5) 0%, transparent 100%),
+                radial-gradient(2px 2px at 48% 78%, rgba(255, 255, 255, 0.6) 0%, transparent 100%),
+                radial-gradient(2px 2px at 62% 92%, rgba(0, 221, 255, 0.5) 0%, transparent 100%),
+                radial-gradient(2px 2px at 78% 82%, rgba(139, 92, 246, 0.7) 0%, transparent 100%),
+                radial-gradient(2px 2px at 92% 95%, rgba(255, 255, 255, 0.5) 0%, transparent 100%);
+            animation: twinkle 3s ease-in-out infinite reverse;
+        }
+
+        /* Estrelas grandes (brilhantes) */
+        .stars-large {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(3px 3px at 15% 25%, rgba(255, 255, 255, 0.9) 0%, transparent 100%),
+                radial-gradient(3px 3px at 45% 55%, rgba(0, 221, 255, 0.8) 0%, transparent 100%),
+                radial-gradient(3px 3px at 75% 35%, rgba(139, 92, 246, 0.9) 0%, transparent 100%),
+                radial-gradient(3px 3px at 25% 75%, rgba(255, 255, 255, 0.8) 0%, transparent 100%),
+                radial-gradient(3px 3px at 85% 85%, rgba(0, 221, 255, 0.9) 0%, transparent 100%),
+                radial-gradient(3px 3px at 55% 15%, rgba(139, 92, 246, 0.8) 0%, transparent 100%);
+            animation: twinkle 5s ease-in-out infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* === HEADER === */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            background: transparent;
+            padding: 0 1rem;
+        }
+
+        .header-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 0.05em;
+        }
+
+        /* Linha decorativa abaixo do header */
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 5%;
+            right: 5%;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(0, 221, 255, 0.3) 20%,
+                rgba(139, 92, 246, 0.5) 50%,
+                rgba(0, 221, 255, 0.3) 80%,
+                transparent 100%);
+        }
+
+        /* Pontos decorativos no header */
+        .header-dot {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--cyan-neon);
+            border-radius: 50%;
+            bottom: -2px;
+        }
+
+        .header-dot.left {
+            left: 5%;
+        }
+
+        .header-dot.right {
+            right: 5%;
+        }
+
+        /* Botão Voltar */
+        .back-button {
+            position: absolute;
+            left: 1rem;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            transform: scale(1.1);
+        }
+
+        .back-button i {
+            color: var(--text-primary);
+            font-size: 1.25rem;
+        }
+
+        /* Botão Refresh */
+        .refresh-button {
+            position: absolute;
+            right: 1rem;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-button:hover {
+            transform: rotate(180deg);
+        }
+
+        .refresh-button i {
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        /* === MAIN CONTENT === */
+        .main-content {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 80px;
+            padding-bottom: 2rem;
+            gap: 1rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        /* === CARD PRINCIPAL === */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 400px;
+            box-shadow:
+                0 0 30px rgba(139, 92, 246, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title i {
+            color: var(--cyan-neon);
+        }
+
+        .card-dots {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .card-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--purple-neon);
+            opacity: 0.5;
+        }
+
+        .task-description {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .task-description strong {
+            color: var(--cyan-neon);
+        }
+
+        /* === PROGRESS SECTION === */
+        .progress-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .progress-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .progress-label i {
+            margin-right: 0.5rem;
+            color: var(--purple-neon);
+        }
+
+        .progress-bar-container {
+            height: 0.5rem;
+            background: rgba(139, 92, 246, 0.2);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 0.5rem;
+            transition: width 0.5s ease;
+            background: linear-gradient(90deg, var(--cyan-neon), var(--purple-neon));
+            box-shadow: 0 0 10px rgba(0, 221, 255, 0.5);
+        }
+
+        .progress-bar.completed {
+            background: linear-gradient(90deg, var(--green-neon), #34d399);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        /* === STATS GRID (FORA DO CARD) === */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .stat-box {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--cyan-neon);
+            text-shadow: 0 0 15px rgba(0, 221, 255, 0.5);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        /* === BUTTONS (FORA DO CARD) === */
+        .button-container {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .ad-button {
+            width: 100%;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 1rem;
+            font-size: 1rem;
+            border: none;
+            background: linear-gradient(135deg, var(--purple-neon) 0%, #a855f7 100%);
+            color: white;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .ad-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+        }
+
+        .ad-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .ad-button i {
+            font-size: 1.1rem;
+        }
+
+        .spin-button {
+            background: linear-gradient(135deg, var(--green-neon) 0%, #34d399 100%);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .spin-button:hover:not(:disabled) {
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        }
+
+        /* === STATUS MESSAGE === */
+        .status-message {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            display: none;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .status-message.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            color: var(--green-neon);
+        }
+
+        .status-message.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+        }
+
+        .status-message.warning {
+            background: rgba(251, 191, 36, 0.2);
+            border: 1px solid rgba(251, 191, 36, 0.4);
+            color: var(--yellow-neon);
+        }
+
+        /* === RESPONSIVE === */
+        @media (max-height: 700px) {
+            .main-content {
+                padding-top: 70px;
+                gap: 0.75rem;
+            }
+            .card {
+                padding: 1.25rem;
+            }
+            .stat-value {
+                font-size: 1.75rem;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .header {
+                height: 50px;
+            }
+            .main-content {
+                padding-top: 60px;
+            }
+            .card {
+                padding: 1rem;
+            }
+            .stat-value {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Spinner animation */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fundo de estrelas -->
+<div class="stars-background">
+    <div class="stars-small"></div>
+    <div class="stars-medium"></div>
+    <div class="stars-large"></div>
+</div>
+
+<header class="header">
+    <span class="header-title">Minhas Tarefas</span>
+    <button class="refresh-button" onclick="fetchStats()">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+    <span class="header-dot left"></span>
+    <span class="header-dot right"></span>
+</header>
+
+<main class="main-content">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title"><i class="fas fa-tasks"></i> Tarefa Diária</h2>
+            <div class="card-dots">
+                <span class="card-dot"></span>
+                <span class="card-dot"></span>
+                <span class="card-dot"></span>
+            </div>
+        </div>
+
+        <div class="task-description">
+            Complete a tarefa abaixo para desbloquear a roleta e ganhar prêmios!
+            <br><br>
+            • Assista <strong id="requiredImpressionsText"><i class="fas fa-spinner fa-spin"></i></strong> (impressões)
+        </div>
+
+        <div class="progress-section">
+            <div class="progress-item">
+                <div class="progress-label">
+                    <span><i class="fas fa-eye"></i> Anúncios Assistidos</span>
+                    <span id="impressionCount"><i class="fas fa-spinner fa-spin"></i></span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="impressionBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Grid (FORA do card) -->
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="stat-value" id="statImpressions"><i class="fas fa-spinner fa-spin"></i></div>
+            <div class="stat-label">Impressões</div>
+        </div>
+    </div>
+
+    <!-- Botões (FORA do card) -->
+    <div class="button-container">
+        <!-- Botão ASSISTIR ANÚCIO - Oculto até carregar API -->
+        <button class="ad-button" id="adButton" onclick="handleAdClick()" style="display: none;">
+            <i class="fas fa-play"></i> ASSISTIR ANÚNCIO
+        </button>
+
+        <!-- Botão GIRAR ROLETA (aparece quando tarefa é concluída) -->
+        <button class="ad-button spin-button" id="spinButton" onclick="openSpinWheel()" style="display: none;">
+            <i class="fas fa-dice"></i> GIRAR ROLETA
+        </button>
+    </div>
+
+    <div id="statusMessage" class="status-message"></div>
+</main>
+
+<!-- ========================================
+     SISTEMA DE OVERLAY FLUTUANTE DE 20 SEGUNDOS
+     ======================================== -->
+<script>
+    (function() {
+        'use strict';
+
+        const OVERLAY_DURATION = 20;
+        let overlayCreated = false;
+        let overlayCountdown = OVERLAY_DURATION;
+        let overlayInterval = null;
+
+        console.log('[OVERLAY SYSTEM] Iniciado - Duração: ' + OVERLAY_DURATION + ' segundos');
+
+        function createFloatingOverlay() {
+            if (overlayCreated) {
+                console.log('[OVERLAY] Overlay já existe, ignorando...');
+                return;
+            }
+
+            overlayCreated = true;
+
+            console.log('[OVERLAY] Anúncio detectado! Criando overlay flutuante de ' + OVERLAY_DURATION + ' segundos...');
+
+            const overlay = document.createElement('div');
+            overlay.id = 'monetag-block-overlay';
+            overlay.style.cssText = `
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(0, 0, 0, 0.1) !important;
+                z-index: 2147483647 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                animation: fadeInOverlay 0.3s ease !important;
+                pointer-events: auto !important;
+            `;
+
+            ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'pointerdown', 'pointerup'].forEach(function(eventType) {
+                overlay.addEventListener(eventType, function(e) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                    console.log('[OVERLAY] Evento ' + eventType + ' bloqueado');
+                    return false;
+                }, true);
+            });
+
+            const message = document.createElement('div');
+            message.style.cssText = `
+                background: linear-gradient(135deg, rgba(20, 25, 45, 0.95) 0%, rgba(13, 18, 37, 0.95) 100%) !important;
+                padding: 2rem !important;
+                border-radius: 1rem !important;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 30px rgba(139, 92, 246, 0.2) !important;
+                text-align: center !important;
+                max-width: 300px !important;
+                border: 1px solid rgba(139, 92, 246, 0.3) !important;
+            `;
+
+            message.innerHTML = `
+                <div style="width: 3rem; height: 3rem; margin: 0 auto 1rem; position: relative;">
+                    <svg viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(139, 92, 246, 0.2)" stroke-width="8"></circle>
+                        <circle id="overlay-progress-circle" cx="50" cy="50" r="45" fill="none" stroke="#00ddff" stroke-width="8" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear;"></circle>
+                    </svg>
+                    <span id="overlay-timer" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: 'Orbitron', monospace; font-size: 1rem; font-weight: 700; color: #00ddff;">${OVERLAY_DURATION}</span>
+                </div>
+                <p style="margin: 0; color: #a0aec0; font-size: 0.875rem; font-family: 'Inter', sans-serif;">Realizando tarefa automaticamente...</p>
+            `;
+
+            overlay.appendChild(message);
+            document.documentElement.appendChild(overlay);
+
+            const overlayEl = overlay;
+            function keepOverlayOnTop() {
+                if (overlayEl.parentNode !== document.documentElement || overlayEl !== document.documentElement.lastElementChild) {
+                    document.documentElement.appendChild(overlayEl);
+                }
+                overlayEl.style.zIndex = '2147483647';
+            }
+
+            const topInterval = setInterval(keepOverlayOnTop, 100);
+
+            const circumference = 283;
+            overlayCountdown = OVERLAY_DURATION;
+
+            // Verificar se deve enviar impressão quando chegar em 3 segundos
+            let impressionSent = false;
+
+            overlayInterval = setInterval(function() {
+                overlayCountdown--;
+
+                const timerEl = document.getElementById('overlay-timer');
+                const progressCircle = document.getElementById('overlay-progress-circle');
+
+                if (timerEl) timerEl.textContent = overlayCountdown;
+
+                if (progressCircle) {
+                    const progress = (OVERLAY_DURATION - overlayCountdown) / OVERLAY_DURATION;
+                    progressCircle.style.strokeDashoffset = circumference * (1 - progress);
+                }
+
+                // Quando chegar em 3 segundos, enviar a impressão
+                if (overlayCountdown === 3 && !impressionSent) {
+                    impressionSent = true;
+                    console.log('[OVERLAY] ⏰ Contador chegou em 3 segundos! Enviando impressão...');
+                    if (typeof window.sendImpressionFromOverlay === 'function') {
+                        window.sendImpressionFromOverlay();
+                    }
+                }
+
+                if (overlayCountdown <= 0) {
+                    clearInterval(overlayInterval);
+                    clearInterval(topInterval);
+                    overlayInterval = null;
+                    console.log('[OVERLAY] Contador finalizado! Reiniciando página...');
+                    window.location.reload();
+                }
+            }, 1000);
+
+            console.log('[OVERLAY] Overlay criado com sucesso!');
+        }
+
+        function removeOverlay() {
+            const overlay = document.getElementById('monetag-block-overlay');
+            if (overlay) {
+                overlay.style.animation = 'fadeOutOverlay 0.3s ease';
+                setTimeout(function() {
+                    overlay.remove();
+                    overlayCreated = false;
+                    console.log('[OVERLAY] Overlay removido!');
+                }, 300);
+            }
+        }
+
+        function detectMonetagAd() {
+            const selectors = [
+                'iframe[src*="monetag"]',
+                'iframe[src*="libtl"]',
+                'iframe[src*="ad"]',
+                '[class*="monetag"]',
+                '[id*="monetag"]',
+                'div[style*="z-index: 2147483647"]',
+                'div[style*="z-index:2147483647"]',
+                'iframe[style*="z-index"]',
+                'div[id^="container-"]',
+                'iframe[id*="google_ads"]',
+                'div[id*="google_ads"]'
+            ];
+
+            for (let selector of selectors) {
+                const elements = document.querySelectorAll(selector);
+                if (elements.length > 0) {
+                    return true;
+                }
+            }
+
+            const iframes = document.querySelectorAll('iframe');
+            for (let iframe of iframes) {
+                const src = iframe.src || '';
+                const style = iframe.getAttribute('style') || '';
+                if (src.includes('monetag') || src.includes('libtl') || src.includes('ad') || style.includes('z-index') || iframe.style.zIndex > 1000) {
+                    console.log('[DETECTOR] Iframe de anúncio detectado:', src);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        let adDetected = false;
+        const observer = new MutationObserver(function(mutations) {
+            if (!adDetected && detectMonetagAd()) {
+                adDetected = true;
+                console.log('[OBSERVER] Anúncio Monetag detectado via MutationObserver!');
+                createFloatingOverlay();
+                setTimeout(function() {
+                    adDetected = false;
+                }, 2000);
+            }
+        });
+
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class', 'id', 'src']
+        });
+
+        setInterval(function() {
+            if (!adDetected && detectMonetagAd()) {
+                adDetected = true;
+                console.log('[INTERVAL] Anúncio Monetag detectado via verificação periódica!');
+                createFloatingOverlay();
+                setTimeout(function() {
+                    adDetected = false;
+                }, 2000);
+            }
+        }, 500);
+
+        window.createMonetagOverlay = createFloatingOverlay;
+        window.removeMonetagOverlay = removeOverlay;
+    })();
+</script>
+
+<!-- ========================================
+     SISTEMA PRINCIPAL - APENAS IMPRESSÕES
+     ======================================== -->
+<script>
+    'use strict';
+
+    const ZONE_ID = '10325249';
+    const SDK_FUNC = 'show_10325249';
+    const SCRIPT_SRC = 'https://libtl.com/sdk.js';
+
+    // URLs via proxy local para evitar CORS
+    const POSTBACK_URL = '/api/postback';
+
+    const YOUNGMONEY_API = '/api/youngmoney';
+    const PROFILE_ENDPOINT = `${YOUNGMONEY_API}/profile`;
+
+    let REQUIRED_IMPRESSIONS = 20;
+    const AUTO_REFRESH_INTERVAL = 3000;
+
+    // Estado da tarefa - APENAS IMPRESSÕES
+    let TaskState = {
+        userId: null,
+        userEmail: null,
+        impressions: 0,
+        isProcessing: false,
+        isLoading: false,
+        requiredImpressionsLoaded: false,
+        lastImpressionSent: 0,
+        lastImpressions: 0
+    };
+
+    let autoRefreshInterval = null;
+
+    // Função para mostrar tela de manutenção
+    function showMaintenanceScreen() {
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes float {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-10px); }
+            }
+            @keyframes pulse-glow {
+                0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.3); }
+                50% { box-shadow: 0 0 40px rgba(251, 191, 36, 0.5); }
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: scale(0.95); }
+                to { opacity: 1; transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        document.body.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: linear-gradient(180deg, #0a0e1a 0%, #0d1225 50%, #0a0e1a 100%);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 999999;
+                padding: 20px;
+            ">
+                <div style="
+                    background: rgba(20, 25, 45, 0.95);
+                    padding: 40px;
+                    border-radius: 24px;
+                    text-align: center;
+                    max-width: 90%;
+                    width: 400px;
+                    border: 1px solid rgba(251, 191, 36, 0.3);
+                    animation: fadeIn 0.5s ease-out, pulse-glow 3s ease-in-out infinite;
+                    position: relative;
+                ">
+                    <div style="
+                        width: 80px;
+                        height: 80px;
+                        margin: 0 auto 2rem;
+                        background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 2px solid rgba(251, 191, 36, 0.3);
+                        animation: float 3s ease-in-out infinite;
+                    ">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 8V12M12 16H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    
+                    <h1 style="
+                        margin: 0 0 0.75rem 0;
+                        color: #fbbf24;
+                        font-size: 1.75rem;
+                        font-weight: 600;
+                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                        letter-spacing: -0.5px;
+                    ">Em Manutenção</h1>
+                    
+                    <p style="
+                        margin: 0;
+                        color: #a0aec0;
+                        font-size: 1rem;
+                        line-height: 1.6;
+                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                    ">
+                        Estamos realizando melhorias no sistema.<br>
+                        Por favor, tente novamente mais tarde.
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+
+    // Função para mostrar tela de acesso restrito
+    function showRestrictedScreen() {
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes float {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-10px); }
+            }
+            @keyframes pulse-glow {
+                0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+                50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.5); }
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: scale(0.95); }
+                to { opacity: 1; transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        document.body.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: linear-gradient(180deg, #0a0e1a 0%, #0d1225 50%, #0a0e1a 100%);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 999999;
+                padding: 20px;
+            ">
+                <div style="
+                    background: rgba(20, 25, 45, 0.95);
+                    padding: 40px;
+                    border-radius: 24px;
+                    text-align: center;
+                    max-width: 90%;
+                    width: 400px;
+                    border: 1px solid rgba(139, 92, 246, 0.2);
+                    animation: fadeIn 0.5s ease-out, pulse-glow 3s ease-in-out infinite;
+                    position: relative;
+                ">
+                    <div style="
+                        width: 80px;
+                        height: 80px;
+                        margin: 0 auto 2rem;
+                        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%);
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 2px solid rgba(139, 92, 246, 0.3);
+                        animation: float 3s ease-in-out infinite;
+                    ">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19 11H5C3.89543 11 3 11.8954 3 13V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V13C21 11.8954 20.1046 11 19 11Z" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="12" cy="16" r="1" fill="#8b5cf6"/>
+                        </svg>
+                    </div>
+                    
+                    <h1 style="
+                        margin: 0 0 0.75rem 0;
+                        color: #ffffff;
+                        font-size: 1.75rem;
+                        font-weight: 600;
+                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                        letter-spacing: -0.5px;
+                    ">Acesso Restrito</h1>
+                    
+                    <p style="
+                        margin: 0;
+                        color: #a0aec0;
+                        font-size: 1rem;
+                        line-height: 1.6;
+                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                    ">
+                        Você precisa estar cadastrado para acessar.<br>
+                        Entre em contato com o suporte.
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Função para enviar postback de IMPRESSÃO para o servidor
+    async function sendPostbackToServer(type) {
+        if (type !== 'impression') return; // Apenas impressões
+        
+        // Evitar duplicatas (cooldown de 3 segundos)
+        const now = Date.now();
+        if (now - TaskState.lastImpressionSent < 3000) {
+            console.log('[INTERCEPTOR] Impressão ignorada (cooldown)');
+            return;
+        }
+        
+        TaskState.lastImpressionSent = now;
+        
+        console.log(`[INTERCEPTOR] 🎯 IMPRESSÃO ENVIANDO!`);
+        
+        // Enviar para o servidor de postback principal
+        const params = new URLSearchParams({
+            event_type: 'impression',
+            zone_id: ZONE_ID,
+            ymid: TaskState.userId,
+            user_email: TaskState.userEmail || 'unknown',
+            estimated_price: '0.0023'
+        });
+        
+        const url = `${POSTBACK_URL}?${params.toString()}`;
+        
+        try {
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+            console.log(`[INTERCEPTOR] ✅ Impressão registrada:`, data);
+            setTimeout(() => fetchStats(), 500);
+        } catch (err) {
+            console.error(`[INTERCEPTOR] ❌ Erro ao enviar impressão:`, err);
+        }
+    }
+    
+    // Função para detectar tipo de evento baseado na URL
+    function detectEventType(url) {
+        if (url.includes('event_type=impression') || url.includes('event_type%3Dimpression')) {
+            return 'impression';
+        }
+        return null;
+    }
+    
+    // Função para verificar se é um postback do Monetag (contém {ymid} não substituído)
+    function isMonetagPostback(url) {
+        return (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server')) && 
+               (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
+    }
+    
+    // Interceptar fetch - detectar postbacks do Monetag
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0]?.url || args[0] || '';
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] 🚫 Postback do Monetag interceptado:', url);
+            const eventType = detectEventType(url);
+            if (eventType === 'impression') {
+                // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
+            }
+            // Bloquear a requisição original e retornar sucesso
+            return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
+        }
+        return originalFetch.apply(this, args);
+    };
+    
+    // Interceptar XMLHttpRequest - detectar postbacks do Monetag
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] 🚫 XHR Postback do Monetag interceptado:', url);
+            const eventType = detectEventType(url);
+            if (eventType === 'impression') {
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
+            }
+            this._blocked = true;
+        }
+        return originalXHROpen.call(this, method, url, ...rest);
+    };
+    
+    // Interceptar Image (pixel tracking) - detectar postbacks do Monetag
+    const originalImage = window.Image;
+    window.Image = function() {
+        const img = new originalImage();
+        const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+        Object.defineProperty(img, 'src', {
+            set: function(value) {
+                if (typeof value === 'string' && isMonetagPostback(value)) {
+                    console.log('[INTERCEPTOR] 🚫 Image Postback do Monetag interceptado:', value);
+                    const eventType = detectEventType(value);
+                    if (eventType === 'impression') {
+                        console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
+                    }
+                    return;
+                }
+                originalSrcDescriptor.set.call(this, value);
+            },
+            get: function() {
+                return originalSrcDescriptor.get.call(this);
+            }
+        });
+        return img;
+    };
+    
+    console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
+    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas quando o contador do overlay chegar em 3 segundos');
+    
+    // FUNÇÃO GLOBAL para o overlay chamar quando o contador chegar em 3 segundos
+    window.sendImpressionFromOverlay = function() {
+        console.log('[OVERLAY CALLBACK] 📺 Enviando impressão do overlay...');
+        sendPostbackToServer('impression');
+    };
+
+    async function fetchRequiredImpressions() {
+        try {
+            const url = `${YOUNGMONEY_API}/monetag/progress?user_id=${TaskState.userId}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                // Carregar valores necessários
+                REQUIRED_IMPRESSIONS = data.data.required_impressions || 20;
+                
+                // Carregar progresso atual do usuário
+                TaskState.impressions = data.data.impressions || 0;
+                TaskState.requiredImpressionsLoaded = true;
+
+                console.log('[REQUIREMENTS] ✅ Valores carregados da API:');
+                console.log('[REQUIREMENTS]   - Impressões atuais:', TaskState.impressions);
+                console.log('[REQUIREMENTS]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
+
+                // Atualizar texto de loading
+                const reqImpText = document.getElementById('requiredImpressionsText');
+                if (reqImpText) reqImpText.textContent = `${REQUIRED_IMPRESSIONS} anúncios`;
+
+                updateUI();
+            }
+        } catch (err) {
+            console.error('[REQUIREMENTS] ❌ Erro ao carregar valores:', err);
+        }
+    }
+
+    async function init() {
+        console.log('[INIT] Iniciando sistema...');
+
+        TaskState.isLoading = true;
+        updateUI();
+
+        // Obter user_id da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        TaskState.userId = urlParams.get('user_id') || window.TELEGRAM_USER_ID;
+
+        if (!TaskState.userId) {
+            console.error('[INIT] ❌ user_id não encontrado na URL');
+            showRestrictedScreen();
+            return;
+        }
+
+        console.log('[INIT] User ID:', TaskState.userId);
+
+        // Buscar perfil do usuário
+        try {
+            const profileUrl = `${PROFILE_ENDPOINT}?user_id=${TaskState.userId}`;
+            console.log('[INIT] Buscando perfil:', profileUrl);
+
+            const response = await fetch(profileUrl);
+            const data = await response.json();
+
+            console.log('[INIT] Resposta do perfil:', data);
+
+            if (data.success && data.data) {
+                TaskState.userEmail = data.data.email || 'unknown';
+                console.log('[INIT] ✅ Perfil carregado - Email:', TaskState.userEmail);
+            } else if (data.error === 'user_not_found') {
+                console.error('[INIT] ❌ Usuário não encontrado');
+                showRestrictedScreen();
+                return;
+            } else if (data.error === 'maintenance') {
+                console.log('[INIT] 🔧 Sistema em manutenção');
+                showMaintenanceScreen();
+                return;
+            }
+        } catch (err) {
+            console.error('[INIT] ❌ Erro ao buscar perfil:', err);
+        }
+
+        // Carregar SDK do Monetag
+        try {
+            const script = document.createElement('script');
+            script.src = SCRIPT_SRC;
+            script.async = true;
+            script.setAttribute('data-cfasync', 'false');
+            document.head.appendChild(script);
+            console.log('[INIT] ✅ SDK Monetag carregado');
+        } catch (err) {
+            console.error('[INIT] ❌ Erro ao carregar SDK:', err);
+        }
+
+        // Buscar valores necessários e estatísticas
+        await fetchRequiredImpressions();
+        await fetchStats();
+
+        TaskState.isLoading = false;
+        updateUI();
+
+        console.log('[INIT] ✅ Sistema iniciado com sucesso!');
+    }
+
+    async function fetchStats() {
+        try {
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            console.log(`[STATS] [${timestamp}] Buscando estatísticas do usuário ${TaskState.userId}...`);
+
+            // Usar a API progress.php para buscar estatísticas
+            const url = `${YOUNGMONEY_API}/monetag/progress?user_id=${TaskState.userId}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            console.log('[STATS] Resposta:', data);
+
+            if (data.success && data.data) {
+                const newImpressions = data.data.impressions || 0;
+
+                const hasChanges = newImpressions !== TaskState.lastImpressions;
+
+                if (hasChanges) {
+                    TaskState.impressions = newImpressions;
+                    TaskState.lastImpressions = newImpressions;
+                    
+                    // Atualizar também os valores necessários caso tenham mudado
+                    REQUIRED_IMPRESSIONS = data.data.required_impressions || REQUIRED_IMPRESSIONS;
+                    
+                    updateUI();
+                }
+
+                console.log('[STATS] ✅ Estatísticas atualizadas:', TaskState.impressions, '/', REQUIRED_IMPRESSIONS);
+            }
+        } catch (err) {
+            console.error('[STATS] ❌ Erro ao buscar estatísticas:', err);
+        }
+    }
+
+    function goBack() {
+        console.log('[BACK] Botão voltar clicado - Abrindo app com.youngmoney2');
+        
+        // Abrir o app pelo package name
+        window.location.href = 'intent://scan/#Intent;scheme=com.youngmoney2;package=com.youngmoney2;end';
+    }
+
+    // ========================================
+    // REFRESH AUTOMÁTICO AO VOLTAR PARA A TELA
+    // ========================================
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            console.log('[VISIBILITY] 🔄 Página ficou visível - Atualizando dados...');
+            fetchStats();
+            fetchRequiredImpressions();
+        }
+    });
+
+    // Também atualiza quando a janela ganha foco
+    window.addEventListener('focus', function() {
+        console.log('[FOCUS] 🔄 Janela ganhou foco - Atualizando dados...');
+        fetchStats();
+        fetchRequiredImpressions();
+    });
+
+    function updateUI() {
+        // SÓ atualizar valores se a API já carregou
+        if (!TaskState.requiredImpressionsLoaded) {
+            // Manter spinners - não fazer nada
+            return;
+        }
+        
+        // Contadores (valores grandes nos boxes)
+        document.getElementById('statImpressions').textContent = TaskState.impressions;
+
+        // Progresso de impressões (barra)
+        const impressionProgress = Math.min((TaskState.impressions / REQUIRED_IMPRESSIONS) * 100, 100);
+        document.getElementById('impressionBar').style.width = impressionProgress + '%';
+        document.getElementById('impressionCount').textContent = `${TaskState.impressions}/${REQUIRED_IMPRESSIONS}`;
+
+        if (TaskState.impressions >= REQUIRED_IMPRESSIONS) {
+            document.getElementById('impressionBar').classList.add('completed');
+        }
+
+        // Botão
+        const button = document.getElementById('adButton');
+
+        const taskCompleted = TaskState.requiredImpressionsLoaded &&
+                              TaskState.impressions >= REQUIRED_IMPRESSIONS;
+
+        if (taskCompleted) {
+            button.style.display = 'none';
+            showStatus('<i class="fas fa-check-circle"></i> Parabéns! Tarefa concluída. Volte para girar a roleta!', 'success');
+        } else {
+            hideStatus();
+            // Só mostrar botão se API já carregou
+            button.style.display = 'flex';
+            button.disabled = TaskState.isLoading || TaskState.isProcessing;
+
+            if (TaskState.isLoading) {
+                button.innerHTML = '<span class="spinner"></span> CARREGANDO DADOS...';
+            } else if (TaskState.isProcessing) {
+                button.innerHTML = '<span class="spinner"></span> CARREGANDO...';
+            } else {
+                button.innerHTML = '<i class="fas fa-play"></i> ASSISTIR ANÚNCIO';
+            }
+        }
+    }
+
+    function showStatus(message, type) {
+        const statusEl = document.getElementById('statusMessage');
+        statusEl.innerHTML = message;
+        statusEl.className = `status-message ${type}`;
+        statusEl.style.display = 'block';
+    }
+
+    function hideStatus() {
+        const statusEl = document.getElementById('statusMessage');
+        if (statusEl) {
+            statusEl.style.display = 'none';
+        }
+    }
+
+    function handleAdClick() {
+        if (TaskState.isProcessing) return;
+
+        TaskState.isProcessing = true;
+        updateUI();
+
+        console.log('[AD] Iniciando exibição de anúncio');
+
+        if (typeof window[SDK_FUNC] !== 'function') {
+            console.warn('[AD] SDK não está pronto');
+            TaskState.isProcessing = false;
+            updateUI();
+            showStatus('⚠️ Aguarde o carregamento...', 'warning');
+            return;
+        }
+
+        console.log('[AD] Chamando SDK com ymid e requestVar');
+        window[SDK_FUNC]({
+            ymid: TaskState.userId,
+            requestVar: TaskState.userEmail
+        }).then(() => {
+            console.log('[AD] ✅ Anúncio exibido pelo Monetag');
+            
+            // Impressão será detectada automaticamente pelo interceptador
+            // Não enviar manualmente para evitar duplicação
+
+            setTimeout(() => {
+                TaskState.isProcessing = false;
+                updateUI();
+            }, 2000);
+        }).catch(err => {
+            console.error('[AD] ❌ Erro:', err);
+            TaskState.isProcessing = false;
+            updateUI();
+        });
+    }
+
+    function startAutoRefresh() {
+        console.log('[AUTO-REFRESH] Desabilitado');
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    function openSpinWheel() {
+        console.log('[SPIN] Abrindo roleta...');
+        stopAutoRefresh();
+
+        if (window.AndroidInterface?.onTaskCompleted) {
+            window.AndroidInterface.onTaskCompleted();
+        } else if (window.Android?.onTaskCompleted) {
+            window.Android.onTaskCompleted();
+        }
+
+        if (window.Telegram?.WebApp?.close) {
+            window.Telegram.WebApp.close();
+        }
+    }
+
+    window.addEventListener('DOMContentLoaded', function() {
+        init();
+    });
+</script>
+</body>
+</html>
