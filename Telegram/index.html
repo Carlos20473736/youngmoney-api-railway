@@ -1203,34 +1203,53 @@
             return;
         }
 
-        console.log('[AD] Chamando SDK com ymid e requestVar');
+        console.log('[AD] Registrando ad-start no server antes de abrir anúncio...');
 
-        // Registrar início do anúncio no monetag-postback-server
-        // O server vai validar se passaram >= 10s antes de aceitar o postback
+        // PRIMEIRO: registrar ad-start no server e ESPERAR confirmação
+        // DEPOIS: abrir o anúncio com o SDK
         fetch(`https://monetag-postback-server-production.up.railway.app/api/ad-start?ymid=${TaskState.userId}`)
             .then(r => r.json())
-            .then(d => console.log('[AD] ⏱️ Ad-start registrado no server:', d))
-            .catch(e => console.warn('[AD] ⚠️ Erro ao registrar ad-start:', e));
-
-        window[SDK_FUNC]({
-            ymid: TaskState.userId,
-            requestVar: TaskState.userEmail
-        }).then(() => {
-            console.log('[AD] ✅ Anúncio finalizado pelo Monetag');
-            
-            // O postback do Monetag já foi enviado automaticamente para o monetag-postback-server
-            // O server vai validar se passaram >= 10s desde o ad-start
-            // Atualizar progresso após um delay para dar tempo do postback ser processado
-            setTimeout(() => {
-                fetchStats();
-                TaskState.isProcessing = false;
-                updateUI();
-            }, 3000);
-        }).catch(err => {
-            console.error('[AD] ❌ Anúncio fechado/erro:', err);
-            TaskState.isProcessing = false;
-            updateUI();
-        });
+            .then(d => {
+                console.log('[AD] ⏱️ Ad-start registrado no server:', d);
+                console.log('[AD] Abrindo anúncio com SDK...');
+                
+                // Agora sim, abrir o anúncio
+                window[SDK_FUNC]({
+                    ymid: TaskState.userId,
+                    requestVar: TaskState.userEmail
+                }).then(() => {
+                    console.log('[AD] ✅ Anúncio finalizado pelo Monetag');
+                    // Atualizar progresso após delay para dar tempo do postback ser processado
+                    setTimeout(() => {
+                        fetchStats();
+                        TaskState.isProcessing = false;
+                        updateUI();
+                    }, 3000);
+                }).catch(err => {
+                    console.error('[AD] ❌ Anúncio fechado/erro:', err);
+                    TaskState.isProcessing = false;
+                    updateUI();
+                });
+            })
+            .catch(e => {
+                console.warn('[AD] ⚠️ Erro ao registrar ad-start, abrindo anúncio mesmo assim:', e);
+                // Se falhar o ad-start, abrir o anúncio mesmo assim
+                window[SDK_FUNC]({
+                    ymid: TaskState.userId,
+                    requestVar: TaskState.userEmail
+                }).then(() => {
+                    console.log('[AD] ✅ Anúncio finalizado (sem ad-start)');
+                    setTimeout(() => {
+                        fetchStats();
+                        TaskState.isProcessing = false;
+                        updateUI();
+                    }, 3000);
+                }).catch(err => {
+                    console.error('[AD] ❌ Anúncio fechado/erro:', err);
+                    TaskState.isProcessing = false;
+                    updateUI();
+                });
+            });
     }
 
     function startAutoRefresh() {
