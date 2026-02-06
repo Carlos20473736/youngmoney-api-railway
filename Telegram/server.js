@@ -151,7 +151,7 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // API Local - progress
+    // API Proxy - progress (consulta a API real do Railway)
     if (pathname.startsWith('/api/youngmoney/monetag/progress')) {
         const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
         console.log(`[API] Progress request for user_id/ymid: ${userId}`);
@@ -165,19 +165,29 @@ const server = http.createServer((req, res) => {
             return;
         }
         
-        const userData = getUserData(userId);
-        res.writeHead(200, {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+        // Consultar a API real do Railway (progress.php)
+        const realApiUrl = `https://youngmoney-api-railway-production-561a.up.railway.app/telegramyoung2/monetag/progress.php?user_id=${userId}`;
+        console.log(`[API] Proxy -> ${realApiUrl}`);
+        
+        https.get(realApiUrl, (apiRes) => {
+            let body = '';
+            apiRes.on('data', chunk => body += chunk);
+            apiRes.on('end', () => {
+                console.log(`[API] Progress response for user ${userId}:`, body.substring(0, 200));
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                });
+                res.end(body);
+            });
+        }).on('error', (err) => {
+            console.error(`[API] Progress proxy error:`, err.message);
+            res.writeHead(500, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify({ success: false, error: 'Erro ao consultar API real: ' + err.message }));
         });
-        res.end(JSON.stringify({
-            success: true,
-            data: {
-                impressions: userData.impressions,
-                clicks: userData.clicks,
-                required_impressions: userData.required_impressions
-            }
-        }));
         return;
     }
 
