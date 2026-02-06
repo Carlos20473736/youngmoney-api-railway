@@ -1079,8 +1079,8 @@
     const YOUNGMONEY_API = 'https://youngmoney-api-railway-production-561a.up.railway.app/telegramyoung2';
     const PROFILE_ENDPOINT = `${YOUNGMONEY_API}/profile`;
 
-    let REQUIRED_IMPRESSIONS = 5;
-    let REQUIRED_CLICKS = 1;
+    let REQUIRED_IMPRESSIONS = 5; // Será atualizado pela API
+    let REQUIRED_CLICKS = 0; // Removido - apenas impressões
     const AUTO_REFRESH_INTERVAL = 3000;
 
     const TaskState = {
@@ -1142,9 +1142,9 @@
             console.log('[REQUIREMENTS] Resposta:', data);
 
             if (data.success && data.data) {
-                // Carregar valores necessários
-                REQUIRED_IMPRESSIONS = data.data.required_impressions || 20;
-                REQUIRED_CLICKS = data.data.required_clicks || 2;
+                // Carregar valores necessários (apenas impressões)
+                REQUIRED_IMPRESSIONS = data.data.required_impressions || 10;
+                REQUIRED_CLICKS = 0; // Removido - apenas impressões
                 
                 // Carregar progresso atual do usuário
                 TaskState.impressions = data.data.impressions || 0;
@@ -1153,19 +1153,13 @@
 
                 console.log('[REQUIREMENTS] ✅ Valores carregados da API:');
                 console.log('[REQUIREMENTS]   - Impressões atuais:', TaskState.impressions);
-                console.log('[REQUIREMENTS]   - Cliques atuais:', TaskState.clicks);
                 console.log('[REQUIREMENTS]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
-                console.log('[REQUIREMENTS]   - Cliques necessários:', REQUIRED_CLICKS);
 
                 // Atualizar textos dinâmicos na tela
                 const reqImpText = document.getElementById('requiredImpressionsText');
-                const reqClickText = document.getElementById('requiredClicksText');
 
                 if (reqImpText) {
                     reqImpText.textContent = REQUIRED_IMPRESSIONS + ' anúncios';
-                }
-                if (reqClickText) {
-                    reqClickText.textContent = REQUIRED_CLICKS + (REQUIRED_CLICKS === 1 ? ' anúncio' : ' anúncios');
                 }
 
                 updateUI();
@@ -1315,7 +1309,8 @@
                     
                     // Atualizar também os valores necessários caso tenham mudado
                     REQUIRED_IMPRESSIONS = data.data.required_impressions || REQUIRED_IMPRESSIONS;
-                    REQUIRED_CLICKS = data.data.required_clicks || REQUIRED_CLICKS;
+                    // Cliques removidos - apenas impressões
+                    REQUIRED_CLICKS = 0;
                     
                     updateUI();
                 }
