@@ -1184,9 +1184,9 @@
         TaskState.isLoading = true;
         updateUI();
 
-        // Obter user_id da URL
+        // Obter user_id da URL (aceita user_id ou user_id_telegram)
         const urlParams = new URLSearchParams(window.location.search);
-        TaskState.userId = urlParams.get('user_id') || window.TELEGRAM_USER_ID;
+        TaskState.userId = urlParams.get('user_id') || urlParams.get('user_id_telegram') || window.TELEGRAM_USER_ID;
 
         if (!TaskState.userId) {
             console.error('[INIT] ❌ user_id não encontrado na URL');
