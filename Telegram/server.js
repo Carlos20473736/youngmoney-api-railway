@@ -120,6 +120,35 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // API Local - reset global (resetar todos os usuários)
+    if (pathname.includes('reset_global') || pathname.includes('reset_all')) {
+        console.log(`[API] Reset global - resetando todos os usuários`);
+        
+        let resetCount = 0;
+        for (const userId in userDataStore) {
+            const userData = userDataStore[userId];
+            // Resetar impressões para um valor randômico entre 0 e 5
+            userData.impressions = Math.floor(Math.random() * 6);
+            userData.clicks = 0;
+            // Randomizar required_impressions entre 15 e 25
+            userData.required_impressions = Math.floor(Math.random() * 11) + 15;
+            resetCount++;
+        }
+        
+        console.log(`[API] Reset global concluído - ${resetCount} usuários resetados`);
+        
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify({ 
+            success: true, 
+            message: `Reset global concluído - ${resetCount} usuários resetados`,
+            users_reset: resetCount
+        }));
+        return;
+    }
+
     // API Local - reset_postback (resetar e randomizar impressões)
     if (pathname.startsWith('/monetag/reset_postback') || pathname.includes('reset_postback')) {
         const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
