@@ -120,6 +120,34 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // API Local - reset_postback (resetar e randomizar impressões)
+    if (pathname.startsWith('/monetag/reset_postback') || pathname.startsWith('/api/reset_postback')) {
+        const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
+        console.log(`[API] Reset postback for user_id: ${userId}`);
+        
+        if (userId) {
+            const userData = getUserData(userId);
+            // Resetar impressões para um valor randômico entre 0 e 5
+            const randomImpressions = Math.floor(Math.random() * 6);
+            userData.impressions = randomImpressions;
+            userData.clicks = 0;
+            // Randomizar required_impressions entre 15 e 25
+            userData.required_impressions = Math.floor(Math.random() * 11) + 15;
+            console.log(`[API] User ${userId} reset - impressions: ${userData.impressions}, required: ${userData.required_impressions}`);
+        }
+        
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify({ 
+            success: true, 
+            message: 'Postback reset successfully',
+            data: userId ? getUserData(userId) : null
+        }));
+        return;
+    }
+
     // API Local - postback (registrar impressões/cliques)
     if (pathname.startsWith('/api/postback')) {
         const eventType = parsedUrl.query.event_type;
