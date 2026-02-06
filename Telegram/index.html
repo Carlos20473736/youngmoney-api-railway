@@ -1187,6 +1187,8 @@
         }
     }
 
+    const AD_MIN_SECONDS = 10; // Tempo mínimo em segundos para contar impressão
+
     function handleAdClick() {
         if (TaskState.isProcessing) return;
 
@@ -1203,22 +1205,33 @@
             return;
         }
 
-        console.log('[AD] Chamando SDK com ymid e requestVar');
+        // Registrar timestamp de quando o anúncio abriu
+        const adStartTime = Date.now();
+        console.log('[AD] Chamando SDK com ymid e requestVar - timer iniciado');
+
         window[SDK_FUNC]({
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
         }).then(() => {
-            console.log('[AD] ✅ Anúncio concluído pelo Monetag - enviando impressão');
-            
-            // Anúncio foi concluído (vídeo completo) - enviar impressão
-            sendPostbackToServer('impression');
+            const elapsedSeconds = (Date.now() - adStartTime) / 1000;
+            console.log(`[AD] Anúncio fechado após ${elapsedSeconds.toFixed(1)}s`);
+
+            if (elapsedSeconds >= AD_MIN_SECONDS) {
+                // Assistiu pelo menos 10 segundos - contabilizar
+                console.log(`[AD] ✅ Tempo suficiente (${elapsedSeconds.toFixed(1)}s >= ${AD_MIN_SECONDS}s) - enviando impressão`);
+                sendPostbackToServer('impression');
+            } else {
+                // Fechou antes de 10 segundos - NÃO contabilizar
+                console.log(`[AD] ❌ Tempo insuficiente (${elapsedSeconds.toFixed(1)}s < ${AD_MIN_SECONDS}s) - impressão NÃO contabilizada`);
+            }
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
                 updateUI();
             }, 2000);
         }).catch(err => {
-            console.error('[AD] ❌ Anúncio fechado/erro - impressão NÃO contabilizada:', err);
+            const elapsedSeconds = (Date.now() - adStartTime) / 1000;
+            console.error(`[AD] ❌ Erro/fechado após ${elapsedSeconds.toFixed(1)}s - impressão NÃO contabilizada:`, err);
             TaskState.isProcessing = false;
             updateUI();
         });
