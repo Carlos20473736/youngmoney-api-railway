@@ -121,7 +121,7 @@ const server = http.createServer((req, res) => {
     }
 
     // API Local - reset_postback (resetar e randomizar impressões)
-    if (pathname.startsWith('/monetag/reset_postback') || pathname.startsWith('/api/reset_postback')) {
+    if (pathname.startsWith('/monetag/reset_postback') || pathname.includes('reset_postback')) {
         const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
         console.log(`[API] Reset postback for user_id: ${userId}`);
         
