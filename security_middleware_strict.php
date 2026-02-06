@@ -14,7 +14,7 @@
  * - X-Request-Signature
  * - X-App-Hash
  * 
- * @version 2.1.0
+ * @version 2.2.0
  */
 
 // =====================================================
@@ -47,8 +47,10 @@ $maintenanceExemptEndpoints = [
     '/api/v1/auth/device-login.php',
     '/api/v1/tunnel.php',
     '/api/v1/secure.php',
-    '/api/v1/app/check-update.php',  // Verificação de atualização do app
-    '/api/v1/app/version.php'         // Versão do app
+    '/api/v1/app/check-update.php',
+    '/api/v1/app/version.php',
+    '/api/v1/cron/',
+    '/api/v1/reset/'
 ];
 
 // Verificar se é endpoint isento de manutenção
@@ -227,9 +229,13 @@ $publicEndpoints = [
     '/api/v1/device/register.php',
     '/api/v1/tunnel.php',
     '/api/v1/secure.php',
+    '/api/v1/app/check-update.php',
+    '/api/v1/app/version.php',
     '/admin/',
     '/health',
-    '/health.php'
+    '/health.php',
+    '/api/v1/cron/',
+    '/api/v1/reset/'
 ];
 
 // Verificar se é endpoint público
