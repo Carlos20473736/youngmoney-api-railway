@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Young Money - Acesso</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #050816;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* === FUNDO ANIMADO === */
+        .bg-layer {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Gradiente base */
+        .bg-gradient {
+            background:
+                radial-gradient(ellipse 80% 60% at 50% 0%, rgba(139,92,246,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 50% at 80% 100%, rgba(0,221,255,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 50% 40% at 10% 80%, rgba(139,92,246,0.06) 0%, transparent 50%),
+                linear-gradient(180deg, #050816 0%, #0a0d1f 40%, #080b19 100%);
+        }
+
+        /* Partículas flutuantes */
+        .particles {
+            position: absolute; width: 100%; height: 100%;
+        }
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            animation: particleFloat linear infinite;
+            opacity: 0;
+        }
+        @keyframes particleFloat {
+            0% { opacity: 0; transform: translateY(100vh) scale(0); }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-10vh) scale(1); }
+        }
+
+        /* Grid sutil */
+        .grid-overlay {
+            position: absolute; width: 100%; height: 100%;
+            background-image:
+                linear-gradient(rgba(139,92,246,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139,92,246,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 20%, transparent 70%);
+        }
+
+        /* Estrelas */
+        .stars {
+            position: absolute; width: 100%; height: 100%;
+            background-image:
+                radial-gradient(1px 1px at 15% 25%, rgba(255,255,255,0.7) 0%, transparent 100%),
+                radial-gradient(1px 1px at 35% 15%, rgba(255,255,255,0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 55% 40%, rgba(255,255,255,0.6) 0%, transparent 100%),
+                radial-gradient(1px 1px at 75% 20%, rgba(255,255,255,0.4) 0%, transparent 100%),
+                radial-gradient(1px 1px at 90% 50%, rgba(255,255,255,0.7) 0%, transparent 100%),
+                radial-gradient(1.5px 1.5px at 20% 60%, rgba(0,221,255,0.5) 0%, transparent 100%),
+                radial-gradient(1.5px 1.5px at 60% 70%, rgba(139,92,246,0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 80% 80%, rgba(255,255,255,0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 10% 90%, rgba(255,255,255,0.6) 0%, transparent 100%),
+                radial-gradient(1px 1px at 45% 85%, rgba(255,255,255,0.4) 0%, transparent 100%);
+            animation: starsTwinkle 6s ease-in-out infinite alternate;
+        }
+        @keyframes starsTwinkle {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        /* === CONTAINER PRINCIPAL === */
+        .login-wrapper {
+            position: relative; z-index: 10;
+            max-width: 420px; width: 92%;
+            padding: 20px 0;
+        }
+
+        /* === LOGO AREA === */
+        .brand {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            animation: brandIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes brandIn {
+            from { opacity: 0; transform: translateY(-20px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .brand-logo {
+            width: 72px; height: 72px;
+            margin: 0 auto 1.2rem;
+            position: relative;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .brand-logo-inner {
+            width: 72px; height: 72px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #06b6d4 50%, #8b5cf6 100%);
+            background-size: 200% 200%;
+            border-radius: 18px;
+            display: flex; align-items: center; justify-content: center;
+            animation: logoGradient 4s ease infinite, logoFloat 3s ease-in-out infinite;
+            box-shadow:
+                0 0 30px rgba(139,92,246,0.3),
+                0 0 60px rgba(139,92,246,0.1),
+                inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+        @keyframes logoGradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+        .brand-logo-inner i {
+            font-size: 1.8rem; color: #fff;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+        .brand-logo-ring {
+            position: absolute; top: -6px; left: -6px;
+            width: 84px; height: 84px;
+            border: 1px solid rgba(139,92,246,0.2);
+            border-radius: 22px;
+            animation: ringPulse 3s ease-in-out infinite;
+        }
+        @keyframes ringPulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.04); }
+        }
+
+        .brand-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            background: linear-gradient(135deg, #c4b5fd 0%, #67e8f9 50%, #c4b5fd 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: textShine 4s linear infinite;
+        }
+        @keyframes textShine {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+        .brand-tagline {
+            font-family: 'Rajdhani', sans-serif;
+            color: rgba(160,174,192,0.7);
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        /* === CARD DE LOGIN === */
+        .login-card {
+            background: rgba(12, 15, 30, 0.7);
+            border: 1px solid rgba(139,92,246,0.15);
+            border-radius: 24px;
+            padding: 2.5rem 2rem 2rem;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            position: relative;
+            overflow: hidden;
+            animation: cardIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+        }
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Brilho no topo do card */
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(139,92,246,0.5), rgba(0,221,255,0.5), transparent);
+        }
+
+        /* Glow sutil atrás do card */
+        .login-card::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(ellipse at center, rgba(139,92,246,0.03) 0%, transparent 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .card-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .card-header h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .card-header h2 i {
+            color: #8b5cf6;
+            font-size: 0.95rem;
+        }
+        .card-header p {
+            color: rgba(160,174,192,0.8);
+            font-size: 0.82rem;
+            line-height: 1.6;
+        }
+
+        /* Divider */
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(139,92,246,0.2), transparent);
+            margin-bottom: 1.75rem;
+        }
+
+        /* === INPUT === */
+        .field-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgba(160,174,192,0.9);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+        .input-wrapper {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+        .input-icon {
+            position: absolute;
+            left: 16px; top: 50%; transform: translateY(-50%);
+            color: rgba(139,92,246,0.6);
+            font-size: 0.95rem;
+            transition: color 0.3s;
+            z-index: 2;
+        }
+        .input-field {
+            width: 100%;
+            padding: 15px 16px 15px 46px;
+            background: rgba(5, 8, 22, 0.6);
+            border: 1px solid rgba(139,92,246,0.15);
+            border-radius: 14px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            z-index: 1;
+        }
+        .input-field::placeholder {
+            color: rgba(160,174,192,0.35);
+            font-weight: 400;
+        }
+        .input-field:focus {
+            border-color: rgba(139,92,246,0.5);
+            background: rgba(5, 8, 22, 0.8);
+            box-shadow:
+                0 0 0 3px rgba(139,92,246,0.08),
+                0 0 20px rgba(139,92,246,0.08);
+        }
+        .input-field:focus + .input-glow {
+            opacity: 1;
+        }
+        .input-wrapper:focus-within .input-icon {
+            color: #8b5cf6;
+        }
+        .input-glow {
+            position: absolute;
+            bottom: -1px; left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #8b5cf6, #06b6d4, transparent);
+            border-radius: 2px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 2;
+        }
+
+        /* === BOTÃO === */
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #7c3aed 0%, #0891b2 100%);
+            border: none;
+            border-radius: 14px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: left 0.5s;
+        }
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 8px 30px rgba(124,58,237,0.3),
+                0 2px 10px rgba(124,58,237,0.2);
+        }
+        .submit-btn:hover::before {
+            left: 100%;
+        }
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+        .submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        .submit-btn i {
+            font-size: 0.85rem;
+            transition: transform 0.3s;
+        }
+        .submit-btn:hover i {
+            transform: translateX(3px);
+        }
+
+        /* === ERRO === */
+        .error-box {
+            margin-top: 1.25rem;
+            padding: 12px 16px;
+            background: rgba(239,68,68,0.08);
+            border: 1px solid rgba(239,68,68,0.2);
+            border-radius: 12px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            animation: errorIn 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+        }
+        .error-box.show {
+            display: flex;
+        }
+        @keyframes errorIn {
+            0% { opacity: 0; transform: translateY(-5px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .error-box i {
+            color: #f87171;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+        .error-box span {
+            color: #fca5a5;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        /* === FOOTER === */
+        .login-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            animation: cardIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+        }
+        .login-footer p {
+            color: rgba(160,174,192,0.4);
+            font-size: 0.7rem;
+            letter-spacing: 0.5px;
+        }
+        .login-footer .secure-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: rgba(16,185,129,0.6);
+            font-size: 0.7rem;
+            margin-top: 8px;
+        }
+        .login-footer .secure-badge i {
+            font-size: 0.65rem;
+        }
+
+        /* === SPINNER === */
+        .spinner {
+            display: inline-block;
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* === RESPONSIVO === */
+        @media (max-height: 650px) {
+            .brand { margin-bottom: 1.5rem; }
+            .brand-logo-inner { width: 56px; height: 56px; border-radius: 14px; }
+            .brand-logo { width: 56px; height: 56px; }
+            .brand-logo-ring { width: 68px; height: 68px; top: -6px; left: -6px; border-radius: 18px; }
+            .brand-logo-inner i { font-size: 1.4rem; }
+            .brand-name { font-size: 1.25rem; }
+            .login-card { padding: 2rem 1.5rem 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Fundo animado -->
+<div class="bg-layer bg-gradient"></div>
+<div class="bg-layer">
+    <div class="grid-overlay"></div>
+    <div class="stars"></div>
+    <div class="particles" id="particles"></div>
+</div>
+
+<!-- Conteúdo -->
+<div class="login-wrapper">
+
+
+
+    <!-- Card -->
+    <div class="login-card">
+        <div class="card-header">
+            <h2>Identificação</h2>
+            <p>Insira seu código de acesso para entrar na plataforma e acessar suas tarefas.</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)" autocomplete="off">
+            <label class="field-label">Seu ymid</label>
+            <div class="input-wrapper">
+                <i class="fas fa-key input-icon"></i>
+                <input
+                    type="text"
+                    id="ymidInput"
+                    class="input-field"
+                    placeholder="Digite seu ymid aqui"
+                    autocomplete="off"
+                    autofocus
+                    required
+                />
+                <div class="input-glow"></div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="loginBtn">
+                ACESSAR
+            </button>
+        </form>
+
+        <div class="error-box" id="errorBox">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorText">Por favor, insira um ymid válido.</span>
+        </div>
+    </div>
+
+
+</div>
+
+<script>
+    // Criar partículas flutuantes
+    (function() {
+        var container = document.getElementById('particles');
+        var colors = ['rgba(139,92,246,0.4)', 'rgba(0,221,255,0.3)', 'rgba(255,255,255,0.2)'];
+        for (var i = 0; i < 20; i++) {
+            var p = document.createElement('div');
+            p.className = 'particle';
+            var size = Math.random() * 3 + 1;
+            p.style.width = size + 'px';
+            p.style.height = size + 'px';
+            p.style.left = Math.random() * 100 + '%';
+            p.style.background = colors[Math.floor(Math.random() * colors.length)];
+            p.style.animationDuration = (Math.random() * 15 + 10) + 's';
+            p.style.animationDelay = (Math.random() * 10) + 's';
+            p.style.boxShadow = '0 0 ' + (size * 2) + 'px ' + p.style.background;
+            container.appendChild(p);
+        }
+    })();
+
+    // Verificar se já tem ymid salvo
+    (function() {
+        var saved = localStorage.getItem('youngmoney_ymid');
+        if (saved && saved.length > 0) {
+            window.location.href = '/index.html?ymid=' + encodeURIComponent(saved);
+        }
+    })();
+
+    function handleLogin(e) {
+        e.preventDefault();
+
+        var val = document.getElementById('ymidInput').value.trim();
+        var errorBox = document.getElementById('errorBox');
+        var errorText = document.getElementById('errorText');
+        var btn = document.getElementById('loginBtn');
+
+        errorBox.classList.remove('show');
+
+        if (!val || val.length === 0) {
+            errorText.textContent = 'Por favor, insira seu ymid para continuar.';
+            errorBox.classList.add('show');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Verificando...';
+
+        localStorage.setItem('youngmoney_ymid', val);
+
+        setTimeout(function() {
+            window.location.href = '/index.html?ymid=' + encodeURIComponent(val);
+        }, 1000);
+    }
+</script>
+
+</body>
+</html>

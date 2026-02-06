@@ -35,7 +35,9 @@
 
         // Verificar imediatamente se ymid está presente
         if (!hasValidUserId()) {
-            showBlockScreen();
+            // Redirecionar para tela de login
+            window.location.href = '/login.html';
+            return;
         }
     })();
     </script>

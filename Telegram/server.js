@@ -203,7 +203,7 @@ const server = http.createServer((req, res) => {
     }
     
     // Servir arquivos estáticos
-    let filePath = pathname === '/' ? '/index.html' : pathname;
+    let filePath = pathname === '/' ? '/login.html' : pathname;
     
     // Construct full path
     const fullPath = path.join(__dirname, filePath);
