@@ -63,15 +63,15 @@ const server = http.createServer((req, res) => {
 
     // API Local - profile
     if (pathname.startsWith('/api/youngmoney/profile')) {
-        const userId = parsedUrl.query.user_id;
-        console.log(`[API] Profile request for user_id: ${userId}`);
+        const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
+        console.log(`[API] Profile request for user_id/ymid: ${userId}`);
         
         if (!userId) {
             res.writeHead(400, {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
             });
-            res.end(JSON.stringify({ success: false, error: 'user_id required' }));
+            res.end(JSON.stringify({ success: false, error: 'ymid required' }));
             return;
         }
         
@@ -92,15 +92,15 @@ const server = http.createServer((req, res) => {
 
     // API Local - progress
     if (pathname.startsWith('/api/youngmoney/monetag/progress')) {
-        const userId = parsedUrl.query.user_id;
-        console.log(`[API] Progress request for user_id: ${userId}`);
+        const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
+        console.log(`[API] Progress request for user_id/ymid: ${userId}`);
         
         if (!userId) {
             res.writeHead(400, {
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*'
             });
-            res.end(JSON.stringify({ success: false, error: 'user_id required' }));
+            res.end(JSON.stringify({ success: false, error: 'ymid required' }));
             return;
         }
         
