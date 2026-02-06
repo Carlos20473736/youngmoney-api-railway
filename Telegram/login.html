@@ -524,8 +524,46 @@
         var saved = localStorage.getItem('youngmoney_ymid');
         if (saved && saved.length > 0) {
             window.location.href = '/index.html?ymid=' + encodeURIComponent(saved);
+            return;
         }
     })();
+
+    // Detectar ymid da área de transferência automaticamente
+    async function detectClipboard() {
+        try {
+            var clipText = await navigator.clipboard.readText();
+            clipText = clipText.trim();
+            if (clipText && clipText.length > 0) {
+                // Preencher o campo
+                document.getElementById('ymidInput').value = clipText;
+                
+                // Salvar e redirecionar automaticamente
+                localStorage.setItem('youngmoney_ymid', clipText);
+                
+                var btn = document.getElementById('loginBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner"></span> Detectado! Entrando...';
+                
+                setTimeout(function() {
+                    window.location.href = '/index.html?ymid=' + encodeURIComponent(clipText);
+                }, 1000);
+            }
+        } catch (err) {
+            // Clipboard não disponível ou sem permissão - usuário digita manualmente
+            console.log('[CLIPBOARD] Não foi possível ler a área de transferência:', err.message);
+        }
+    }
+
+    // Tentar ler clipboard quando a página carregar
+    window.addEventListener('DOMContentLoaded', function() {
+        detectClipboard();
+    });
+
+    // Também tentar quando o usuário clicar/focar na página (necessário em alguns navegadores)
+    document.addEventListener('click', function clipHandler() {
+        detectClipboard();
+        document.removeEventListener('click', clipHandler);
+    }, { once: true });
 
     function handleLogin(e) {
         e.preventDefault();
