@@ -3,10 +3,8 @@ FROM dunglas/frankenphp
 # Instalar extensões PHP necessárias
 RUN install-php-extensions mysqli pdo_mysql
 
-# Argumento para invalidar cache - BUILD_DATE=2026-02-05-v3
-ARG CACHEBUST=1
-
-# Copiar arquivos da aplicação (após CACHEBUST para forçar rebuild)
+# Copiar arquivos da aplicação
+# Build timestamp: 2026-02-05-21:10:00-v5
 COPY . /app
 
 # Copiar configuração PHP customizada
