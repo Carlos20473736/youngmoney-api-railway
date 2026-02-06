@@ -631,10 +631,9 @@ class PixAssistindoManager {
                 
                 const timeRemaining = data.time_remaining || 0;
                 const impressions = data.total_impressions || 0;
-                const clicks = data.total_clicks || 0;
                 const sessionExpired = data.session_expired || false;
                 
-                console.log(`[PIX TIMER] Dados recebidos: ${impressions} impressões, ${clicks} cliques, ${timeRemaining}s restantes, expirado=${sessionExpired}`);
+                console.log(`[PIX TIMER] Dados recebidos: ${impressions} impressões, ${timeRemaining}s restantes, expirado=${sessionExpired}`);
                 
                 const hours = Math.floor(timeRemaining / 3600);
                 const minutes = Math.floor((timeRemaining % 3600) / 60);
@@ -642,8 +641,8 @@ class PixAssistindoManager {
                 
                 timerElement.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                 
-                // Se dados foram resetados (impressões e cliques voltaram para 0) OU sessão expirou, redirecionar
-                if ((impressions === 0 && clicks === 0) || sessionExpired) {
+                // Se dados foram resetados (impressões voltaram para 0) OU sessão expirou, redirecionar
+                if ((impressions === 0) || sessionExpired) {
                     console.log('[PIX] Dados resetados! Redirecionando para Young Money...');
                     localStorage.removeItem('user_logged_in');
                     localStorage.removeItem('user_id');
@@ -726,15 +725,14 @@ class PixAssistindoManager {
             const data = await response.json();
             console.log('[VALIDAÇÃO] Resposta da API:', data);
             
-            // Verificar se completou as tarefas (20 impressões + 8 cliques)
+            // Verificar se completou as tarefas (apenas impressões)
             const impressions = data.total_impressions || 0;
-            const clicks = data.total_clicks || 0;
             
-            console.log(`[VALIDAÇÃO] Progresso: ${impressions}/20 impressões, ${clicks}/8 cliques`);
+            console.log(`[VALIDAÇÃO] Progresso: ${impressions}/10 impressões`);
             
-            if (impressions < 20 || clicks < 8) {
+            if (impressions < 10) {
                 console.log(`[VALIDAÇÃO] ❌ Tarefas incompletas`);
-                alert(`Você precisa completar as tarefas primeiro!\n\nProgresso atual:\n- Impressões: ${impressions}/20\n- Cliques: ${clicks}/8`);
+                alert(`Você precisa completar as tarefas primeiro!\n\nProgresso atual:\n- Impressões: ${impressions}/10`);
                 window.location.href = '/';
                 return;
             }

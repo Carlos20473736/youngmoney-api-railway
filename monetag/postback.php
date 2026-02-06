@@ -51,8 +51,9 @@ if (!$type) {
     sendError('type é obrigatório');
 }
 
-if (!in_array($type, ['impression', 'click'])) {
-    sendError('type deve ser impression ou click');
+// APENAS IMPRESSÕES - remover suporte a cliques
+if (!in_array($type, ['impression'])) {
+    sendError('type deve ser impression');
 }
 
 // Validar user_id
@@ -71,8 +72,8 @@ try {
     // ========================================
     // BUSCAR LIMITES DO USUÁRIO
     // ========================================
-    $required_impressions = 5;
-    $required_clicks = 1;
+    $required_impressions = 10;
+    $required_clicks = 0; // Removido - apenas impressões
     
     $user_settings_stmt = $conn->prepare("
         SELECT required_impressions, required_clicks FROM user_required_impressions 
@@ -84,7 +85,8 @@ try {
     
     if ($user_row = $user_settings_result->fetch_assoc()) {
         $required_impressions = (int)$user_row['required_impressions'];
-        $required_clicks = (int)($user_row['required_clicks'] ?? 1);
+        // Cliques removidos - apenas impressões
+        $required_clicks = 0;
     }
     $user_settings_stmt->close();
     
@@ -106,7 +108,8 @@ try {
     $check_limit_stmt->close();
     
     // Definir limite baseado no tipo
-    $limit = ($type === 'click') ? $required_clicks : $required_impressions;
+    // APENAS IMPRESSÕES - remover lógica de cliques
+    $limit = $required_impressions;
     
     // Se já atingiu o limite, retornar sucesso mas sem registrar
     if ($current_count >= $limit) {
@@ -135,12 +138,12 @@ try {
             'user_id' => $user_id,
             'progress' => [
                 'impressions' => (int)$progress['impressions'],
-                'clicks' => (int)$progress['clicks'],
+                'clicks' => 0,
                 'required_impressions' => $required_impressions,
-                'required_clicks' => $required_clicks,
+                'required_clicks' => 0,
                 'impressions_completed' => (int)$progress['impressions'] >= $required_impressions,
-                'clicks_completed' => (int)$progress['clicks'] >= $required_clicks,
-                'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks
+                'clicks_completed' => false,
+                'all_completed' => (int)$progress['impressions'] >= $required_impressions
             ]
         ]);
     }
@@ -183,12 +186,12 @@ try {
         'session_id' => $session_id,
         'progress' => [
             'impressions' => (int)$progress['impressions'],
-            'clicks' => (int)$progress['clicks'],
+            'clicks' => 0,
             'required_impressions' => $required_impressions,
-            'required_clicks' => $required_clicks,
+            'required_clicks' => 0,
             'impressions_completed' => (int)$progress['impressions'] >= $required_impressions,
-            'clicks_completed' => (int)$progress['clicks'] >= $required_clicks,
-            'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks
+            'clicks_completed' => false,
+            'all_completed' => (int)$progress['impressions'] >= $required_impressions
         ]
     ];
     
