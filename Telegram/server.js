@@ -80,10 +80,10 @@ const server = http.createServer((req, res) => {
                     
                     const payload = JSON.stringify({
                         chat_id: chatId,
-                        text: `Olá, ${firstName}! \u{1F4B0}\n\nBem-vindo ao Young Money!\nClique no botão abaixo para acessar a plataforma.`,
+                        text: `Olá, ${firstName}!\n\nBem-vindo ao Young Money!\nClique no botão abaixo para acessar a plataforma.`,
                         reply_markup: {
                             inline_keyboard: [[{
-                                text: '\u{1F4B0} Acessar',
+                                text: 'Acessar',
                                 web_app: { url: WEBAPP_URL }
                             }]]
                         }
