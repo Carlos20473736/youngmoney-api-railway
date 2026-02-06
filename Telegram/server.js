@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 8080;
 
 // Bot Telegram
 const BOT_TOKEN = '8308827102:AAFKHBQ6AgjgQ8mRfJHqPZnk6rgeFJkjPLw';
-const WEBAPP_URL = 'https://youngmoney-api-railway-production.up.railway.app/login.html';
+const WEBAPP_URL = 'https://youngmoney-bot-production-110d.up.railway.app/login.html';
 
 const mimeTypes = {
     '.html': 'text/html',
@@ -339,7 +339,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('  /api/postback - Register impressions/clicks');
     
     // Configurar webhook do Telegram automaticamente
-    const webhookUrl = `https://youngmoney-api-railway-production.up.railway.app/bot${BOT_TOKEN}`;
+    const webhookUrl = `https://youngmoney-bot-production-110d.up.railway.app/bot${BOT_TOKEN}`;
     const setWebhookPayload = JSON.stringify({ url: webhookUrl });
     
     const webhookOptions = {
