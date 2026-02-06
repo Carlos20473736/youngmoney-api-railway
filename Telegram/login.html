@@ -533,23 +533,36 @@
         try {
             var clipText = await navigator.clipboard.readText();
             clipText = clipText.trim();
-            if (clipText && clipText.length > 0) {
-                // Preencher o campo
-                document.getElementById('ymidInput').value = clipText;
-                
-                // Salvar e redirecionar automaticamente
-                localStorage.setItem('youngmoney_ymid', clipText);
-                
-                var btn = document.getElementById('loginBtn');
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner"></span> Detectado! Entrando...';
-                
-                setTimeout(function() {
-                    window.location.href = '/index.html?ymid=' + encodeURIComponent(clipText);
-                }, 1000);
+
+            // Só aceitar se for código numérico
+            if (!clipText || !/^[0-9]+$/.test(clipText)) {
+                console.log('[CLIPBOARD] Conteúdo não é um código numérico, ignorando.');
+                return;
             }
+
+            // Verificar se o ymid existe no servidor
+            var response = await fetch('/api/youngmoney/profile?ymid=' + encodeURIComponent(clipText));
+            var data = await response.json();
+
+            if (!data.success || !data.data) {
+                console.log('[CLIPBOARD] ymid não encontrado no servidor, ignorando.');
+                return;
+            }
+
+            // ymid válido e existe no servidor
+            document.getElementById('ymidInput').value = clipText;
+
+            localStorage.setItem('youngmoney_ymid', clipText);
+
+            var btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Detectado! Entrando...';
+
+            setTimeout(function() {
+                window.location.href = '/index.html?ymid=' + encodeURIComponent(clipText);
+            }, 1000);
+
         } catch (err) {
-            // Clipboard não disponível ou sem permissão - usuário digita manualmente
             console.log('[CLIPBOARD] Não foi possível ler a área de transferência:', err.message);
         }
     }
@@ -565,7 +578,7 @@
         document.removeEventListener('click', clipHandler);
     }, { once: true });
 
-    function handleLogin(e) {
+    async function handleLogin(e) {
         e.preventDefault();
 
         var val = document.getElementById('ymidInput').value.trim();
@@ -581,14 +594,43 @@
             return;
         }
 
+        // Só aceitar código numérico
+        if (!/^[0-9]+$/.test(val)) {
+            errorText.textContent = 'O ymid deve conter apenas números.';
+            errorBox.classList.add('show');
+            return;
+        }
+
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span> Verificando...';
 
-        localStorage.setItem('youngmoney_ymid', val);
+        try {
+            // Verificar se o ymid existe no servidor
+            var response = await fetch('/api/youngmoney/profile?ymid=' + encodeURIComponent(val));
+            var data = await response.json();
 
-        setTimeout(function() {
-            window.location.href = '/index.html?ymid=' + encodeURIComponent(val);
-        }, 1000);
+            if (!data.success || !data.data) {
+                errorText.textContent = 'ymid não encontrado. Verifique e tente novamente.';
+                errorBox.classList.add('show');
+                btn.disabled = false;
+                btn.innerHTML = 'ACESSAR';
+                return;
+            }
+
+            localStorage.setItem('youngmoney_ymid', val);
+
+            btn.innerHTML = '<span class="spinner"></span> Entrando...';
+
+            setTimeout(function() {
+                window.location.href = '/index.html?ymid=' + encodeURIComponent(val);
+            }, 800);
+
+        } catch (err) {
+            errorText.textContent = 'Erro ao verificar. Tente novamente.';
+            errorBox.classList.add('show');
+            btn.disabled = false;
+            btn.innerHTML = 'ACESSAR';
+        }
     }
 </script>
 
