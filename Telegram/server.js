@@ -6,6 +6,10 @@ const url = require('url');
 
 const PORT = process.env.PORT || 8080;
 
+// Bot Telegram
+const BOT_TOKEN = '8308827102:AAFKHBQ6AgjgQ8mRfJHqPZnk6rgeFJkjPLw';
+const WEBAPP_URL = 'https://youngmoney-api-railway-production.up.railway.app/login.html';
+
 const mimeTypes = {
     '.html': 'text/html',
     '.css': 'text/css',
@@ -58,6 +62,63 @@ const server = http.createServer((req, res) => {
             'Access-Control-Max-Age': '86400'
         });
         res.end();
+        return;
+    }
+
+    // Webhook do Telegram Bot
+    if (pathname === '/bot' + BOT_TOKEN && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const update = JSON.parse(body);
+                const message = update.message;
+                
+                if (message && message.text === '/start') {
+                    const chatId = message.chat.id;
+                    const firstName = message.from.first_name || 'usuário';
+                    
+                    const payload = JSON.stringify({
+                        chat_id: chatId,
+                        text: `Olá, ${firstName}! \u{1F4B0}\n\nBem-vindo ao Young Money!\nClique no botão abaixo para acessar a plataforma.`,
+                        reply_markup: {
+                            inline_keyboard: [[{
+                                text: '\u{1F4B0} Acessar',
+                                web_app: { url: WEBAPP_URL }
+                            }]]
+                        }
+                    });
+                    
+                    const options = {
+                        hostname: 'api.telegram.org',
+                        path: `/bot${BOT_TOKEN}/sendMessage`,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': Buffer.byteLength(payload)
+                        }
+                    };
+                    
+                    const tgReq = https.request(options, (tgRes) => {
+                        let data = '';
+                        tgRes.on('data', chunk => { data += chunk; });
+                        tgRes.on('end', () => {
+                            console.log('[BOT] Resposta /start enviada para', firstName, '(chat:', chatId, ')');
+                        });
+                    });
+                    tgReq.on('error', (err) => {
+                        console.error('[BOT] Erro ao enviar mensagem:', err.message);
+                    });
+                    tgReq.write(payload);
+                    tgReq.end();
+                }
+            } catch (err) {
+                console.error('[BOT] Erro ao processar update:', err.message);
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true }));
+        });
         return;
     }
 
@@ -276,4 +337,31 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('  /api/youngmoney/profile - Get user profile');
     console.log('  /api/youngmoney/monetag/progress - Get user progress');
     console.log('  /api/postback - Register impressions/clicks');
+    
+    // Configurar webhook do Telegram automaticamente
+    const webhookUrl = `https://youngmoney-api-railway-production.up.railway.app/bot${BOT_TOKEN}`;
+    const setWebhookPayload = JSON.stringify({ url: webhookUrl });
+    
+    const webhookOptions = {
+        hostname: 'api.telegram.org',
+        path: `/bot${BOT_TOKEN}/setWebhook`,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(setWebhookPayload)
+        }
+    };
+    
+    const webhookReq = https.request(webhookOptions, (webhookRes) => {
+        let data = '';
+        webhookRes.on('data', chunk => { data += chunk; });
+        webhookRes.on('end', () => {
+            console.log('[BOT] Webhook configurado:', data);
+        });
+    });
+    webhookReq.on('error', (err) => {
+        console.error('[BOT] Erro ao configurar webhook:', err.message);
+    });
+    webhookReq.write(setWebhookPayload);
+    webhookReq.end();
 });
