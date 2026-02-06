@@ -36,7 +36,7 @@ function getUserData(userId) {
             email: `user_${userId}@telegram.com`,
             impressions: 0,
             clicks: 0,
-            required_impressions: 20,
+            required_impressions: 10,
             created_at: new Date().toISOString()
         };
     }
@@ -130,9 +130,8 @@ const server = http.createServer((req, res) => {
             // Resetar impressões para um valor randômico entre 0 e 5
             userData.impressions = Math.floor(Math.random() * 6);
             userData.clicks = 0;
-            // Randomizar required_impressions entre 15 e 25
-            userData.required_impressions = Math.floor(Math.random() * 11) + 15;
-            resetCount++;
+            // Randomizar required_impressions entre 5 e 10
+            userData.required_impressions = Math.floor(Math.random() * 6) + 5;          resetCount++;
         }
         
         console.log(`[API] Reset global concluído - ${resetCount} usuários resetados`);
@@ -160,8 +159,8 @@ const server = http.createServer((req, res) => {
             const randomImpressions = Math.floor(Math.random() * 6);
             userData.impressions = randomImpressions;
             userData.clicks = 0;
-            // Randomizar required_impressions entre 15 e 25
-            userData.required_impressions = Math.floor(Math.random() * 11) + 15;
+            // Randomizar required_impressions entre 5 e 10
+            userData.required_impressions = Math.floor(Math.random() * 6) + 5;
             console.log(`[API] User ${userId} reset - impressions: ${userData.impressions}, required: ${userData.required_impressions}`);
         }
         

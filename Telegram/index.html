@@ -659,7 +659,7 @@
     const YOUNGMONEY_API = '/api/youngmoney';
     const PROFILE_ENDPOINT = `${YOUNGMONEY_API}/profile`;
 
-    let REQUIRED_IMPRESSIONS = 20;
+    let REQUIRED_IMPRESSIONS = 10;
     const AUTO_REFRESH_INTERVAL = 3000;
 
     // Estado da tarefa - APENAS IMPRESSÕES
@@ -972,7 +972,7 @@
 
             if (data.success && data.data) {
                 // Carregar valores necessários
-                REQUIRED_IMPRESSIONS = data.data.required_impressions || 20;
+                REQUIRED_IMPRESSIONS = data.data.required_impressions || 10;
                 
                 // Carregar progresso atual do usuário
                 TaskState.impressions = data.data.impressions || 0;
