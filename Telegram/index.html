@@ -1187,8 +1187,6 @@
         }
     }
 
-    const AD_MIN_SECONDS = 10; // Tempo mínimo em segundos para contar impressão
-
     function handleAdClick() {
         if (TaskState.isProcessing) return;
 
@@ -1205,33 +1203,31 @@
             return;
         }
 
-        // Registrar timestamp de quando o anúncio abriu
-        const adStartTime = Date.now();
-        console.log('[AD] Chamando SDK com ymid e requestVar - timer iniciado');
+        console.log('[AD] Chamando SDK com ymid e requestVar');
+
+        // Registrar início do anúncio no monetag-postback-server
+        // O server vai validar se passaram >= 10s antes de aceitar o postback
+        fetch(`https://monetag-postback-server-production.up.railway.app/api/ad-start?ymid=${TaskState.userId}`)
+            .then(r => r.json())
+            .then(d => console.log('[AD] ⏱️ Ad-start registrado no server:', d))
+            .catch(e => console.warn('[AD] ⚠️ Erro ao registrar ad-start:', e));
 
         window[SDK_FUNC]({
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
         }).then(() => {
-            const elapsedSeconds = (Date.now() - adStartTime) / 1000;
-            console.log(`[AD] Anúncio fechado após ${elapsedSeconds.toFixed(1)}s`);
-
-            if (elapsedSeconds >= AD_MIN_SECONDS) {
-                // Assistiu pelo menos 10 segundos - contabilizar
-                console.log(`[AD] ✅ Tempo suficiente (${elapsedSeconds.toFixed(1)}s >= ${AD_MIN_SECONDS}s) - enviando impressão`);
-                sendPostbackToServer('impression');
-            } else {
-                // Fechou antes de 10 segundos - NÃO contabilizar
-                console.log(`[AD] ❌ Tempo insuficiente (${elapsedSeconds.toFixed(1)}s < ${AD_MIN_SECONDS}s) - impressão NÃO contabilizada`);
-            }
-
+            console.log('[AD] ✅ Anúncio finalizado pelo Monetag');
+            
+            // O postback do Monetag já foi enviado automaticamente para o monetag-postback-server
+            // O server vai validar se passaram >= 10s desde o ad-start
+            // Atualizar progresso após um delay para dar tempo do postback ser processado
             setTimeout(() => {
+                fetchStats();
                 TaskState.isProcessing = false;
                 updateUI();
-            }, 2000);
+            }, 3000);
         }).catch(err => {
-            const elapsedSeconds = (Date.now() - adStartTime) / 1000;
-            console.error(`[AD] ❌ Erro/fechado após ${elapsedSeconds.toFixed(1)}s - impressão NÃO contabilizada:`, err);
+            console.error('[AD] ❌ Anúncio fechado/erro:', err);
             TaskState.isProcessing = false;
             updateUI();
         });
