@@ -1226,10 +1226,39 @@
         try {
             const script = document.createElement('script');
             script.src = SCRIPT_SRC;
+            script.setAttribute('data-zone', ZONE_ID);
+            script.setAttribute('data-sdk', SDK_FUNC);
             script.async = true;
             script.setAttribute('data-cfasync', 'false');
+            
+            // Aguardar o SDK carregar e tentar preload
+            script.onload = function() {
+                console.log('[SDK] ✅ Script do Monetag carregado com sucesso');
+                // Verificar se a função foi criada
+                setTimeout(function() {
+                    if (typeof window[SDK_FUNC] === 'function') {
+                        console.log('[SDK] ✅ Função ' + SDK_FUNC + ' disponível!');
+                        // Preload do anúncio para reduzir delay
+                        try {
+                            window[SDK_FUNC]({ type: 'preload', ymid: TaskState.userId }).then(function() {
+                                console.log('[SDK] ✅ Anúncio pré-carregado com sucesso');
+                            }).catch(function(e) {
+                                console.warn('[SDK] ⚠️ Preload falhou (normal se não há anúncio disponível):', e);
+                            });
+                        } catch(e) {
+                            console.warn('[SDK] ⚠️ Erro no preload:', e);
+                        }
+                    } else {
+                        console.warn('[SDK] ⚠️ Função ' + SDK_FUNC + ' ainda não disponível após load');
+                    }
+                }, 1000);
+            };
+            script.onerror = function(e) {
+                console.error('[SDK] ❌ Erro ao carregar script do Monetag:', e);
+            };
+            
             document.head.appendChild(script);
-            console.log('[INIT] ✅ SDK Monetag carregado');
+            console.log('[INIT] ✅ SDK Monetag sendo carregado...');
         } catch (err) {
             console.error('[INIT] ❌ Erro ao carregar SDK:', err);
         }
