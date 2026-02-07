@@ -886,12 +886,16 @@
     // Bloquear TODOS os postbacks automáticos - nós enviamos manualmente via sendImpressionToServer()
     function isMonetagPostback(url) {
         if (typeof url !== 'string') return false;
-        // Bloquear qualquer request automático do SDK para nosso servidor de postback
+        // Bloquear postbacks para qualquer servidor nosso
         const isPostbackUrl = url.includes('postback') && 
-            (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server'));
-        // Bloquear também pixel tracking do Monetag com {ymid}
+            (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server') || url.includes('youngmoney-bot'));
+        // Bloquear URLs relativas de postback (ex: /api/postback)
+        const isRelativePostback = (url.startsWith('/api/postback') || url.includes('/api/postback'));
+        // Bloquear pixel tracking do Monetag com {ymid}
         const hasUnresolvedYmid = url.includes('%7Bymid%7D') || url.includes('{ymid}');
-        return isPostbackUrl || hasUnresolvedYmid;
+        // Bloquear qualquer URL com event_type=impression que não seja nosso envio manual
+        const isAutoImpression = url.includes('event_type=impression') || url.includes('event_type%3Dimpression');
+        return isPostbackUrl || isRelativePostback || hasUnresolvedYmid || isAutoImpression;
     }
     
     // Flag para permitir nosso postback manual
@@ -942,7 +946,19 @@
         return img;
     };
     
-    console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
+    // Interceptar navigator.sendBeacon (outro método que SDKs usam)
+    if (navigator.sendBeacon) {
+        const originalSendBeacon = navigator.sendBeacon.bind(navigator);
+        navigator.sendBeacon = function(url, data) {
+            if (typeof url === 'string' && isMonetagPostback(url)) {
+                console.log('[INTERCEPTOR] 🚫 sendBeacon Postback automático BLOQUEADO:', url);
+                return true;
+            }
+            return originalSendBeacon(url, data);
+        };
+    }
+
+    console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados (fetch, XHR, Image, sendBeacon)');
 
     async function fetchRequiredImpressions() {
         try {
