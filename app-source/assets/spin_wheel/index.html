@@ -1,0 +1,2863 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Roleta da Sorte</title>
+
+    <!-- Monetag SDK -->
+    <script>
+        // Capturar User Agent real do dispositivo
+        console.log('✅ User Agent real capturado');
+        console.log('UA:', navigator.userAgent);
+    
+    // Create stars for loading overlay
+    function createLoadingStars() {
+        const leftContainer = document.getElementById('loadingStarsLeft');
+        const rightContainer = document.getElementById('loadingStarsRight');
+        
+        if (!leftContainer || !rightContainer) return;
+
+        // Criar estrelas para o lado esquerdo
+        for (let i = 0; i < 25; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.animationDelay = Math.random() * 3 + 's';
+            leftContainer.appendChild(star);
+        }
+
+        // Criar estrelas para o lado direito
+        for (let i = 0; i < 25; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.animationDelay = Math.random() * 3 + 's';
+            rightContainer.appendChild(star);
+        }
+    }
+
+    createLoadingStars();
+
+    </script>
+    <script src="https://alwingulla.com/88/tag.min.js" data-zone="10028159" async data-cfasync="false">
+        // Create stars for loading overlay
+        function createLoadingStars() {
+            const leftContainer = document.getElementById('loadingStarsLeft');
+            const rightContainer = document.getElementById('loadingStarsRight');
+
+            if (!leftContainer || !rightContainer) return;
+
+            // Criar estrelas para o lado esquerdo
+            for (let i = 0; i < 25; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                leftContainer.appendChild(star);
+            }
+
+            // Criar estrelas para o lado direito
+            for (let i = 0; i < 25; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                rightContainer.appendChild(star);
+            }
+        }
+
+        createLoadingStars();
+
+    </script>
+    <style>
+        /* === CORREÇÕES DE LAYOUT GLOBAL === */
+        html, body {
+            overflow-x: hidden;
+            max-width: 100vw;
+            width: 100%;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        /* Textos que podem ser cortados */
+        .text-ellipsis {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Container flexível que respeita limites */
+        .flex-overflow {
+            min-width: 0;
+            overflow: hidden;
+        }
+        
+        /* Elemento que não deve encolher */
+        .no-shrink {
+            flex-shrink: 0;
+        }
+        /* === FIM CORREÇÕES DE LAYOUT === */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #0a0e27;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        /* Header dark */
+        .header {
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 0.0625rem solid rgba(255, 255, 255, 0.1);
+            padding: 0.625rem;
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+        }
+
+        .back-button {
+            width: 2.25rem;
+            height: 2.25rem;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.3s, opacity 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .back-button:active {
+            transform: scale(0.95);
+            background: rgba(15, 23, 42, 0.95);
+        }
+
+        .header-title {
+            flex: 1;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0e27;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            transition: opacity 0.2s ease;
+            will-change: opacity;
+        }
+
+        
+        
+
+                
+
+        
+
+        
+
+        
+
+        /* Estrelas no loading - igual ao fundo do home */
+        .loading-stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .loading-stars .star {
+            position: absolute;
+            width: 0.125rem;
+            height: 0.125rem;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 4px solid rgba(139, 92, 246, 0.2);
+            border-top-color: #8b5cf6;
+            border-radius: 50%;
+            animation: spin-loader 0.8s linear infinite;
+            will-change: transform;
+        }
+
+        @keyframes spin-loader {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Estrelas de fundo */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            width: 0.125rem;
+            height: 0.125rem;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+
+        @keyframes twinkle {
+
+        /* Animação de piscar das estrelas */
+        @keyframes twinkle-loading {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        @keyframes twinkle-delay-loading {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.9; }
+        }
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* Contador de giros */
+        .spins-counter {
+            text-align: center;
+            padding: 0.9375rem;
+            margin: 0.625rem 1.25rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(167, 139, 250, 0.1) 100%);
+            border: 2px solid #8b5cf6;
+            border-radius: 0.9375rem;
+            box-shadow:
+                0 0 20px rgba(139, 92, 246, 0.3),
+                inset 0 0 20px rgba(139, 92, 246, 0.1);
+            font-size: 1.125rem;
+            color: #a78bfa;
+            font-weight: 600;
+            z-index: 1;
+        }
+
+        /* Container principal */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 21.875rem;
+            height: 21.875rem;
+            margin-bottom: 1.875rem;
+        }
+
+        /* Sombra da roleta com glow */
+        .wheel-shadow {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%);
+            filter: blur(30px);
+            transform: translateY(10px);
+            z-index: 0;
+        }
+
+        /* Anel externo */
+        .outer-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: calc(100% + 1.25rem);
+            height: calc(100% + 1.25rem);
+            border-radius: 50%;
+            background: transparent;
+            border: 0.625rem solid #1e1b4b;
+            box-shadow:
+                0 0 0 4px #8b5cf6,
+                0 0 20px rgba(139, 92, 246, 0.6),
+                0 0 40px rgba(139, 92, 246, 0.4);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Efeitos de luz neon rotativa */
+        .light-effect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 25rem;
+            height: 25rem;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: conic-gradient(
+                from 0deg,
+                transparent 0deg,
+                rgba(139, 92, 246, 0.2) 30deg,
+                rgba(167, 139, 250, 0.3) 60deg,
+                transparent 90deg,
+                transparent 180deg,
+                rgba(139, 92, 246, 0.2) 210deg,
+                rgba(167, 139, 250, 0.3) 240deg,
+                transparent 270deg
+            );
+            animation: rotate-light 4s linear infinite;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        @keyframes rotate-light {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* Indicador (seta) profissional */
+        .indicator {
+            position: absolute;
+            top: -1.875rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2.5rem;
+            height: 3.125rem;
+            z-index: 10;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+        }
+
+        .indicator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 1.25rem solid transparent;
+            border-right: 1.25rem solid transparent;
+            border-top: 2.8125rem solid #c0c0c0;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .indicator::after {
+            content: '';
+            position: absolute;
+            top: 0.125rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 1rem solid transparent;
+            border-right: 1rem solid transparent;
+            border-top: 2.375rem solid;
+            border-top-color: #8b5cf6;
+            background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 40%, #7c3aed 100%);
+        }
+
+        /* Efeito de brilho na seta */
+        .indicator-shine {
+            position: absolute;
+            top: -1.875rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2.5rem;
+            height: 3.125rem;
+            z-index: 11;
+            pointer-events: none;
+        }
+
+        .indicator-shine::before {
+            content: '';
+            position: absolute;
+            top: 0.25rem;
+            left: 50%;
+            transform: translateX(-50%) translateX(-6px);
+            width: 0;
+            height: 0;
+            border-left: 0.25rem solid transparent;
+            border-right: 0.25rem solid transparent;
+            border-top: 2rem solid rgba(255, 255, 255, 0.4);
+        }
+
+        /* Círculo decorativo na base da seta */
+        .indicator-base {
+            position: absolute;
+            top: -0.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1.25rem;
+            height: 1.25rem;
+            background: linear-gradient(145deg, #d4d4d4, #a3a3a3);
+            border-radius: 50%;
+            border: 3px solid #8b5cf6;
+            box-shadow:
+                0 0 10px rgba(139, 92, 246, 0.6),
+                inset 0 2px 4px rgba(255,255,255,0.4),
+                inset 0 -2px 4px rgba(0,0,0,0.2);
+            z-index: 12;
+        }
+
+        .indicator-base::after {
+            content: '';
+            position: absolute;
+            top: 0.1875rem;
+            left: 0.1875rem;
+            width: 0.5rem;
+            height: 0.5rem;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), transparent);
+            border-radius: 50%;
+        }
+
+        /* Canvas da roleta */
+        #wheelCanvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            border-radius: 50%;
+        }
+
+        /* Círculo central dark */
+        .center-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4.375rem;
+            height: 4.375rem;
+            background: linear-gradient(145deg, #1e1b4b, #0f0d24);
+            border-radius: 50%;
+            border: 4px solid #8b5cf6;
+            box-shadow:
+                0 0 30px rgba(139, 92, 246, 0.6),
+                inset 0 0 20px rgba(0,0,0,0.8),
+                inset 0 0 10px rgba(139, 92, 246, 0.3);
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .center-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.8)) brightness(1.1) contrast(1.2);
+        }
+
+        /* Resultado */
+        .result {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #a78bfa;
+            text-align: center;
+            margin-bottom: 1.25rem;
+            min-height: 1.875rem;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.3s ease;
+        }
+
+        .result.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Botão girar */
+        .spin-button {
+            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+            color: white;
+            border: none;
+            padding: 1.125rem 3.75rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            border-radius: 3.125rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+
+        .spin-button:active {
+            transform: scale(0.95);
+        }
+
+        .spin-button:disabled {
+            background: linear-gradient(135deg, #4b5563, #6b7280) !important;
+            cursor: not-allowed !important;
+            opacity: 0.6 !important;
+            box-shadow: none !important;
+        }
+
+        .spin-button.cooldown {
+            background: linear-gradient(135deg, #4b5563, #6b7280) !important;
+            cursor: not-allowed !important;
+            opacity: 0.8 !important;
+            box-shadow: none !important;
+        }
+
+        .spin-button.locked {
+            background: linear-gradient(135deg, #4b5563, #6b7280);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* Container dos botões */
+        .buttons-container {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            position: relative;
+        }
+
+        /* Botão de auto-spin */
+        .auto-spin-button {
+            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+            color: white;
+            border: none;
+            width: 3.125rem;
+            height: 3.125rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            right: 1.25rem;
+        }
+
+        .auto-spin-button:active {
+            transform: scale(0.95);
+        }
+
+        .auto-spin-button:disabled {
+            background: linear-gradient(135deg, #4b5563, #6b7280);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .auto-spin-button.active {
+            background: linear-gradient(135deg, #10b981, #34d399);
+            animation: pulse-auto 1.5s infinite;
+        }
+
+        @keyframes pulse-auto {
+            0%, 100% { box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 4px 25px rgba(16, 185, 129, 0.8); }
+        }
+
+        .auto-spin-button svg {
+            width: 1.375rem;
+            height: 1.375rem;
+        }
+
+        /* Botão de anúncio */
+        .ad-button {
+            background: linear-gradient(135deg, #10b981, #34d399);
+            color: white;
+            border: none;
+            padding: 1.125rem 3.75rem;
+            font-size: 1.125rem;
+            font-weight: bold;
+            border-radius: 3.125rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+            margin-bottom: 0.9375rem;
+        }
+
+        .ad-button:active {
+            transform: scale(0.95);
+        }
+
+        .ad-button:disabled {
+            background: linear-gradient(135deg, #4b5563, #6b7280);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* Mensagem de bloqueio */
+        .lock-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.75rem;
+            margin-bottom: 0.9375rem;
+            font-size: 0.875rem;
+            text-align: center;
+        }
+
+        .lock-message.hidden {
+            display: none;
+        }
+
+        /* Texto de horários de reset - Versão compacta com expansão */
+        .reset-times {
+            color: #10b981;
+            font-size: 0.75rem;
+            text-align: center;
+            margin-top: 1.25rem;
+            padding: 0;
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            border-radius: 0.875rem;
+            max-width: 21.25rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .reset-times-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s ease;
+        }
+
+        .reset-times-header:active {
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .reset-times-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .reset-times-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .reset-times-icon svg {
+            width: 1.125rem;
+            height: 1.125rem;
+        }
+
+        .reset-times-title {
+            font-weight: 600;
+            font-size: 0.8125rem;
+            color: #34d399;
+        }
+
+        .reset-times-expand {
+            width: 1.5rem;
+            height: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(16, 185, 129, 0.15);
+            border-radius: 0.375rem;
+            transition: transform 0.3s ease, background 0.2s ease;
+        }
+
+        .reset-times-expand svg {
+            width: 0.875rem;
+            height: 0.875rem;
+            stroke: #34d399;
+            transition: transform 0.3s ease;
+        }
+
+        .reset-times.expanded .reset-times-expand svg {
+            transform: rotate(180deg);
+        }
+
+        .reset-times-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .reset-times.expanded .reset-times-content {
+            max-height: 12.5rem;
+            padding: 0 1rem 0.875rem;
+        }
+
+        .reset-times-scroll {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.375rem 0.625rem;
+            padding-top: 0.5rem;
+            border-top: 0.0625rem solid rgba(16, 185, 129, 0.15);
+        }
+
+        .reset-time-item {
+            font-size: 0.6875rem;
+            color: #6ee7b7;
+            padding: 0.25rem 0.5rem;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 0.375rem;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Partículas */
+        .particle {
+            position: fixed;
+            width: 0.5rem;
+            height: 0.5rem;
+            background: #8b5cf6;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        @keyframes particle-float {
+            to {
+                transform: translate(var(--tx), -200px);
+                opacity: 0;
+            }
+        }
+    
+        /* ========== MODAL AVISO TELEGRAM ========== */
+        .telegram-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .telegram-modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .telegram-modal {
+            background: linear-gradient(135deg, #1a1f3a 0%, #0f1429 100%);
+            border: 2px solid rgba(0, 136, 204, 0.4);
+            border-radius: 1.25rem;
+            padding: 1.75rem 1.5rem;
+            max-width: 20rem;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 136, 204, 0.2);
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+        }
+
+        .telegram-modal-overlay.active .telegram-modal {
+            transform: scale(1);
+        }
+
+        .telegram-modal-icon {
+            width: 4rem;
+            height: 4rem;
+            margin: 0 auto 1rem;
+            background: linear-gradient(135deg, rgba(0, 136, 204, 0.2), rgba(34, 158, 217, 0.15));
+            border: 2px solid rgba(0, 136, 204, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .telegram-modal-icon svg {
+            width: 2.25rem;
+            height: 2.25rem;
+            fill: #0088cc;
+        }
+
+        .telegram-modal-title {
+            color: #ffffff;
+            font-size: 1.125rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .telegram-modal-text {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin-bottom: 1.25rem;
+        }
+
+        .telegram-modal-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.625rem;
+        }
+
+        .telegram-modal-btn-install {
+            background: linear-gradient(135deg, #0088cc, #229ed9);
+            color: white;
+            border: none;
+            padding: 0.875rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 136, 204, 0.4);
+        }
+
+        .telegram-modal-btn-install:active {
+            transform: scale(0.95);
+        }
+
+        .telegram-modal-btn-close {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 0.625rem 1.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .telegram-modal-btn-close:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* ========== AJUSTES PARA DPI BAIXO ========== */
+        /* Telas com altura menor que 800px - ajuste moderado */
+        @media (max-height: 800px) {
+            .header {
+                padding: 0.5rem 0.9375rem;
+            }
+
+            .back-button, .notification-btn, .settings-btn, .close-btn {
+                width: 2.25rem;
+                height: 2.25rem;
+            }
+
+            .back-button svg, .notification-btn svg, .settings-btn svg, .close-btn svg {
+                width: 1rem;
+                height: 1rem;
+            }
+
+            .container {
+                padding: 0.9375rem;
+            }
+
+            .section-title {
+                font-size: 0.875rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .card, .stat-card, .menu-item, .activity-card, .game-card {
+                padding: 0.75rem;
+                border-radius: 0.625rem;
+            }
+
+            .loading-spinner {
+                width: 2rem;
+                height: 2rem;
+            }
+
+            .loading-text {
+                font-size: 0.875rem;
+            }
+
+            .profile-avatar {
+                width: 3rem;
+                height: 3rem;
+            }
+
+            .profile-name {
+                font-size: 0.875rem;
+            }
+
+            .stat-value {
+                font-size: 0.875rem;
+            }
+
+            .stat-label {
+                font-size: 0.625rem;
+            }
+
+            .menu-icon {
+                width: 2.25rem;
+                height: 2.25rem;
+            }
+
+            .menu-title {
+                font-size: 0.875rem;
+            }
+
+            .menu-subtitle {
+                font-size: 0.6875rem;
+            }
+
+            .balance-amount, .balance-value {
+                font-size: 1rem;
+            }
+
+            .game-icon {
+                width: 2.75rem;
+                height: 2.75rem;
+            }
+
+            .game-name, .activity-title {
+                font-size: 0.625rem;
+            }
+
+            .game-reward, .activity-subtitle {
+                font-size: 0.5rem;
+            }
+
+            .game-card, .activity-card {
+                min-width: 6.25rem;
+                max-width: 6.25rem;
+                min-height: 6.875rem;
+            }
+
+            .wheel-container {
+                width: 18rem;
+                height: 18rem;
+            }
+
+            .spins-counter {
+                padding: 0.75rem;
+                font-size: 1rem;
+            }
+
+            .checkin-card {
+                padding: 1.5rem 1rem;
+            }
+
+            .checkin-icon {
+                width: 4rem;
+                height: 4rem;
+            }
+
+            .checkin-status {
+                font-size: 1rem;
+            }
+
+            .checkin-button {
+                height: 3rem;
+                font-size: 0.875rem;
+            }
+
+            .streak-card, .stats-card {
+                padding: 1rem;
+            }
+
+            .dialog-content, .modal-content {
+                padding: 1.25rem;
+            }
+
+            .form-select, .form-input, .custom-select-trigger {
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+
+            .btn, .submit-btn, .logout-button {
+                padding: 0.875rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Telas com altura menor que 700px - ajuste agressivo */
+        @media (max-height: 700px) {
+            .header {
+                padding: 0.375rem 0.75rem;
+            }
+
+            .back-button, .notification-btn, .settings-btn, .close-btn {
+                width: 2rem;
+                height: 2rem;
+                border-radius: 0.5rem;
+            }
+
+            .back-button svg, .notification-btn svg, .settings-btn svg, .close-btn svg {
+                width: 0.875rem;
+                height: 0.875rem;
+            }
+
+            .header-title {
+                font-size: 1rem;
+            }
+
+            .container {
+                padding: 0.75rem;
+            }
+
+            .section-title {
+                font-size: 0.75rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .card, .stat-card, .menu-item, .activity-card, .game-card {
+                padding: 0.5rem;
+                border-radius: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .loading-spinner {
+                width: 1.75rem;
+                height: 1.75rem;
+            }
+
+            .loading-text {
+                font-size: 0.75rem;
+                margin-top: 0.75rem;
+            }
+
+            .profile-avatar {
+                width: 2.5rem;
+                height: 2.5rem;
+                margin-bottom: 0.375rem;
+            }
+
+            .profile-name {
+                font-size: 0.75rem;
+            }
+
+            .stats-grid {
+                gap: 0.5rem;
+            }
+
+            .stat-card {
+                padding: 0.5rem;
+            }
+
+            .stat-icon svg {
+                width: 0.875rem;
+                height: 0.875rem;
+            }
+
+            .stat-value {
+                font-size: 0.75rem;
+            }
+
+            .stat-label {
+                font-size: 0.5625rem;
+            }
+
+            .menu-icon {
+                width: 2rem;
+                height: 2rem;
+            }
+
+            .menu-title {
+                font-size: 0.75rem;
+            }
+
+            .menu-subtitle {
+                font-size: 0.625rem;
+            }
+
+            .balance-amount, .balance-value {
+                font-size: 0.875rem;
+            }
+
+            .balance-label {
+                font-size: 0.75rem;
+            }
+
+            .game-icon {
+                width: 2.25rem;
+                height: 2.25rem;
+                padding: 0.375rem;
+            }
+
+            .game-name, .activity-title {
+                font-size: 0.5625rem;
+            }
+
+            .game-reward, .activity-subtitle {
+                font-size: 0.4375rem;
+            }
+
+            .game-card, .activity-card {
+                min-width: 5.5rem;
+                max-width: 5.5rem;
+                min-height: 6rem;
+                gap: 0.375rem;
+            }
+
+            .games-container, .activity-cards {
+                gap: 0.5rem;
+            }
+
+            .wheel-container {
+                width: 15rem;
+                height: 15rem;
+                margin-bottom: 1rem;
+            }
+
+            .spins-counter {
+                padding: 0.5rem;
+                margin: 0.375rem 0.75rem;
+                font-size: 0.875rem;
+            }
+
+            .checkin-card {
+                padding: 1rem 0.75rem;
+            }
+
+            .checkin-icon {
+                width: 3rem;
+                height: 3rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .checkin-status {
+                font-size: 0.875rem;
+            }
+
+            .checkin-description {
+                font-size: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .checkin-button {
+                height: 2.5rem;
+                font-size: 0.75rem;
+                max-width: 14rem;
+            }
+
+            .streak-card, .stats-card {
+                padding: 0.75rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .streak-title, .stats-title {
+                font-size: 0.875rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .streak-number {
+                font-size: 0.875rem;
+            }
+
+            .streak-label {
+                font-size: 0.75rem;
+            }
+
+            .streak-description {
+                font-size: 0.625rem;
+            }
+
+            .stats-row {
+                padding: 0.5rem 0;
+            }
+
+            .stats-label, .stats-value {
+                font-size: 0.75rem;
+            }
+
+            .dialog-content, .modal-content {
+                padding: 1rem;
+            }
+
+            .form-group {
+                margin-bottom: 0.75rem;
+            }
+
+            .form-label {
+                font-size: 0.75rem;
+                margin-bottom: 0.375rem;
+            }
+
+            .form-select, .form-input, .custom-select-trigger {
+                padding: 0.625rem;
+                font-size: 0.75rem;
+                border-radius: 0.5rem;
+            }
+
+            .btn, .submit-btn, .logout-button {
+                padding: 0.75rem;
+                font-size: 0.75rem;
+                border-radius: 0.75rem;
+            }
+
+            .notification-badge {
+                min-width: 0.875rem;
+                height: 0.875rem;
+                font-size: 0.5625rem;
+            }
+
+            .announcement-banner {
+                bottom: 4rem;
+            }
+
+            .announcement-banner-content {
+                padding: 0.75rem 1rem;
+            }
+
+            .announcement-banner-text {
+                font-size: 0.625rem;
+            }
+        }
+
+        /* Telas com altura menor que 600px - ajuste extremo */
+        @media (max-height: 600px) {
+            .header {
+                padding: 0.25rem 0.5rem;
+            }
+
+            .back-button, .notification-btn, .settings-btn, .close-btn {
+                width: 1.75rem;
+                height: 1.75rem;
+                border-radius: 0.375rem;
+            }
+
+            .back-button svg, .notification-btn svg, .settings-btn svg, .close-btn svg {
+                width: 0.75rem;
+                height: 0.75rem;
+            }
+
+            .header-title {
+                font-size: 0.875rem;
+            }
+
+            .container {
+                padding: 0.5rem;
+            }
+
+            .section-title {
+                font-size: 0.625rem;
+                margin-bottom: 0.375rem;
+                padding-left: 0.5rem;
+            }
+
+            .section-title::before {
+                width: 0.1875rem;
+                height: 0.75rem;
+            }
+
+            .card, .stat-card, .menu-item, .activity-card, .game-card {
+                padding: 0.375rem;
+                border-radius: 0.375rem;
+                margin-bottom: 0.375rem;
+            }
+
+            .loading-spinner {
+                width: 1.5rem;
+                height: 1.5rem;
+                border-width: 3px;
+            }
+
+            .loading-text {
+                font-size: 0.625rem;
+                margin-top: 0.5rem;
+            }
+
+            .profile-avatar {
+                width: 2rem;
+                height: 2rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .profile-avatar img {
+                font-size: 1rem;
+            }
+
+            .profile-name {
+                font-size: 0.625rem;
+            }
+
+            .stats-grid {
+                gap: 0.375rem;
+            }
+
+            .stat-card {
+                padding: 0.375rem;
+            }
+
+            .stat-icon {
+                margin-bottom: 0.25rem;
+            }
+
+            .stat-icon svg {
+                width: 0.75rem;
+                height: 0.75rem;
+            }
+
+            .stat-value {
+                font-size: 0.625rem;
+            }
+
+            .stat-label {
+                font-size: 0.5rem;
+            }
+
+            .menu-section {
+                margin-bottom: 0.75rem;
+            }
+
+            .menu-icon {
+                width: 1.75rem;
+                height: 1.75rem;
+            }
+
+            .menu-item {
+                gap: 0.5rem;
+            }
+
+            .menu-title {
+                font-size: 0.625rem;
+            }
+
+            .menu-subtitle {
+                font-size: 0.5rem;
+            }
+
+            .menu-arrow {
+                font-size: 0.875rem;
+            }
+
+            .balance-header {
+                padding: 0.75rem 0.5rem 0.5rem;
+            }
+
+            .balance-amount, .balance-value {
+                font-size: 0.75rem;
+            }
+
+            .balance-label {
+                font-size: 0.625rem;
+            }
+
+            .game-icon {
+                width: 2rem;
+                height: 2rem;
+                padding: 0.25rem;
+                border-radius: 0.5rem;
+            }
+
+            .game-name, .activity-title {
+                font-size: 0.5rem;
+            }
+
+            .game-reward, .activity-subtitle {
+                font-size: 0.375rem;
+            }
+
+            .game-card, .activity-card {
+                min-width: 4.5rem;
+                max-width: 4.5rem;
+                min-height: 5rem;
+                gap: 0.25rem;
+                border-radius: 0.5rem;
+            }
+
+            .games-container, .activity-cards {
+                gap: 0.375rem;
+                padding-bottom: 0.375rem;
+            }
+
+            .wheel-container {
+                width: 12rem;
+                height: 12rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .outer-ring {
+                top: -0.375rem;
+                left: -0.375rem;
+                width: calc(100% + 0.75rem);
+                height: calc(100% + 0.75rem);
+            }
+
+            .spins-counter {
+                padding: 0.375rem;
+                margin: 0.25rem 0.5rem;
+                font-size: 0.75rem;
+                border-radius: 0.625rem;
+            }
+
+            .main-container {
+                padding: 0.75rem;
+            }
+
+            .checkin-card {
+                padding: 0.75rem 0.5rem;
+                border-radius: 0.875rem;
+            }
+
+            .checkin-icon {
+                width: 2.5rem;
+                height: 2.5rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .checkin-status {
+                font-size: 0.75rem;
+                margin-bottom: 0.375rem;
+            }
+
+            .checkin-description {
+                font-size: 0.625rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .checkin-button {
+                height: 2rem;
+                font-size: 0.625rem;
+                max-width: 12rem;
+                border-radius: 1rem;
+            }
+
+            .streak-card, .stats-card {
+                padding: 0.5rem;
+                margin-bottom: 0.5rem;
+                border-radius: 0.875rem;
+            }
+
+            .streak-title, .stats-title {
+                font-size: 0.75rem;
+                margin-bottom: 0.375rem;
+            }
+
+            .streak-content {
+                gap: 0.5rem;
+            }
+
+            .streak-number {
+                font-size: 0.75rem;
+            }
+
+            .streak-label {
+                font-size: 0.625rem;
+            }
+
+            .streak-description {
+                font-size: 0.5rem;
+            }
+
+            .stats-row {
+                padding: 0.375rem 0;
+            }
+
+            .stats-label, .stats-value {
+                font-size: 0.625rem;
+            }
+
+            .dialog-content, .modal-content {
+                padding: 0.75rem;
+                border-radius: 1rem;
+            }
+
+            .content {
+                padding: 0.75rem;
+            }
+
+            .form-group {
+                margin-bottom: 0.5rem;
+            }
+
+            .form-label {
+                font-size: 0.625rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .form-select, .form-input, .custom-select-trigger {
+                padding: 0.5rem;
+                font-size: 0.625rem;
+                border-radius: 0.375rem;
+            }
+
+            .btn, .submit-btn, .logout-button {
+                padding: 0.5rem;
+                font-size: 0.625rem;
+                border-radius: 0.5rem;
+            }
+
+            .notification-badge {
+                min-width: 0.75rem;
+                height: 0.75rem;
+                font-size: 0.5rem;
+                top: 0.125rem;
+                right: 0.125rem;
+            }
+
+            .version {
+                font-size: 0.5rem;
+                margin-top: 0.75rem;
+            }
+
+            .announcement-banner {
+                bottom: 3.5rem;
+                left: 0.375rem;
+                right: 0.375rem;
+            }
+
+            .announcement-banner-content {
+                padding: 0.5rem 0.75rem;
+            }
+
+            .announcement-banner-badge {
+                font-size: 0.4375rem;
+                padding: 0.1875rem 0.5rem;
+            }
+
+            .announcement-banner-text {
+                font-size: 0.5rem;
+                padding-right: 1.25rem;
+            }
+
+            .announcement-banner-close {
+                width: 1.25rem;
+                height: 1.25rem;
+                top: 0.5rem;
+                right: 0.5rem;
+            }
+
+            /* Login específico */
+            .login-container {
+                padding: 0.75rem;
+            }
+
+            .logo-container {
+                margin-bottom: 1rem;
+            }
+
+            .logo {
+                width: 4rem;
+                height: 4rem;
+            }
+
+            .tagline {
+                font-size: 0.75rem;
+            }
+
+            .terms-container {
+                margin-bottom: 0.75rem;
+            }
+
+            .terms-text {
+                font-size: 0.625rem;
+            }
+
+            .swipe-container {
+                min-width: 16rem;
+                padding: 0 0.75rem;
+            }
+
+            .swipe-track {
+                height: 2.25rem;
+            }
+
+            .swipe-thumb {
+                width: 1.75rem;
+                height: 1.75rem;
+            }
+
+            .swipe-text {
+                font-size: 0.625rem;
+            }
+
+            .login-divider {
+                margin: 0.5rem 0;
+            }
+
+            .login-divider-text {
+                font-size: 0.5625rem;
+            }
+
+            .email-login-toggle {
+                height: 2.25rem;
+                font-size: 0.625rem;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+</div>
+
+<!-- Estrelas de fundo -->
+<div class="stars" id="stars"></div>
+
+<!-- Header -->
+<div class="header">
+    <div class="back-button" onclick="goBack()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+    </div>
+    <div class="header-title"></div>
+</div>
+
+<!-- Contador de giros -->
+<div class="spins-counter">
+    <div class="spins-today-text" id="spinsToday">Giros hoje: 0/10</div>
+</div>
+
+<!-- Container principal -->
+<div class="main-container">
+    <div class="wheel-container">
+        <div class="wheel-shadow"></div>
+        <div class="outer-ring"></div>
+        <div class="light-effect"></div>
+        <div class="indicator"></div>
+        <div class="indicator-shine"></div>
+        <div class="indicator-base"></div>
+        <canvas id="wheelCanvas" width="350" height="350"></canvas>
+        <div class="center-circle">
+            <img src="center_icon.png" alt="Logo">
+        </div>
+    </div>
+    <div class="result" id="result"></div>
+    <div class="lock-message" id="lockMessage" style="display: none;">
+        Realize a tarefa para desbloquear o giro
+    </div>
+    <button class="ad-button" id="adButton" onclick="openAdWebView()" style="display: none;">Assistir Anúncio</button>
+    <div class="buttons-container" id="buttonsContainer" style="display: none;">
+        <button class="spin-button" id="spinButton" onclick="requestSpin()">GIRAR</button>
+        <button class="auto-spin-button" id="autoSpinButton" onclick="toggleAutoSpin()" title="Roleta Automática">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 1l4 4-4 4"/>
+                <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                <path d="M7 23l-4-4 4-4"/>
+                <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Horários de reset da roleta -->
+    <div class="reset-times" id="resetTimes">
+        <div class="reset-times-header" onclick="toggleResetTimes()">
+            <div class="reset-times-title-wrap">
+                <div class="reset-times-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </div>
+                <span class="reset-times-title">Horários de Reset</span>
+            </div>
+            <div class="reset-times-expand">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+        </div>
+        <div class="reset-times-content">
+            <div class="reset-times-scroll">
+                <span class="reset-time-item">00:00</span>
+                <span class="reset-time-item">01:00</span>
+                <span class="reset-time-item">02:00</span>
+                <span class="reset-time-item">03:00</span>
+                <span class="reset-time-item">04:00</span>
+                <span class="reset-time-item">05:00</span>
+                <span class="reset-time-item">06:00</span>
+                <span class="reset-time-item">07:00</span>
+                <span class="reset-time-item">08:00</span>
+                <span class="reset-time-item">09:00</span>
+                <span class="reset-time-item">10:00</span>
+                <span class="reset-time-item">11:00</span>
+                <span class="reset-time-item">12:00</span>
+                <span class="reset-time-item">13:00</span>
+                <span class="reset-time-item">14:00</span>
+                <span class="reset-time-item">15:00</span>
+                <span class="reset-time-item">16:00</span>
+                <span class="reset-time-item">17:00</span>
+                <span class="reset-time-item">18:00</span>
+                <span class="reset-time-item">19:00</span>
+                <span class="reset-time-item">20:00</span>
+                <span class="reset-time-item">21:00</span>
+                <span class="reset-time-item">22:00</span>
+                <span class="reset-time-item">23:00</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Aviso: Telegram não instalado -->
+<div class="telegram-modal-overlay" id="telegramModal" onclick="closeTelegramModal(event)">
+    <div class="telegram-modal" onclick="event.stopPropagation()">
+        <div class="telegram-modal-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+            </svg>
+        </div>
+        <div class="telegram-modal-title">Telegram Necessário</div>
+        <div class="telegram-modal-text">
+            Para completar a tarefa e desbloquear a roleta, você precisa ter o <strong style="color: #0088cc;">Telegram</strong> instalado no seu dispositivo.
+        </div>
+        <div class="telegram-modal-buttons">
+            <button class="telegram-modal-btn-install" onclick="installTelegram()">Instalar Telegram</button>
+            <button class="telegram-modal-btn-close" onclick="closeTelegramModal()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    console.log('[ROLETA] Página carregada - Layout antigo restaurado');
+
+    // Função para expandir/recolher horários de reset
+    function toggleResetTimes() {
+        const resetTimes = document.getElementById('resetTimes');
+        if (resetTimes) {
+            resetTimes.classList.toggle('expanded');
+        }
+    }
+
+    // Criar estrelas de fundo
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 50; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        star.style.animationDelay = Math.random() * 3 + 's';
+        starsContainer.appendChild(star);
+    }
+
+    // Configuração do canvas
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 165;
+
+    // Segmentos da roleta - SERÁ CARREGADO DA API
+    let segments = [];
+
+    // Cores pré-definidas para os segmentos (cicla se tiver mais segmentos)
+    const segmentColors = [
+        { color: '#dc2626', darkColor: '#7f1d1d', glowColor: 'rgba(220, 38, 38, 0.5)' },
+        { color: '#0891b2', darkColor: '#164e63', glowColor: 'rgba(8, 145, 178, 0.5)' },
+        { color: '#ca8a04', darkColor: '#713f12', glowColor: 'rgba(202, 138, 4, 0.5)' },
+        { color: '#16a34a', darkColor: '#14532d', glowColor: 'rgba(22, 163, 74, 0.5)' },
+        { color: '#db2777', darkColor: '#831843', glowColor: 'rgba(219, 39, 119, 0.5)' },
+        { color: '#8b5cf6', darkColor: '#5b21b6', glowColor: 'rgba(139, 92, 246, 0.5)' },
+        { color: '#f97316', darkColor: '#9a3412', glowColor: 'rgba(249, 115, 22, 0.5)' },
+        { color: '#10b981', darkColor: '#065f46', glowColor: 'rgba(16, 185, 129, 0.5)' }
+    ];
+
+    // Função para gerar segmentos a partir dos valores da API
+    function generateSegments(prizeValues) {
+        return prizeValues.map((value, index) => {
+            const colorIndex = index % segmentColors.length;
+            return {
+                value: value,
+                ...segmentColors[colorIndex]
+            };
+        });
+    }
+
+    let currentRotation = 0;
+    let isSpinning = false;
+    let spinsRemaining = 3;
+
+    // Variáveis para auto-spin
+    let isAutoSpinning = false;
+    let autoSpinTimeout = null;
+
+    // Variáveis para cooldown
+    const COOLDOWN_SECONDS = 10;
+    const COOLDOWN_STORAGE_KEY = 'spin_cooldown_end_time';
+    let isCooldown = false;
+    let cooldownInterval = null;
+
+    // Desenhar roleta com tema dark
+    function drawWheel() {
+        const segmentAngle = (Math.PI * 2) / segments.length;
+
+        segments.forEach((segment, index) => {
+            const startAngle = index * segmentAngle - Math.PI / 2;
+            const endAngle = startAngle + segmentAngle;
+
+            // Criar gradiente radial dark
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+            gradient.addColorStop(0, segment.color);
+            gradient.addColorStop(0.7, segment.darkColor);
+            gradient.addColorStop(1, '#000000');
+
+            // Desenhar segmento
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Borda escura sutil
+            ctx.strokeStyle = '#1e1b4b';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Linha divisória neon
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            const lineX = centerX + radius * Math.cos(startAngle);
+            const lineY = centerY + radius * Math.sin(startAngle);
+            ctx.lineTo(lineX, lineY);
+            ctx.strokeStyle = '#8b5cf6';
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = segment.glowColor;
+            ctx.shadowBlur = 5;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Desenhar texto com efeito neon
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(startAngle + segmentAngle / 2);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Sombra do texto (glow)
+            ctx.shadowColor = segment.glowColor;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 32px Arial';
+            ctx.fillText(segment.value, radius * 0.68, 0);
+
+            // Texto principal
+            ctx.shadowBlur = 8;
+            ctx.fillText(segment.value, radius * 0.68, 0);
+
+            ctx.restore();
+        });
+
+        // Borda interna escura
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#0a0e27';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // Rotacionar a roleta
+    function rotateWheel(angle) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(angle);
+        ctx.translate(-centerX, -centerY);
+        drawWheel();
+        ctx.restore();
+    }
+
+    // Inicializar
+    drawWheel();
+
+    // Variáveis de controle de loading
+    let prizeValuesLoaded = false;
+    let spinsCounterLoaded = false;
+    let taskCheckLoaded = false;
+    let taskCompleted = false;
+
+    function checkAndHideLoading() {
+        if (prizeValuesLoaded && spinsCounterLoaded && taskCheckLoaded) {
+            console.log('[ROLETA] ✅ Todos os dados carregados! Escondendo loading...');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden');
+            }, 300);
+        } else {
+            console.log('[ROLETA] ⏳ Aguardando dados... Valores:', prizeValuesLoaded, '| Contador:', spinsCounterLoaded, '| Tarefa:', taskCheckLoaded);
+        }
+    }
+
+    // ========================================
+    // VERIFICAÇÃO DE TAREFA VIA API
+    // ========================================
+
+    // Valores dinâmicos carregados da API - APENAS IMPRESSÕES
+    let REQUIRED_IMPRESSIONS = 5;
+
+    async function checkTaskCompletion() {
+        console.log('[ROLETA-TASK] ========================================');
+        console.log('[ROLETA-TASK] Iniciando verificação de tarefa...');
+
+        // Obter User ID do Android
+        let userId = null;
+
+        // Tentar obter do Android.getUserId()
+        if (typeof Android !== 'undefined') {
+            console.log('[ROLETA-TASK] Interface Android disponível');
+            if (Android.getUserId) {
+                try {
+                    userId = Android.getUserId();
+                    console.log('[ROLETA-TASK] ✅ User ID obtido via Android.getUserId():', userId);
+                } catch (e) {
+                    console.warn('[ROLETA-TASK] ⚠️ Erro ao chamar Android.getUserId():', e);
+                }
+            } else {
+                console.warn('[ROLETA-TASK] ⚠️ Método Android.getUserId() não disponível');
+            }
+        } else {
+            console.warn('[ROLETA-TASK] ⚠️ Interface Android não disponível');
+        }
+
+        if (!userId) {
+            console.error('[ROLETA-TASK] ❌ Não foi possível obter User ID!');
+            console.error('[ROLETA-TASK] typeof Android:', typeof Android);
+            if (typeof Android !== 'undefined') {
+                console.error('[ROLETA-TASK] Métodos disponíveis:', Object.keys(Android));
+            }
+            taskCheckLoaded = true;
+            checkAndHideLoading();
+            return;
+        }
+
+        try {
+            // PRIMEIRO: Buscar os requisitos da API (required_impressions)
+            console.log('[ROLETA-TASK] Buscando requisitos da API...');
+            const requirementsUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
+            console.log('[ROLETA-TASK] URL requisitos:', requirementsUrl);
+
+            const reqResponse = await fetch(requirementsUrl, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (reqResponse.ok) {
+                const reqData = await reqResponse.json();
+                console.log('[ROLETA-TASK] Resposta requisitos:', JSON.stringify(reqData));
+
+                if (reqData.success && reqData.data) {
+                    REQUIRED_IMPRESSIONS = reqData.data.required_impressions || 5;
+                    console.log('[ROLETA-TASK] ✅ Requisitos carregados da API:');
+                    console.log('[ROLETA-TASK]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
+                }
+            }
+
+            // SEGUNDO: Buscar as estatísticas do usuário
+            const statsUrl = `https://monetag-postback-server-production.up.railway.app/api/stats/user/${userId}`;
+            console.log('[ROLETA-TASK] Chamando API de stats...');
+            console.log('[ROLETA-TASK] URL:', statsUrl);
+
+            const response = await fetch(statsUrl, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            console.log('[ROLETA-TASK] Status da resposta:', response.status);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('[ROLETA-TASK] Resposta completa da API:', JSON.stringify(data));
+
+            if (data.success) {
+                // A API retorna: total_impressions (apenas impressões)
+                const impressions = data.total_impressions || 0;
+
+                console.log('[ROLETA-TASK] ✅ Dados obtidos com sucesso!');
+                console.log('[ROLETA-TASK]   - Impressões: ' + impressions);
+
+                // Verificar se tarefa foi concluída - APENAS IMPRESSÕES
+                taskCompleted = impressions >= REQUIRED_IMPRESSIONS;
+                console.log('[ROLETA-TASK] Verificação: ' + impressions + ' >= ' + REQUIRED_IMPRESSIONS + ' = ' + taskCompleted);
+
+                // Se tarefa foi concluída, esconder botão de anúncio e desbloquear roleta
+                if (taskCompleted) {
+                    console.log('[ROLETA-TASK] ✅ TAREFA CONCLUÍDA! Desbloqueando roleta...');
+
+                    const lockMsg = document.getElementById('lockMessage');
+                    const adBtn = document.getElementById('adButton');
+                    const spinBtn = document.getElementById('spinButton');
+
+                    console.log('[ROLETA-TASK] Elementos encontrados:');
+                    console.log('[ROLETA-TASK]   - lockMessage:', lockMsg ? 'SIM' : 'NÃO');
+                    console.log('[ROLETA-TASK]   - adButton:', adBtn ? 'SIM' : 'NÃO');
+                    console.log('[ROLETA-TASK]   - spinButton:', spinBtn ? 'SIM' : 'NÃO');
+
+                    if (lockMsg) {
+                        lockMsg.classList.add('hidden');
+                        console.log('[ROLETA-TASK] ✅ Texto de aviso escondido');
+                    }
+
+                    if (adBtn) {
+                        adBtn.style.display = 'none';
+                        console.log('[ROLETA-TASK] ✅ Botão de anúncio escondido');
+                    }
+
+                    if (spinBtn) {
+                        spinBtn.style.display = 'block';  // Mostrar botão
+                        spinBtn.classList.remove('locked');
+                        spinBtn.disabled = false;
+                        console.log('[ROLETA-TASK] ✅ Botão de roleta mostrado e habilitado');
+                    }
+                } else {
+                    console.log('[ROLETA-TASK] ⏳ Tarefa INCOMPLETA');
+                    console.log('[ROLETA-TASK]   - Faltam ' + (REQUIRED_IMPRESSIONS - impressions) + ' impressões');
+                }
+            } else {
+                console.error('[ROLETA-TASK] ❌ Resposta inválida da API');
+                console.error('[ROLETA-TASK] data.success:', data.success);
+                console.error('[ROLETA-TASK] Resposta:', JSON.stringify(data));
+            }
+        } catch (error) {
+            console.error('[ROLETA-TASK] ❌ Erro ao verificar tarefa:', error);
+            console.error('[ROLETA-TASK] Stack:', error.stack);
+        } finally {
+            taskCheckLoaded = true;
+            checkAndHideLoading();
+            console.log('[ROLETA-TASK] ========================================');
+        }
+    }
+
+    // Chamar verificação de tarefa ao carregar
+    checkTaskCompletion();
+
+    // Atualizar contador de giros
+    function updateSpinsCounter(spins, spinsToday, maxSpins) {
+        console.log('[ROLETA] Atualizando contador:', spins, spinsToday, maxSpins);
+
+        spinsCounterLoaded = true;
+        checkAndHideLoading();
+
+        spinsRemaining = spins;
+
+        if (spinsToday !== undefined && maxSpins !== undefined) {
+            document.getElementById('spinsToday').textContent = `Giros hoje: ${spinsToday}/${maxSpins}`;
+        }
+
+        const button = document.getElementById('spinButton');
+        const autoBtn = document.getElementById('autoSpinButton');
+
+        // NÃO alterar o botão se estiver em cooldown
+        if (isCooldown) {
+            console.log('[ROLETA] Em cooldown, não alterando botão');
+            return;
+        }
+
+        if (spins <= 0) {
+            button.disabled = true;
+            button.textContent = 'VOLTE MAIS TARDE';
+
+            // Desabilitar e parar auto-spin se não tiver mais giros
+            if (autoBtn) {
+                autoBtn.disabled = true;
+            }
+            if (isAutoSpinning) {
+                stopAutoSpin();
+            }
+        } else {
+            button.disabled = false;
+            button.textContent = 'GIRAR';
+
+            // Habilitar botão de auto-spin
+            if (autoBtn) {
+                autoBtn.disabled = false;
+            }
+        }
+    }
+
+    // Solicitar giro (chama Android)
+    function requestSpin() {
+        // A verificação de tarefa agora é feita pelo Android
+        // O HTML só mostra/esconde os botões baseado no status
+
+        // Verificar se está em cooldown
+        if (isCooldown) {
+            console.log('[ROLETA] ⚠️ Aguardando cooldown...');
+            return;
+        }
+
+        if (!isSpinning && spinsRemaining > 0) {
+            if (typeof Android !== 'undefined') {
+                Android.onSpinRequested();
+            }
+        }
+    }
+
+    // FUNÇÃO: Encontrar o índice do valor exato no array de segmentos
+    function findSegmentIndex(prizeValue) {
+        for (let i = 0; i < segments.length; i++) {
+            if (segments[i].value === prizeValue) {
+                return i;
+            }
+        }
+        // Se não encontrar valor exato, retornar -1
+        return -1;
+    }
+
+    // FUNÇÃO: Calcular posição angular de um segmento
+    function calculateSegmentPosition(segmentIndex) {
+        const segmentAngle = (Math.PI * 2) / segments.length;
+        // Centro do segmento (negativo porque gira anti-horário)
+        return -(segmentIndex * segmentAngle + segmentAngle / 2);
+    }
+
+    // FUNÇÃO: 2 voltas + cai no valor
+    function spin(prizeValue) {
+        console.log('========================================');
+        console.log('[ROLETA] INICIANDO GIRO');
+        console.log('[ROLETA] Valor da API:', prizeValue);
+        console.log('[ROLETA] Valores disponíveis:', segments.map(s => s.value));
+
+        // Encontrar o índice do valor no array de segmentos
+        const segmentIndex = findSegmentIndex(prizeValue);
+
+        if (segmentIndex === -1) {
+            console.error('[ROLETA] ❌ ERRO: Valor', prizeValue, 'não existe na roleta!');
+            console.error('[ROLETA] Valores válidos:', segments.map(s => s.value));
+            alert('Erro: valor ' + prizeValue + ' não existe na roleta!');
+            return;
+        }
+
+        // Calcular posição angular do segmento
+        const targetPosition = calculateSegmentPosition(segmentIndex);
+
+        console.log('[ROLETA] ✅ Valor encontrado!');
+        console.log('[ROLETA] Índice do segmento:', segmentIndex);
+        console.log('[ROLETA] Posição angular:', targetPosition);
+
+        isSpinning = true;
+        document.getElementById('result').classList.remove('show');
+        document.getElementById('spinButton').disabled = true;
+
+        // Lógica simples: girar 2 voltas completas + parar na posição alvo
+        // Sempre começar do zero para evitar acumulação de erros
+        const startRotation = 0;
+        const twoFullRotations = -4 * Math.PI; // 2 voltas completas (sentido anti-horário)
+        const finalRotation = twoFullRotations + targetPosition;
+
+        console.log('[ROLETA] Start:', startRotation, 'Target:', targetPosition, 'Final:', finalRotation);
+
+        // Animação: 3 segundos
+        const duration = 3000;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Easing suave
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+            currentRotation = startRotation + (finalRotation - startRotation) * easeProgress;
+            rotateWheel(currentRotation);
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Finalizado - garantir que pare EXATAMENTE na posição alvo
+                currentRotation = targetPosition;
+                rotateWheel(currentRotation);
+
+                console.log('[ROLETA] ✅ GIRO FINALIZADO');
+                console.log('[ROLETA] Posição final:', currentRotation);
+                console.log('[ROLETA] Valor sorteado:', prizeValue);
+                console.log('========================================');
+
+                setTimeout(() => {
+                    isSpinning = false;
+                    showResult(prizeValue);
+
+                    if (typeof Android !== 'undefined') {
+                        Android.onSpinComplete(prizeValue);
+                    }
+
+                    // Iniciar cooldown de 10 segundos
+                    startCooldown();
+                }, 300);
+            }
+        }
+
+        animate();
+    }
+
+    // Mostrar resultado (removido - sem texto)
+    function showResult(points) {
+        // Texto removido - não mostra nada
+    }
+
+    // Voltar
+    function goBack() {
+        if (typeof Android !== 'undefined') {
+            Android.onBackPressed();
+        }
+    }
+
+    // ========================================
+    // FUNÇÕES DE AUTO-SPIN
+    // ========================================
+
+    // Alternar auto-spin
+    function toggleAutoSpin() {
+        if (isAutoSpinning) {
+            stopAutoSpin();
+        } else {
+            startAutoSpin();
+        }
+    }
+
+    // Iniciar auto-spin
+    function startAutoSpin() {
+        if (spinsRemaining <= 0) {
+            console.log('[AUTO-SPIN] Sem giros disponíveis');
+            return;
+        }
+
+        console.log('[AUTO-SPIN] ▶️ Iniciando auto-spin...');
+        isAutoSpinning = true;
+
+        const autoBtn = document.getElementById('autoSpinButton');
+        if (autoBtn) {
+            autoBtn.classList.add('active');
+            autoBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="6" y="4" width="4" height="16" rx="1"/>
+                    <rect x="14" y="4" width="4" height="16" rx="1"/>
+                </svg>
+            `;
+        }
+
+        // Se não estiver girando, iniciar o primeiro giro
+        if (!isSpinning) {
+            requestSpin();
+        }
+    }
+
+    // Parar auto-spin
+    function stopAutoSpin() {
+        console.log('[AUTO-SPIN] ⏹️ Parando auto-spin...');
+        isAutoSpinning = false;
+
+        if (autoSpinTimeout) {
+            clearTimeout(autoSpinTimeout);
+            autoSpinTimeout = null;
+        }
+
+        const autoBtn = document.getElementById('autoSpinButton');
+        if (autoBtn) {
+            autoBtn.classList.remove('active');
+            autoBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 1l4 4-4 4"/>
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                    <path d="M7 23l-4-4 4-4"/>
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                </svg>
+            `;
+        }
+    }
+
+    // ========================================
+    // FUNÇÕES DE COOLDOWN
+    // ========================================
+
+    // Iniciar cooldown de 10 segundos
+    function startCooldown() {
+        console.log('[COOLDOWN] ⏱️ Iniciando cooldown de ' + COOLDOWN_SECONDS + ' segundos...');
+
+        // Salvar o timestamp de quando o cooldown termina
+        const endTime = Date.now() + (COOLDOWN_SECONDS * 1000);
+        localStorage.setItem(COOLDOWN_STORAGE_KEY, endTime.toString());
+
+        // Iniciar o cooldown com o tempo salvo
+        resumeCooldown();
+    }
+
+    // Retomar cooldown (usado ao iniciar e ao voltar para a tela)
+    function resumeCooldown() {
+        const savedEndTime = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+
+        if (!savedEndTime) {
+            console.log('[COOLDOWN] Nenhum cooldown salvo');
+            return false;
+        }
+
+        const endTime = parseInt(savedEndTime);
+        const now = Date.now();
+        const remainingMs = endTime - now;
+
+        // Se já passou o tempo, limpar e não fazer nada
+        if (remainingMs <= 0) {
+            console.log('[COOLDOWN] Cooldown já expirou');
+            localStorage.removeItem(COOLDOWN_STORAGE_KEY);
+            return false;
+        }
+
+        // Calcular segundos restantes (arredondando para cima)
+        let secondsLeft = Math.ceil(remainingMs / 1000);
+        console.log('[COOLDOWN] Retomando cooldown com ' + secondsLeft + ' segundos restantes');
+
+        isCooldown = true;
+
+        const spinBtn = document.getElementById('spinButton');
+        const autoBtn = document.getElementById('autoSpinButton');
+
+        // Desabilitar botões e adicionar classe de cooldown
+        if (spinBtn) {
+            spinBtn.disabled = true;
+            spinBtn.classList.add('cooldown');
+            spinBtn.textContent = secondsLeft + 's';
+        }
+        if (autoBtn) {
+            autoBtn.disabled = true;
+        }
+
+        // Limpar intervalo anterior se existir
+        if (cooldownInterval) {
+            clearInterval(cooldownInterval);
+        }
+
+        // Atualizar contador a cada segundo
+        cooldownInterval = setInterval(() => {
+            const currentTime = Date.now();
+            const remaining = endTime - currentTime;
+
+            if (remaining <= 0) {
+                // Chegou a zero - agora sim liberar
+                clearInterval(cooldownInterval);
+                cooldownInterval = null;
+                localStorage.removeItem(COOLDOWN_STORAGE_KEY);
+                endCooldown();
+            } else {
+                secondsLeft = Math.ceil(remaining / 1000);
+                if (spinBtn) {
+                    // Manter botão desabilitado e com classe cooldown
+                    spinBtn.disabled = true;
+                    spinBtn.classList.add('cooldown');
+                    spinBtn.textContent = secondsLeft + 's';
+                }
+            }
+        }, 100); // Verificar a cada 100ms para maior precisão
+
+        return true;
+    }
+
+    // Finalizar cooldown
+    function endCooldown() {
+        console.log('[COOLDOWN] ✅ Cooldown finalizado!');
+        isCooldown = false;
+
+        if (cooldownInterval) {
+            clearInterval(cooldownInterval);
+            cooldownInterval = null;
+        }
+
+        // Limpar do localStorage
+        localStorage.removeItem(COOLDOWN_STORAGE_KEY);
+
+        const spinBtn = document.getElementById('spinButton');
+        const autoBtn = document.getElementById('autoSpinButton');
+
+        // Remover classe de cooldown
+        if (spinBtn) {
+            spinBtn.classList.remove('cooldown');
+        }
+
+        // Reabilitar botões se ainda tiver giros
+        if (spinsRemaining > 0) {
+            if (spinBtn) {
+                spinBtn.disabled = false;
+                spinBtn.textContent = 'GIRAR';
+            }
+            if (autoBtn) {
+                autoBtn.disabled = false;
+            }
+
+            // Se auto-spin estiver ativo, continuar girando
+            if (isAutoSpinning) {
+                autoSpinTimeout = setTimeout(() => {
+                    requestSpin();
+                }, 500); // Pequeno delay antes do próximo giro automático
+            }
+        } else {
+            // Sem giros disponíveis
+            if (spinBtn) {
+                spinBtn.disabled = true;
+                spinBtn.textContent = 'SEM GIROS DISPONÍVEIS';
+            }
+            if (autoBtn) {
+                autoBtn.disabled = true;
+            }
+            // Parar auto-spin
+            if (isAutoSpinning) {
+                stopAutoSpin();
+            }
+        }
+    }
+
+    // Verificar cooldown ao carregar a página
+    function checkSavedCooldown() {
+        console.log('[COOLDOWN] Verificando cooldown salvo...');
+        const hasActiveCooldown = resumeCooldown();
+        if (hasActiveCooldown) {
+            console.log('[COOLDOWN] Cooldown ativo encontrado e retomado');
+        } else {
+            console.log('[COOLDOWN] Nenhum cooldown ativo');
+        }
+    }
+
+    // Função para atualizar valores da roleta dinamicamente
+    function setPrizeValues(newValues) {
+        console.log('[ROLETA] setPrizeValues chamada com:', newValues);
+
+        if (!Array.isArray(newValues) || newValues.length === 0) {
+            console.error('[ROLETA] Valores inválidos. Esperado array com pelo menos 1 valor.');
+            return;
+        }
+
+        // Gerar novos segmentos com cores automáticas
+        segments = generateSegments(newValues);
+
+        console.log('[ROLETA] Valores atualizados:', segments.map(s => s.value));
+        console.log('[ROLETA] Total de segmentos:', segments.length);
+
+        // Redesenhar roleta com novos valores
+        drawWheel();
+
+        console.log('[ROLETA] Roleta redesenhada com', segments.length, 'segmentos');
+
+        // Marcar valores como carregados
+        prizeValuesLoaded = true;
+        checkAndHideLoading();
+    }
+
+    // ========================================
+    // INTEGRAÇÃO MONETAG
+    // ========================================
+
+    const ZONE_ID = '10269314';
+    const POSTBACK_URL = 'https://monetag-tracker-production.up.railway.app/api/monetag/postback';
+    // NOTA: Não usar adWatched - usar apenas taskCompleted da API
+    let userId = null;
+    let userEmail = null;
+    let adAttempts = 0;
+    const MAX_AD_ATTEMPTS = 3;
+
+    // Obter User ID e Email do SessionManager via Android
+    if (typeof Android !== 'undefined') {
+        try {
+            if (Android.getUserId) {
+                userId = Android.getUserId();
+                console.log('[MONETAG] User ID obtido do SessionManager:', userId);
+            }
+            if (Android.getEmail) {
+                userEmail = Android.getEmail();
+                console.log('[MONETAG] Email obtido do SessionManager:', userEmail);
+            }
+        } catch (e) {
+            console.warn('[MONETAG] Erro ao obter dados do SessionManager:', e);
+        }
+    }
+
+    // Se não conseguiu do Android, usar dados genéricos
+    if (!userId) {
+        userId = 'app_user_' + Date.now();
+        console.log('[MONETAG] Usando User ID genérico:', userId);
+    }
+    if (!userEmail) {
+        userEmail = 'guest@youngmoney.com';
+        console.log('[MONETAG] Usando Email genérico:', userEmail);
+    }
+
+    // Função para enviar postback
+    async function sendPostback(eventType) {
+        if (!userId) {
+            console.warn('[MONETAG] ⚠️ User ID não disponível para postback');
+            return;
+        }
+
+        try {
+            const url = `${POSTBACK_URL}?event_type=${eventType}&zone_id=${ZONE_ID}&sub_id=${userId}&sub_id2=${encodeURIComponent(userEmail)}&click_id={ymid}&revenue={estimated_price}`;
+            console.log(`[MONETAG] 📤 Enviando postback: ${eventType}`);
+            console.log(`[MONETAG] User ID: ${userId}, Email: ${userEmail}`);
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+                console.log(`[MONETAG] ✅ Postback ${eventType} enviado com sucesso`);
+            } else {
+                console.error(`[MONETAG] ❌ Erro no postback: ${data.error}`);
+            }
+        } catch (error) {
+            console.error(`[MONETAG] ❌ Erro ao enviar postback ${eventType}:`, error);
+        }
+    }
+
+    // Função para pré-carregar anúncio
+    function preloadAd() {
+        if (adAttempts >= MAX_AD_ATTEMPTS) {
+            console.log('[MONETAG] ⚠️ Máximo de tentativas atingido');
+            return;
+        }
+
+        if (typeof window.monetag === 'undefined' || !window.monetag.rewardedInterstitial) {
+            console.log('[MONETAG] ⏳ SDK ainda não carregado, tentando novamente...');
+            adAttempts++;
+            setTimeout(preloadAd, 2000);
+            return;
+        }
+
+        console.log('[MONETAG] 🔄 Pré-carregando anúncio...');
+
+        window.monetag.rewardedInterstitial().preload()
+            .then(() => {
+                console.log('[MONETAG] ✅ Anúncio pré-carregado');
+                // Enviar postback de impressão
+                sendPostback('impression');
+            })
+            .catch((error) => {
+                console.warn('[MONETAG] ⚠️ Pré-carregamento falhou:', error);
+                adAttempts++;
+                if (adAttempts < MAX_AD_ATTEMPTS) {
+                    setTimeout(preloadAd, 3000);
+                }
+            });
+    }
+
+    // Função para mostrar anúncio
+    function showAd() {
+        if (typeof window.monetag === 'undefined' || !window.monetag.rewardedInterstitial) {
+            console.error('[MONETAG] ❌ SDK do Monetag não carregado');
+            alert('⚠️ Erro ao carregar anúncio. Tente novamente.');
+            return;
+        }
+
+        console.log('[MONETAG] ▶️ Mostrando anúncio...');
+
+        const adButton = document.getElementById('adButton');
+        adButton.disabled = true;
+        adButton.textContent = 'CARREGANDO...';
+
+        window.monetag.rewardedInterstitial().show()
+            .then(() => {
+                console.log('[MONETAG] ✅ Anúncio visualizado com sucesso');
+
+                // Atualizar status da tarefa via API
+                updateTaskStatusAfterAd();
+
+                // Pré-carregar próximo anúncio
+                setTimeout(preloadAd, 2000);
+
+                console.log('[MONETAG] 🔄 Status da tarefa será atualizado...');
+            })
+            .catch((error) => {
+                console.error('[MONETAG] ❌ Erro ao mostrar anúncio:', error);
+                adButton.disabled = false;
+                adButton.textContent = '🎬 ASSISTIR ANÚCIO';
+                alert('⚠️ Erro ao exibir anúncio. Tente novamente.');
+            });
+    }
+
+    // Aguardar SDK carregar e pré-carregar primeiro anúncio (apenas se tarefa não foi concluída)
+    setTimeout(() => {
+        if (!taskCompleted) {
+            console.log('[MONETAG] 🔍 Aguardando SDK Monetag...');
+            preloadAd();
+        } else {
+            console.log('[MONETAG] ⏭️ Tarefa já concluída, pulando pré-carregamento de anúncio');
+        }
+    }, 2000);
+
+    // Expor função showAd para o HTML
+    window.showAd = showAd;
+
+    // Função para atualizar status após assistir anúncio
+    // Agora verifica a API para confirmar que a tarefa foi concluída
+    function updateTaskStatusAfterAd() {
+        console.log('[ROLETA] 🔄 Atualizando status da tarefa após assistir anúncio...');
+
+        // Aguardar um pouco e depois verificar a API novamente
+        setTimeout(() => {
+            checkTaskCompletion();
+        }, 2000);
+    }
+
+    // Expor função updateTaskStatusAfterAd para o HTML
+    window.updateTaskStatusAfterAd = updateTaskStatusAfterAd;
+
+    // ========================================
+    // VERIFICAÇÃO DO TELEGRAM
+    // ========================================
+
+    // Função para mostrar modal de aviso do Telegram
+    function showTelegramModal() {
+        const modal = document.getElementById('telegramModal');
+        if (modal) {
+            modal.classList.add('active');
+            console.log('[ROLETA] 📢 Modal de aviso do Telegram exibido');
+        }
+    }
+
+    // Função para fechar modal de aviso do Telegram
+    function closeTelegramModal(event) {
+        // Se clicou no overlay (fora do modal), fechar
+        if (event && event.target !== event.currentTarget) return;
+        const modal = document.getElementById('telegramModal');
+        if (modal) {
+            modal.classList.remove('active');
+            console.log('[ROLETA] ❌ Modal de aviso do Telegram fechado');
+        }
+    }
+
+    // Função para abrir a Play Store na página do Telegram
+    function installTelegram() {
+        console.log('[ROLETA] 📲 Abrindo Play Store para instalar Telegram...');
+        try {
+            // Tentar abrir na Play Store
+            window.location.href = 'market://details?id=org.telegram.messenger';
+        } catch (e) {
+            // Fallback: abrir via navegador
+            window.open('https://play.google.com/store/apps/details?id=org.telegram.messenger', '_blank');
+        }
+        // Fechar o modal
+        closeTelegramModal();
+    }
+
+    // Função para abrir WebView de anúncio (com verificação do Telegram)
+    function openAdWebView() {
+        console.log('[ROLETA] 👀 Verificando se Telegram está instalado...');
+
+        if (typeof Android !== 'undefined' && Android.isTelegramInstalled) {
+            const telegramInstalled = Android.isTelegramInstalled();
+            console.log('[ROLETA] Telegram instalado:', telegramInstalled);
+
+            if (!telegramInstalled) {
+                // Telegram NÃO instalado - mostrar aviso
+                console.log('[ROLETA] ⚠️ Telegram não instalado! Mostrando aviso...');
+                showTelegramModal();
+                return;
+            }
+        }
+
+        // Telegram instalado ou interface não disponível - prosseguir normalmente
+        console.log('[ROLETA] ✅ Telegram instalado! Abrindo bot...');
+        if (typeof Android !== 'undefined' && Android.openAdWebView) {
+            Android.openAdWebView();
+        } else {
+            console.error('[ROLETA] ❌ Android.openAdWebView() não encontrado');
+            alert('⚠️ Erro: Interface Android não disponível');
+        }
+    }
+
+    // Expor funções para o HTML
+    window.openAdWebView = openAdWebView;
+    window.showTelegramModal = showTelegramModal;
+    window.closeTelegramModal = closeTelegramModal;
+    window.installTelegram = installTelegram;
+
+    // ========================================
+    // LISTENER PARA REFRESH QUANDO VOLTAR DO ANÓNCIO
+    // ========================================
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            console.log('[ROLETA] 🔄 Página ficou visível - Atualizando dados...');
+            // Fazer refresh da API e dados
+            checkTaskCompletion();
+        }
+    });
+
+    // Também adicionar listener para quando a janela ganhar foco
+    window.addEventListener('focus', function() {
+        console.log('[ROLETA] 🔄 Janela ganhou foco - Atualizando dados...');
+        checkTaskCompletion();
+    });
+
+    // ========================================
+    // FIM INTEGRAÇÃO MONETAG
+    // ========================================
+
+    /**
+     * Função para atualizar status da tarefa
+     * Chamada pelo Android quando verifica a conclusão da tarefa
+     * @param {boolean} taskCompleted - true se a tarefa foi concluída
+     */
+    function setTaskCompletionStatus(taskCompleted) {
+        console.log('[ROLETA-TASK] 📋 setTaskCompletionStatus chamado com:', taskCompleted);
+
+        const adButton = document.getElementById('adButton');
+        const buttonsContainer = document.getElementById('buttonsContainer');
+        const spinButton = document.getElementById('spinButton');
+        const autoSpinButton = document.getElementById('autoSpinButton');
+        const lockMessage = document.getElementById('lockMessage');
+
+        if (taskCompleted) {
+            // Tarefa foi concluída - mostrar botões de girar roleta
+            console.log('[ROLETA-TASK] ✅ Tarefa concluída! Mostrando botões de girar...');
+
+            if (adButton) {
+                adButton.style.display = 'none';
+                console.log('[ROLETA-TASK] 🙅 Botão "Assistir Anúncio" escondido');
+            }
+
+            if (lockMessage) {
+                lockMessage.style.display = 'none';
+                console.log('[ROLETA-TASK] 🙅 Mensagem "Realize a tarefa" escondida');
+            }
+
+            if (buttonsContainer) {
+                buttonsContainer.style.display = 'flex';
+                console.log('[ROLETA-TASK] ✅ Container de botões mostrado');
+            }
+
+            if (spinButton) {
+                spinButton.classList.remove('locked');
+                // Só habilitar se não estiver em cooldown
+                if (!isCooldown) {
+                    spinButton.disabled = false;
+                    console.log('[ROLETA-TASK] ✅ Botão "GIRAR" habilitado');
+                } else {
+                    console.log('[ROLETA-TASK] ⏱️ Botão em cooldown, mantendo desabilitado');
+                }
+            }
+
+            if (autoSpinButton) {
+                // Só habilitar se não estiver em cooldown
+                if (!isCooldown) {
+                    autoSpinButton.disabled = false;
+                    console.log('[ROLETA-TASK] ✅ Botão "Auto-Spin" habilitado');
+                } else {
+                    console.log('[ROLETA-TASK] ⏱️ Botão Auto-Spin em cooldown, mantendo desabilitado');
+                }
+            }
+        } else {
+            // Tarefa não foi concluída - mostrar botão de assistir anúncio
+            console.log('[ROLETA-TASK] ⏳ Tarefa não concluída. Mostrando botão de assistir anúncio...');
+
+            // Parar auto-spin se estiver ativo
+            if (isAutoSpinning) {
+                stopAutoSpin();
+            }
+
+            if (adButton) {
+                adButton.style.display = 'block';
+                console.log('[ROLETA-TASK] ✅ Botão "Assistir Anúncio" mostrado');
+            }
+
+            if (lockMessage) {
+                lockMessage.style.display = 'block';
+                console.log('[ROLETA-TASK] ✅ Mensagem "Realize a tarefa" mostrada');
+            }
+
+            if (buttonsContainer) {
+                buttonsContainer.style.display = 'none';
+                console.log('[ROLETA-TASK] 🙅 Container de botões escondido');
+            }
+
+            if (spinButton) {
+                spinButton.classList.add('locked');
+                spinButton.disabled = true;
+                console.log('[ROLETA-TASK] 🙅 Botão "GIRAR" desabilitado');
+            }
+
+            if (autoSpinButton) {
+                autoSpinButton.disabled = true;
+                console.log('[ROLETA-TASK] 🙅 Botão "Auto-Spin" desabilitado');
+            }
+        }
+    }
+
+    // Expor função para o Android
+    window.setTaskCompletionStatus = setTaskCompletionStatus;
+
+    // Expor funções para o Android
+    window.spin = spin;
+    window.updateSpinsCounter = updateSpinsCounter;
+    window.setPrizeValues = setPrizeValues;
+
+    // Inicializar com valores padrão até a API carregar
+    segments = generateSegments([100, 250, 500, 750, 1000, 1500, 2000, 5000]);
+    drawWheel();
+
+    // Verificar se existe cooldown salvo ao carregar a página
+    checkSavedCooldown();
+
+    console.log('[ROLETA] Funções expostas: spin(prizeValue), updateSpinsCounter(), setPrizeValues(array)');
+    console.log('[ROLETA] Valores iniciais (padrão):', segments.map(s => s.value));
+    console.log('[ROLETA] Aguardando valores da API...');
+
+    // Create stars for loading overlay
+    function createLoadingStars() {
+        const leftContainer = document.getElementById('loadingStarsLeft');
+        const rightContainer = document.getElementById('loadingStarsRight');
+        
+        if (!leftContainer || !rightContainer) return;
+
+        // Criar estrelas para o lado esquerdo
+        for (let i = 0; i < 25; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.animationDelay = Math.random() * 3 + 's';
+            leftContainer.appendChild(star);
+        }
+
+        // Criar estrelas para o lado direito
+        for (let i = 0; i < 25; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.left = Math.random() * 100 + '%';
+            star.style.top = Math.random() * 100 + '%';
+            star.style.animationDelay = Math.random() * 3 + 's';
+            rightContainer.appendChild(star);
+        }
+    }
+
+    createLoadingStars();
+
+</script>
+</body>
+</html>

@@ -1,11 +1,15 @@
 package com.youngmoney2;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
@@ -23,8 +27,13 @@ import org.json.JSONObject;
 /**
  * SpinWheelActivity - Roleta profissional com WebView em tela cheia
  */
-public class SpinWheelActivity extends BaseActivity {
+public class SpinWheelActivity extends AppCompatActivity {
     private static final String TAG = "SpinWheelActivity";
+    private static final int MIN_DPI_THRESHOLD = 411;
+    // Fator de escala: quanto menor o DPI original, mais reduzimos para caber na tela
+    private static final float SCALE_FACTOR = 0.65f; // Reduz para 65% do tamanho
+    private int originalDpi = 0;
+    private int targetDpi = 0;
 
     private WebView webView;
     private ApiClient apiClient;
@@ -38,10 +47,45 @@ public class SpinWheelActivity extends BaseActivity {
     // Valores possíveis de pontos na roleta (sincronizados com API e JavaScript)
 
 
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(applyDpiIfNeeded(newBase));
+    }
+
+    /**
+     * Aplica DPI customizado apenas se o DPI do dispositivo for menor que 411
+     * DIMINUI o DPI para que os elementos fiquem menores e caibam na tela
+     */
+    private Context applyDpiIfNeeded(Context context) {
+        try {
+            Resources resources = context.getResources();
+            DisplayMetrics displayMetrics = resources.getDisplayMetrics();
+            originalDpi = displayMetrics.densityDpi;
+
+            if (originalDpi < MIN_DPI_THRESHOLD) {
+                // Calcular DPI reduzido para que elementos fiquem menores
+                targetDpi = (int) (originalDpi * SCALE_FACTOR);
+                Log.d(TAG, "DPI baixo detectado: " + originalDpi + " - Reduzindo para " + targetDpi + " (escala " + SCALE_FACTOR + ")");
+                Configuration configuration = new Configuration(resources.getConfiguration());
+                configuration.densityDpi = targetDpi;
+                return context.createConfigurationContext(configuration);
+            } else {
+                Log.d(TAG, "DPI adequado: " + originalDpi + " - Nenhum ajuste necessário");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao verificar/aplicar DPI: " + e.getMessage());
+        }
+        return context;
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Aplicar DPI adicional no onCreate se necessário
+        applyDpiOnCreate();
+
         setContentView(R.layout.activity_spin_wheel);
 
         // Initialize API Client
@@ -58,6 +102,46 @@ public class SpinWheelActivity extends BaseActivity {
 
         // Verificar se a tarefa foi concluída
         checkTaskCompletionStatus();
+    }
+
+    /**
+     * Aplica DPI customizado no onCreate para garantir consistência
+     * DIMINUI o DPI para que os elementos fiquem menores
+     */
+    private void applyDpiOnCreate() {
+        try {
+            Resources resources = getResources();
+            DisplayMetrics displayMetrics = resources.getDisplayMetrics();
+
+            if (originalDpi == 0) {
+                originalDpi = displayMetrics.densityDpi;
+                targetDpi = (int) (originalDpi * SCALE_FACTOR);
+            }
+
+            if (originalDpi < MIN_DPI_THRESHOLD && targetDpi > 0) {
+                displayMetrics.densityDpi = targetDpi;
+                displayMetrics.density = targetDpi / 160f;
+                displayMetrics.scaledDensity = targetDpi / 160f;
+
+                Configuration configuration = resources.getConfiguration();
+                configuration.densityDpi = targetDpi;
+
+                resources.updateConfiguration(configuration, displayMetrics);
+
+                Log.d(TAG, "DPI reduzido no onCreate: " + originalDpi + " -> " + targetDpi);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao aplicar DPI no onCreate: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Reaplicar DPI se necessário após mudança de configuração
+        if (originalDpi > 0 && originalDpi < MIN_DPI_THRESHOLD) {
+            applyDpiOnCreate();
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -144,7 +228,6 @@ public class SpinWheelActivity extends BaseActivity {
             try {
                 // 1. Buscar requisitos da API (impressões necessárias randomizadas)
                 int requiredImpressions = 5; // valor padrão
-                int requiredClicks = 1; // valor padrão
 
                 try {
                     java.net.URL progressUrl = new java.net.URL(progressApiUrl);
@@ -174,8 +257,7 @@ public class SpinWheelActivity extends BaseActivity {
                             JSONObject progressData = progressJson.optJSONObject("data");
                             if (progressData != null) {
                                 requiredImpressions = progressData.optInt("required_impressions", 5);
-                                requiredClicks = progressData.optInt("required_clicks", 1);
-                                Log.d(TAG, "🎯 Requisitos da API: " + requiredImpressions + " impressões, " + requiredClicks + " cliques");
+                                Log.d(TAG, "🎯 Requisitos da API: " + requiredImpressions + " impressões");
                             }
                         }
                     }
@@ -210,19 +292,16 @@ public class SpinWheelActivity extends BaseActivity {
                     Log.d(TAG, "📋 Resposta JSON Stats: " + jsonResponse.toString());
 
                     int totalImpressions = jsonResponse.optInt("total_impressions", 0);
-                    int totalClicks = jsonResponse.optInt("total_clicks", 0);
 
-                    Log.d(TAG, "📊 Stats do usuário: " + totalImpressions + " impressões, " + totalClicks + " cliques");
-                    Log.d(TAG, "🎯 Requisitos: " + requiredImpressions + " impressões, " + requiredClicks + " cliques");
+                    Log.d(TAG, "📊 Stats do usuário: " + totalImpressions + " impressões");
+                    Log.d(TAG, "🎯 Requisitos: " + requiredImpressions + " impressões");
 
-                    // Verificar se a tarefa foi concluída (impressões >= REQUIRED E cliques >= REQUIRED)
+                    // Verificar se a tarefa foi concluída (APENAS IMPRESSÕES)
                     final int finalRequiredImpressions = requiredImpressions;
-                    final int finalRequiredClicks = requiredClicks;
-                    boolean taskCompleted = totalImpressions >= requiredImpressions && totalClicks >= requiredClicks;
+                    boolean taskCompleted = totalImpressions >= requiredImpressions;
 
                     Log.d(TAG, (taskCompleted ? "✅" : "⏳") + " Tarefa concluída: " + taskCompleted +
-                            " (" + totalImpressions + "/" + requiredImpressions + " impressões, " +
-                            totalClicks + "/" + requiredClicks + " cliques)");
+                            " (" + totalImpressions + "/" + requiredImpressions + " impressões)");
 
                     // Enviar resultado para o HTML
                     runOnUiThread(() -> {
@@ -480,21 +559,45 @@ public class SpinWheelActivity extends BaseActivity {
 
         @JavascriptInterface
         public void openAdWebView() {
-            Log.d(TAG, "openAdWebView() chamado - Abrindo navegador externo com YMID");
+            Log.d(TAG, "openAdWebView() chamado - Abrindo bot do Telegram @young_money2_bot");
             runOnUiThread(() -> {
-                // Obter o YMID do usuário
-                SessionManager sessionManager = SessionManager.getInstance(SpinWheelActivity.this);
-                String ymid = sessionManager.getUserId();
-                
-                // Construir URL com o YMID
-                String baseUrl = "https://5000-ic0tesgwq81zrlum2ysh3-d51dcffc.us2.manus.computer";
-                String url = baseUrl + "?ymid=" + (ymid != null ? ymid : "");
-                
-                Log.d(TAG, "Abrindo URL no navegador: " + url);
-                
-                // Abrir no navegador externo do celular
-                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                startActivity(browserIntent);
+                try {
+                    // Obter userId para passar como parâmetro start ao bot
+                    SessionManager sessionManager = SessionManager.getInstance(SpinWheelActivity.this);
+                    String userId = sessionManager.getUserId();
+                    String startParam = (userId != null && !userId.isEmpty()) ? userId : "";
+
+                    // Tentar abrir diretamente no app do Telegram
+                    String telegramAppUrl = "tg://resolve?domain=young_money2_bot" +
+                            (startParam.isEmpty() ? "" : "&start=" + startParam);
+                    Intent telegramIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(telegramAppUrl));
+                    telegramIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                    // Verificar se o Telegram está instalado
+                    if (telegramIntent.resolveActivity(getPackageManager()) != null) {
+                        Log.d(TAG, "✅ Telegram encontrado - Abrindo bot via app");
+                        startActivity(telegramIntent);
+                    } else {
+                        // Fallback: abrir via URL web do Telegram
+                        Log.d(TAG, "⚠️ Telegram não encontrado - Abrindo via navegador");
+                        String webUrl = "https://t.me/young_money2_bot" +
+                                (startParam.isEmpty() ? "" : "?start=" + startParam);
+                        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl));
+                        browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(browserIntent);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "❌ Erro ao abrir Telegram: " + e.getMessage());
+                    // Fallback final: abrir via navegador
+                    try {
+                        String webUrl = "https://t.me/young_money2_bot";
+                        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl));
+                        browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(browserIntent);
+                    } catch (Exception ex) {
+                        Log.e(TAG, "❌ Erro fatal ao abrir Telegram: " + ex.getMessage());
+                    }
+                }
             });
         }
     }
