@@ -490,6 +490,243 @@
             color: var(--yellow-neon);
         }
 
+        /* === YMID BADGE === */
+        .ymid-badge {
+            position: absolute;
+            top: 50%;
+            left: 1rem;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 2rem;
+            padding: 0.25rem 0.65rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            max-width: 120px;
+        }
+
+        .ymid-badge:hover {
+            background: rgba(139, 92, 246, 0.25);
+            border-color: rgba(139, 92, 246, 0.5);
+        }
+
+        .ymid-badge i {
+            color: var(--cyan-neon);
+            font-size: 0.7rem;
+        }
+
+        .ymid-badge-text {
+            font-family: 'Orbitron', monospace;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 70px;
+        }
+
+        .ymid-badge-edit {
+            color: var(--text-secondary);
+            font-size: 0.55rem;
+            opacity: 0.7;
+        }
+
+        /* === YMID MODAL === */
+        .ymid-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            animation: fadeInModal 0.3s ease;
+        }
+
+        .ymid-modal-overlay.active {
+            display: flex;
+        }
+
+        @keyframes fadeInModal {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .ymid-modal {
+            background: linear-gradient(135deg, #0d1225 0%, #141a30 100%);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            border-radius: 1.25rem;
+            padding: 1.75rem;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+            animation: scaleInModal 0.3s ease;
+        }
+
+        @keyframes scaleInModal {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .ymid-modal-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .ymid-modal-title i {
+            color: var(--cyan-neon);
+        }
+
+        .ymid-modal-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+            line-height: 1.5;
+        }
+
+        .ymid-modal-current {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .ymid-modal-current span {
+            font-family: 'Orbitron', monospace;
+            color: var(--cyan-neon);
+            font-size: 0.85rem;
+        }
+
+        .ymid-input-wrapper {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .ymid-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 0.75rem;
+            padding: 0.85rem 1rem 0.85rem 2.5rem;
+            font-family: 'Orbitron', monospace;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .ymid-input:focus {
+            border-color: var(--cyan-neon);
+            box-shadow: 0 0 15px rgba(0, 221, 255, 0.2);
+        }
+
+        .ymid-input::placeholder {
+            color: rgba(160, 174, 192, 0.4);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+        }
+
+        .ymid-input-icon {
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--purple-neon);
+            font-size: 0.9rem;
+        }
+
+        .ymid-modal-error {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 0.5rem;
+            padding: 0.6rem 0.85rem;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+            color: #ef4444;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .ymid-modal-error.show {
+            display: flex;
+        }
+
+        .ymid-modal-buttons {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .ymid-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 0.75rem;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        .ymid-btn-cancel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .ymid-btn-cancel:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .ymid-btn-confirm {
+            background: linear-gradient(135deg, var(--purple-neon) 0%, #a855f7 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+        }
+
+        .ymid-btn-confirm:hover {
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .ymid-btn-confirm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .ymid-btn-logout {
+            width: 100%;
+            margin-top: 0.75rem;
+            padding: 0.6rem;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            font-size: 0.8rem;
+        }
+
+        .ymid-btn-logout:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
         /* === RESPONSIVE === */
         @media (max-height: 700px) {
             .main-content {
@@ -545,6 +782,11 @@
 </div>
 
 <header class="header">
+    <div class="ymid-badge" onclick="openYmidModal()" title="Clique para alterar seu YMID">
+        <i class="fas fa-user"></i>
+        <span class="ymid-badge-text" id="ymidBadgeText">---</span>
+        <i class="fas fa-pen ymid-badge-edit"></i>
+    </div>
     <span class="header-title">Minhas Tarefas</span>
     <button class="refresh-button" onclick="fetchStats()">
         <i class="fas fa-sync-alt"></i>
@@ -552,6 +794,37 @@
     <span class="header-dot left"></span>
     <span class="header-dot right"></span>
 </header>
+
+<!-- Modal para alterar YMID -->
+<div class="ymid-modal-overlay" id="ymidModalOverlay" onclick="closeYmidModalOutside(event)">
+    <div class="ymid-modal">
+        <div class="ymid-modal-title">
+            <i class="fas fa-id-badge"></i>
+            Alterar YMID
+        </div>
+        <div class="ymid-modal-desc">
+            Digite o YMID correto para vincular suas tarefas e pontos.
+        </div>
+        <div class="ymid-modal-current">
+            YMID atual: <span id="ymidModalCurrent">---</span>
+        </div>
+        <div class="ymid-input-wrapper">
+            <i class="fas fa-key ymid-input-icon"></i>
+            <input type="text" class="ymid-input" id="ymidNewInput" placeholder="Digite o novo YMID" inputmode="numeric" autocomplete="off" />
+        </div>
+        <div class="ymid-modal-error" id="ymidModalError">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="ymidModalErrorText">Erro</span>
+        </div>
+        <div class="ymid-modal-buttons">
+            <button class="ymid-btn ymid-btn-cancel" onclick="closeYmidModal()">Cancelar</button>
+            <button class="ymid-btn ymid-btn-confirm" id="ymidConfirmBtn" onclick="confirmYmidChange()">Confirmar</button>
+        </div>
+        <button class="ymid-btn ymid-btn-logout" onclick="logoutYmid()">
+            <i class="fas fa-sign-out-alt"></i> Sair / Trocar conta
+        </button>
+    </div>
+</div>
 
 <main class="main-content">
     <div class="card">
@@ -1264,8 +1537,137 @@
         }
     }
 
+    // ========================================
+    // FUNÇÕES DE ALTERAÇÃO DO YMID
+    // ========================================
+
+    function updateYmidBadge() {
+        const badgeText = document.getElementById('ymidBadgeText');
+        if (badgeText && TaskState.userId) {
+            badgeText.textContent = TaskState.userId;
+        }
+    }
+
+    function openYmidModal() {
+        const overlay = document.getElementById('ymidModalOverlay');
+        const currentEl = document.getElementById('ymidModalCurrent');
+        const inputEl = document.getElementById('ymidNewInput');
+        const errorEl = document.getElementById('ymidModalError');
+
+        if (currentEl) currentEl.textContent = TaskState.userId || '---';
+        if (inputEl) inputEl.value = '';
+        if (errorEl) errorEl.classList.remove('show');
+
+        overlay.classList.add('active');
+
+        setTimeout(() => { if (inputEl) inputEl.focus(); }, 300);
+    }
+
+    function closeYmidModal() {
+        const overlay = document.getElementById('ymidModalOverlay');
+        overlay.classList.remove('active');
+    }
+
+    function closeYmidModalOutside(event) {
+        if (event.target === event.currentTarget) {
+            closeYmidModal();
+        }
+    }
+
+    function showYmidError(msg) {
+        const errorEl = document.getElementById('ymidModalError');
+        const errorText = document.getElementById('ymidModalErrorText');
+        if (errorText) errorText.textContent = msg;
+        if (errorEl) errorEl.classList.add('show');
+    }
+
+    async function confirmYmidChange() {
+        const inputEl = document.getElementById('ymidNewInput');
+        const confirmBtn = document.getElementById('ymidConfirmBtn');
+        const errorEl = document.getElementById('ymidModalError');
+        const newYmid = inputEl ? inputEl.value.trim() : '';
+
+        if (errorEl) errorEl.classList.remove('show');
+
+        if (!newYmid || newYmid.length === 0) {
+            showYmidError('Por favor, insira um YMID.');
+            return;
+        }
+
+        if (!/^[0-9]+$/.test(newYmid)) {
+            showYmidError('O YMID deve conter apenas números.');
+            return;
+        }
+
+        if (newYmid === TaskState.userId) {
+            showYmidError('Este já é o seu YMID atual.');
+            return;
+        }
+
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Verificando...';
+        }
+
+        try {
+            const profileUrl = `${PROFILE_ENDPOINT}?ymid=${newYmid}`;
+            console.log('[YMID] Verificando novo YMID:', newYmid);
+
+            const response = await fetch(profileUrl);
+            const data = await response.json();
+
+            console.log('[YMID] Resposta:', data);
+
+            const oldYmid = TaskState.userId;
+            TaskState.userId = newYmid;
+            TaskState.impressions = 0;
+            TaskState.lastImpressions = 0;
+
+            // Atualizar localStorage
+            localStorage.setItem('youngmoney_ymid', newYmid);
+
+            // Atualizar URL sem recarregar
+            const url = new URL(window.location.href);
+            url.searchParams.set('ymid', newYmid);
+            window.history.replaceState({}, '', url);
+            window.TELEGRAM_USER_ID = newYmid;
+
+            console.log('[YMID] ✅ YMID alterado de', oldYmid, 'para', newYmid);
+
+            updateYmidBadge();
+            closeYmidModal();
+
+            // Recarregar dados
+            fetchRequiredImpressions();
+            fetchStats();
+            checkAdSchedule();
+            updateUI();
+
+            showStatus('<i class="fas fa-check-circle"></i> YMID alterado com sucesso para ' + newYmid, 'success');
+            setTimeout(() => hideStatus(), 3000);
+
+        } catch (err) {
+            console.error('[YMID] Erro:', err);
+            showYmidError('Erro ao verificar. Tente novamente.');
+        } finally {
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Confirmar';
+            }
+        }
+    }
+
+    function logoutYmid() {
+        localStorage.removeItem('youngmoney_ymid');
+        TaskState.userId = null;
+        TaskState.impressions = 0;
+        closeYmidModal();
+        window.location.href = '/login.html';
+    }
+
     window.addEventListener('DOMContentLoaded', function() {
         init();
+        setTimeout(updateYmidBadge, 200);
     });
 </script>
 </body>
