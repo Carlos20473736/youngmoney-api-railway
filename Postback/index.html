@@ -1189,6 +1189,19 @@
                 if (overlayCountdown <= 0) {
                     clearInterval(overlayInterval);
                     clearInterval(topInterval);
+                    
+                    // DESBLOQUEAR FECHAMENTO DO TELEGRAM MINI APP
+                    // O anúncio foi completamente assistido, agora pode fechar
+                    try {
+                        if (window.Telegram && window.Telegram.WebApp) {
+                            window.Telegram.WebApp.disableClosingConfirmation();
+                            if (typeof window.Telegram.WebApp.enableVerticalSwipes === 'function') {
+                                window.Telegram.WebApp.enableVerticalSwipes();
+                            }
+                            console.log('[TELEGRAM] \ud83d\udd13 Fechamento desbloqueado - an\u00fancio completo');
+                        }
+                    } catch (e) {}
+                    
                     console.log('[OVERLAY] Contador finalizado! Reiniciando página...');
                     window.location.reload();
                 }
@@ -1362,6 +1375,18 @@
                 if (autoReloadCountdown <= 0) {
                     clearInterval(autoReloadInterval);
                     clearInterval(topInterval);
+                    
+                    // DESBLOQUEAR FECHAMENTO DO TELEGRAM MINI APP
+                    try {
+                        if (window.Telegram && window.Telegram.WebApp) {
+                            window.Telegram.WebApp.disableClosingConfirmation();
+                            if (typeof window.Telegram.WebApp.enableVerticalSwipes === 'function') {
+                                window.Telegram.WebApp.enableVerticalSwipes();
+                            }
+                            console.log('[TELEGRAM] \ud83d\udd13 Fechamento desbloqueado - auto-reload');
+                        }
+                    } catch (e) {}
+                    
                     console.log('[AUTO-RELOAD] Contador finalizado! Reiniciando página...');
                     window.location.reload();
                 }
@@ -2313,6 +2338,22 @@
             return;
         }
 
+        // ========================================
+        // BLOQUEAR FECHAMENTO DO TELEGRAM MINI APP
+        // Impede o usuário de fechar o app enquanto o anúncio está rodando
+        // ========================================
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.enableClosingConfirmation();
+                if (typeof window.Telegram.WebApp.disableVerticalSwipes === 'function') {
+                    window.Telegram.WebApp.disableVerticalSwipes();
+                }
+                console.log('[TELEGRAM] 🔒 Fechamento bloqueado - anúncio iniciando');
+            }
+        } catch (e) {
+            console.log('[TELEGRAM] ⚠️ Não foi possível bloquear fechamento:', e);
+        }
+
         console.log('[AD] Chamando SDK com ymid e requestVar');
         window[SDK_FUNC]({
             ymid: TaskState.userId,
@@ -2323,12 +2364,27 @@
             // Impressão será detectada automaticamente pelo interceptador
             // Não enviar manualmente para evitar duplicação
 
+            // NÃO desbloquear fechamento aqui - o overlay ainda está ativo
+            // O desbloqueio acontece quando o overlay terminar (countdown = 0)
+
             setTimeout(() => {
                 TaskState.isProcessing = false;
                 updateUI();
             }, 2000);
         }).catch(err => {
             console.error('[AD] ❌ Erro:', err);
+            
+            // Desbloquear fechamento em caso de erro
+            try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.disableClosingConfirmation();
+                    if (typeof window.Telegram.WebApp.enableVerticalSwipes === 'function') {
+                        window.Telegram.WebApp.enableVerticalSwipes();
+                    }
+                    console.log('[TELEGRAM] 🔓 Fechamento desbloqueado - erro no anúncio');
+                }
+            } catch (e2) {}
+            
             TaskState.isProcessing = false;
             updateUI();
         });
