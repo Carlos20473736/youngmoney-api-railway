@@ -8,10 +8,27 @@
     <!-- Telegram Web App SDK - OFICIAL -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- VERIFICAÇÃO DO USER_ID NA URL -->
+    <!-- CONFIGURAÇÃO TELEGRAM WEBAPP -->
     <script>
     (function() {
         'use strict';
+
+        // Inicializar Telegram WebApp
+        if (window.Telegram && window.Telegram.WebApp) {
+            const webapp = window.Telegram.WebApp;
+            
+            // Expandir para ocupar a tela inteira
+            webapp.expand();
+            
+            // Configurar cores para mesclar com o site (esconder barra superior)
+            // Usamos a cor de fundo do site para o header e background do app
+            const bgColor = "#0a0e1a"; // --bg-primary
+            webapp.setHeaderColor(bgColor);
+            webapp.setBackgroundColor(bgColor);
+            
+            // Avisar que o app está pronto
+            webapp.ready();
+        }
 
         // Função para obter parâmetro da URL
         function getUrlParam(param) {
