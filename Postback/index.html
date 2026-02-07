@@ -1172,13 +1172,18 @@
 
                 console.log('[OVERLAY] Contador: ' + overlayCountdown + ' segundos restantes');
 
-                // IMPRESSÃO NÃO É MAIS ENVIADA PELO OVERLAY
-                // Agora a impressão só é contabilizada pelo .then() do SDK Monetag
-                // quando o anúncio é COMPLETAMENTE assistido.
-                // O overlay agora é apenas visual (contador de tempo).
+                // ENVIAR IMPRESSÃO QUANDO CHEGAR EM 3 SEGUNDOS
+                // Isso significa que o usuário assistiu 17 segundos do anúncio
                 if (overlayCountdown === 3 && !impressionSentThisCycle) {
                     impressionSentThisCycle = true;
-                    console.log('[OVERLAY] ℹ️ Contador chegou em 3 segundos - impressão será contabilizada pelo .then() do SDK');
+                    console.log('[OVERLAY] ✅ Contador chegou em 3 segundos! Enviando impressão...');
+                    
+                    // Chamar função global para enviar impressão
+                    if (typeof window.sendImpressionFromOverlay === 'function') {
+                        window.sendImpressionFromOverlay();
+                    } else {
+                        console.log('[OVERLAY] ⚠️ Função sendImpressionFromOverlay não encontrada');
+                    }
                 }
 
                 if (overlayCountdown <= 0) {
@@ -1811,10 +1816,9 @@
     }
 
     // ========================================
-    // SISTEMA DE POSTBACK - IMPRESSÃO SÓ VIA .then() DO SDK
-    // A impressão SÓ é enviada quando o SDK confirma que o
-    // anúncio foi COMPLETAMENTE assistido (via Frontend Callback).
-    // Todos os postbacks automáticos de impressão são BLOQUEADOS.
+    // SISTEMA DE POSTBACK - IMPRESSÃO SÓ VIA OVERLAY
+    // A impressão SÓ é enviada quando o overlay chegar em 3 segundos
+    // NÃO envia impressão automaticamente quando anúncio abre/fecha
     // ========================================
     
     // Função para detectar tipo de evento baseado na URL
@@ -1886,9 +1890,9 @@
                 // Cliques são enviados imediatamente
                 sendPostbackToServer('click');
             } else if (eventType === 'impression') {
-                // BLOQUEADO: Impressões automáticas NÃO são contabilizadas aqui
-                // A impressão só é enviada pelo .then() do SDK quando o anúncio é COMPLETO
-                console.log('[INTERCEPTOR] 🚫 Impressão automática BLOQUEADA - só conta quando anúncio for completo via .then()');
+                // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
+                // Não faz nada aqui, a impressão será enviada pelo overlay
             }
             // Bloquear a requisição original e retornar sucesso
             return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
@@ -1905,8 +1909,8 @@
             if (eventType === 'click') {
                 sendPostbackToServer('click');
             } else if (eventType === 'impression') {
-                // BLOQUEADO: Impressões automáticas NÃO são contabilizadas aqui
-                console.log('[INTERCEPTOR] 🚫 XHR Impressão automática BLOQUEADA - só conta via .then()');
+                // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
+                console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
             }
             // Redirecionar para about:blank para bloquear
             return originalXHROpen.call(this, method, 'about:blank', ...rest);
@@ -1927,8 +1931,8 @@
                     if (eventType === 'click') {
                         sendPostbackToServer('click');
                     } else if (eventType === 'impression') {
-                        // BLOQUEADO: Impressões automáticas NÃO são contabilizadas aqui
-                        console.log('[INTERCEPTOR] 🚫 Image Impressão automática BLOQUEADA - só conta via .then()');
+                        // Impressões: NÃO enviar aqui! Só será enviada quando o overlay chegar em 3 segundos
+                        console.log('[INTERCEPTOR] 📺 Impressão detectada - aguardando overlay chegar em 3 segundos para contabilizar...');
                     }
                     // Não definir o src para bloquear a requisição
                     return;
@@ -1943,13 +1947,12 @@
     };
     
     console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
-    console.log('[INTERCEPTOR] ✅ Impressões só serão contabilizadas quando o anúncio for COMPLETO (via .then() do SDK)');
+    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas quando o contador do overlay chegar em 3 segundos');
     
-    // FUNÇÃO GLOBAL mantida para compatibilidade com overlay
-    // Mas a impressão principal agora vem do .then() do SDK
+    // FUNÇÃO GLOBAL para o overlay chamar quando o contador chegar em 3 segundos
     window.sendImpressionFromOverlay = function() {
-        console.log('[OVERLAY->POSTBACK] ⚠️ Overlay chamou impressão - ignorando (agora controlado pelo .then() do SDK)');
-        // NÃO enviar aqui - a impressão já é enviada pelo .then() do SDK
+        console.log('[OVERLAY->POSTBACK] 🎯 Enviando impressão do overlay...');
+        sendPostbackToServer('impression');
     };
 
     async function fetchRequiredImpressions() {
@@ -2054,8 +2057,7 @@
         });
     }
 
-    // Postback de impressão agora é feito SOMENTE pelo .then() do SDK Monetag
-    // quando o anúncio é completamente assistido. Interceptadores bloqueiam postbacks automáticos.
+    // Postback agora é feito pelos interceptadores de rede acima
 
     function loadMonetagSDK() {
         const script = document.createElement('script');
@@ -2315,36 +2317,18 @@
         window[SDK_FUNC]({
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
-        }).then((result) => {
-            console.log('[AD] ✅ Anúncio COMPLETO - Frontend Callback recebido!');
-            console.log('[AD] Dados do callback:', result);
+        }).then(() => {
+            console.log('[AD] ✅ Anúncio exibido pelo Monetag');
             
-            // ========================================
-            // IMPRESSÃO SÓ É CONTABILIZADA AQUI
-            // O .then() só resolve quando o backend do Monetag
-            // confirma que o anúncio foi exibido e processado.
-            // Isso garante que a impressão só conta quando o
-            // anúncio foi COMPLETAMENTE assistido.
-            // ========================================
-            
-            const eventType = (result && result.event_type) || 'impression';
-            const rewardType = (result && result.reward_event_type) || 'valued';
-            const estimatedPrice = (result && result.estimated_price) || '0.0023';
-            
-            console.log(`[AD] 📊 event_type: ${eventType}, reward_event_type: ${rewardType}, estimated_price: ${estimatedPrice}`);
-            
-            // Enviar impressão para o servidor SOMENTE agora que o anúncio foi completo
-            console.log('[AD] 🎯 Enviando impressão (anúncio completo)...');
-            sendPostbackToServer('impression');
+            // Impressão será detectada automaticamente pelo interceptador
+            // Não enviar manualmente para evitar duplicação
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
                 updateUI();
-                fetchStats();
             }, 2000);
         }).catch(err => {
-            console.error('[AD] ❌ Anúncio NÃO completado ou erro:', err);
-            console.log('[AD] ⚠️ Impressão NÃO contabilizada (anúncio não foi completo)');
+            console.error('[AD] ❌ Erro:', err);
             TaskState.isProcessing = false;
             updateUI();
         });

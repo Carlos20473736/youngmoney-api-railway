@@ -1194,143 +1194,11 @@
     }
 
     // ========================================
-    // SISTEMA DE POSTBACK - IMPRESSÃO SÓ VIA .then() DO SDK
-    // A impressão SÓ é enviada quando o SDK confirma que o
-    // anúncio foi COMPLETAMENTE assistido (via Frontend Callback).
-    // Todos os postbacks automáticos de impressão são BLOQUEADOS.
+    // POSTBACK DO MONETAG
+    // O Monetag envia os postbacks diretamente para o servidor configurado
+    // na plataforma deles. Não precisamos interceptar nada aqui.
     // ========================================
-    
-    // Função para detectar tipo de evento baseado na URL
-    function detectEventType(url) {
-        if (url.includes('event_type=click') || url.includes('event_type%3Dclick')) {
-            return 'click';
-        }
-        if (url.includes('event_type=impression') || url.includes('event_type%3Dimpression')) {
-            return 'impression';
-        }
-        return null;
-    }
-    
-    // Função para verificar se é um postback do Monetag (contém {ymid} não substituído)
-    function isMonetagPostback(url) {
-        return (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server')) && 
-               (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
-    }
-    
-    // Cooldown para evitar duplicatas
-    let lastImpressionSent = 0;
-    let lastClickSent = 0;
-    
-    async function sendPostbackToServer(type) {
-        if (!TaskState.userId) return;
-        
-        // Evitar duplicatas (cooldown de 3 segundos)
-        const now = Date.now();
-        if (type === 'impression' && now - lastImpressionSent < 3000) {
-            console.log('[POSTBACK] Impressão ignorada (cooldown)');
-            return;
-        }
-        if (type === 'click' && now - lastClickSent < 3000) {
-            console.log('[POSTBACK] Clique ignorado (cooldown)');
-            return;
-        }
-        
-        if (type === 'impression') lastImpressionSent = now;
-        if (type === 'click') lastClickSent = now;
-        
-        console.log(`[POSTBACK] 🎯 ${type.toUpperCase()} ENVIANDO!`);
-        
-        // Enviar para o servidor de postback principal
-        const params = new URLSearchParams({
-            event_type: type,
-            zone_id: ZONE_ID,
-            ymid: TaskState.userId,
-            user_email: TaskState.userEmail || 'unknown',
-            estimated_price: type === 'click' ? '0.0045' : '0.0023'
-        });
-        
-        const url = `${POSTBACK_URL}?${params.toString()}`;
-        console.log(`[POSTBACK] 📤 Enviando ${type} para:`, url);
-        
-        try {
-            const response = await fetch(url, { method: 'GET', mode: 'cors' });
-            const data = await response.json();
-            console.log(`[POSTBACK] ✅ ${type} registrado:`, data);
-            setTimeout(() => fetchStats(), 500);
-        } catch (err) {
-            console.error(`[POSTBACK] ❌ Erro ao enviar ${type}:`, err);
-        }
-    }
-    
-    // Interceptar fetch - detectar e bloquear postbacks automáticos do Monetag
-    const originalFetch = window.fetch;
-    window.fetch = function(...args) {
-        const url = args[0]?.url || args[0] || '';
-        if (typeof url === 'string' && isMonetagPostback(url)) {
-            console.log('[INTERCEPTOR] 🚫 Postback do Monetag interceptado:', url);
-            const eventType = detectEventType(url);
-            if (eventType === 'click') {
-                // Cliques são enviados imediatamente
-                sendPostbackToServer('click');
-            } else if (eventType === 'impression') {
-                // BLOQUEADO: Impressões automáticas NÃO são contabilizadas aqui
-                // A impressão só é enviada pelo .then() do SDK quando o anúncio é COMPLETO
-                console.log('[INTERCEPTOR] 🚫 Impressão automática BLOQUEADA - só conta quando anúncio for completo via .then()');
-            }
-            // Bloquear a requisição original e retornar sucesso
-            return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
-        }
-        return originalFetch.apply(this, args);
-    };
-    
-    // Interceptar XMLHttpRequest - detectar e bloquear postbacks automáticos do Monetag
-    const originalXHROpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-        if (typeof url === 'string' && isMonetagPostback(url)) {
-            console.log('[INTERCEPTOR] 🚫 XHR Postback do Monetag interceptado:', url);
-            const eventType = detectEventType(url);
-            if (eventType === 'click') {
-                sendPostbackToServer('click');
-            } else if (eventType === 'impression') {
-                // BLOQUEADO: Impressões automáticas NÃO são contabilizadas aqui
-                console.log('[INTERCEPTOR] 🚫 XHR Impressão automática BLOQUEADA - só conta via .then()');
-            }
-            // Redirecionar para about:blank para bloquear
-            return originalXHROpen.call(this, method, 'about:blank', ...rest);
-        }
-        return originalXHROpen.call(this, method, url, ...rest);
-    };
-    
-    // Interceptar Image (pixel tracking) - detectar e bloquear postbacks automáticos do Monetag
-    const originalImage = window.Image;
-    window.Image = function() {
-        const img = new originalImage();
-        const originalSrcSetter = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
-        Object.defineProperty(img, 'src', {
-            set: function(value) {
-                if (typeof value === 'string' && isMonetagPostback(value)) {
-                    console.log('[INTERCEPTOR] 🚫 Image Postback do Monetag interceptado:', value);
-                    const eventType = detectEventType(value);
-                    if (eventType === 'click') {
-                        sendPostbackToServer('click');
-                    } else if (eventType === 'impression') {
-                        // BLOQUEADO: Impressões automáticas NÃO são contabilizadas aqui
-                        console.log('[INTERCEPTOR] 🚫 Image Impressão automática BLOQUEADA - só conta via .then()');
-                    }
-                    // Não definir o src para bloquear a requisição
-                    return;
-                }
-                originalSrcSetter.call(this, value);
-            },
-            get: function() {
-                return this.getAttribute('src');
-            }
-        });
-        return img;
-    };
-    
-    console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
-    console.log('[INTERCEPTOR] ✅ Impressões só serão contabilizadas quando o anúncio for COMPLETO (via .then() do SDK)');
+    console.log('[POSTBACK] Usando postback oficial do Monetag (configurado na plataforma)');
 
     function loadMonetagSDK() {
         const script = document.createElement('script');
@@ -1526,8 +1394,8 @@
         }
     }
 
-    // Postback de impressão agora é feito SOMENTE pelo .then() do SDK Monetag
-    // quando o anúncio é completamente assistido. Interceptadores bloqueiam postbacks automáticos.
+    // Função sendPostbackToNewServer removida.
+    // O Monetag envia os postbacks diretamente para o servidor configurado na plataforma.
 
     function showStatus(message, type) {
         const statusEl = document.getElementById('statusMessage');
@@ -1570,27 +1438,10 @@
         window[SDK_FUNC]({
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
-        }).then((result) => {
-            console.log('[AD] ✅ Anúncio COMPLETO - Frontend Callback recebido!');
-            console.log('[AD] Dados do callback:', result);
-            
-            // ========================================
-            // IMPRESSÃO SÓ É CONTABILIZADA AQUI
-            // O .then() só resolve quando o backend do Monetag
-            // confirma que o anúncio foi exibido e processado.
-            // Isso garante que a impressão só conta quando o
-            // anúncio foi COMPLETAMENTE assistido.
-            // ========================================
-            
-            const eventType = (result && result.event_type) || 'impression';
-            const rewardType = (result && result.reward_event_type) || 'valued';
-            const estimatedPrice = (result && result.estimated_price) || '0.0023';
-            
-            console.log(`[AD] 📊 event_type: ${eventType}, reward_event_type: ${rewardType}, estimated_price: ${estimatedPrice}`);
-            
-            // Enviar impressão para o servidor SOMENTE agora que o anúncio foi completo
-            console.log('[AD] 🎯 Enviando impressão (anúncio completo)...');
-            sendPostbackToServer('impression');
+        }).then(() => {
+            console.log('[AD] ✅ Anúncio exibido pelo Monetag');
+            // O postback é enviado automaticamente pelo Monetag para o servidor
+            // configurado na plataforma. Não precisamos fazer nada manualmente.
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
@@ -1598,8 +1449,7 @@
                 fetchStats();
             }, 2000);
         }).catch(err => {
-            console.error('[AD] ❌ Anúncio NÃO completado ou erro:', err);
-            console.log('[AD] ⚠️ Impressão NÃO contabilizada (anúncio não foi completo)');
+            console.error('[AD] ❌ Erro:', err);
             TaskState.isProcessing = false;
             updateUI();
         });
