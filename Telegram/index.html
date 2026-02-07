@@ -830,39 +830,44 @@
         `;
     }
     
-    // Função para enviar postback de IMPRESSÃO para o servidor
-    async function sendPostbackToServer(type) {
-        if (type !== 'impression') return; // Apenas impressões
-        
+    // Função para enviar impressão ao servidor (postback.php) - chamada APENAS no evento 'end'
+    async function sendImpressionToServer() {
+        if (!TaskState.userId) {
+            console.warn('[POSTBACK] ⚠️ User ID não disponível para postback');
+            return;
+        }
+
         // Evitar duplicatas (cooldown de 3 segundos)
         const now = Date.now();
         if (now - TaskState.lastImpressionSent < 3000) {
-            console.log('[INTERCEPTOR] Impressão ignorada (cooldown)');
+            console.log('[POSTBACK] Impressão ignorada (cooldown)');
             return;
         }
-        
         TaskState.lastImpressionSent = now;
-        
-        console.log(`[INTERCEPTOR] 🎯 IMPRESSÃO ENVIANDO!`);
-        
-        // Enviar para o servidor de postback principal
-        const params = new URLSearchParams({
-            event_type: 'impression',
-            zone_id: ZONE_ID,
-            ymid: TaskState.userId,
-            user_email: TaskState.userEmail || 'unknown',
-            estimated_price: '0.0023'
-        });
-        
-        const url = `${POSTBACK_URL}?${params.toString()}`;
-        
+
+        console.log('[POSTBACK] 📤 Enviando impressão após anúncio finalizado...');
+
+        const url = `https://youngmoney-api-railway-production.up.railway.app/monetag/postback.php?type=impression&user_id=${TaskState.userId}`;
+        console.log('[POSTBACK] URL:', url);
+
         try {
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
             const data = await response.json();
-            console.log(`[INTERCEPTOR] ✅ Impressão registrada:`, data);
+
+            if (data.success) {
+                console.log('[POSTBACK] ✅ Impressão registrada com sucesso!');
+                if (data.data && data.data.progress) {
+                    console.log(`[POSTBACK] 📊 Progresso: ${data.data.progress.impressions}/${data.data.progress.required_impressions}`);
+                    if (data.data.progress.all_completed) {
+                        console.log('[POSTBACK] 🎉 Tarefa COMPLETA!');
+                    }
+                }
+            } else {
+                console.error('[POSTBACK] ❌ Erro:', data.error);
+            }
             setTimeout(() => fetchStats(), 500);
         } catch (err) {
-            console.error(`[INTERCEPTOR] ❌ Erro ao enviar impressão:`, err);
+            console.error('[POSTBACK] ❌ Erro ao enviar impressão:', err);
         }
     }
     
@@ -1009,20 +1014,14 @@
             // Aguardar o SDK carregar e tentar preload
             script.onload = function() {
                 console.log('[SDK] ✅ Script do Monetag carregado com sucesso');
-                // Verificar se a função foi criada
+                // Tentar preload do anúncio (sem enviar impressão)
                 setTimeout(function() {
                     if (typeof window[SDK_FUNC] === 'function') {
                         console.log('[SDK] ✅ Função ' + SDK_FUNC + ' disponível!');
-                        // Preload do anúncio para reduzir delay
-                        try {
-                            window[SDK_FUNC]({ type: 'preload', ymid: TaskState.userId }).then(function() {
-                                console.log('[SDK] ✅ Anúncio pré-carregado com sucesso');
-                            }).catch(function(e) {
-                                console.warn('[SDK] ⚠️ Preload falhou (normal se não há anúncio disponível):', e);
-                            });
-                        } catch(e) {
-                            console.warn('[SDK] ⚠️ Erro no preload:', e);
-                        }
+                        console.log('[SDK] 🔄 Pré-carregando anúncio...');
+                        window[SDK_FUNC]({ type: 'preload', ymid: TaskState.userId || '', timeout: 10 })
+                            .then(function() { console.log('[SDK] ✅ Anúncio pré-carregado com sucesso'); })
+                            .catch(function(e) { console.warn('[SDK] ⚠️ Preload falhou:', e); });
                     } else {
                         console.warn('[SDK] ⚠️ Função ' + SDK_FUNC + ' ainda não disponível após load');
                     }
@@ -1181,16 +1180,21 @@
             return;
         }
 
-        console.log('[AD] Abrindo anúncio com SDK...');
+        console.log('[AD] Abrindo anúncio com SDK (type: end)...');
 
-        // Abrir o anúncio diretamente
-        // A validação é no server: só conta impressão se houve ganho (estimated_price > 0)
+        // Usar type: 'end' - a Promise resolve APÓS o usuário FECHAR o anúncio
         window[SDK_FUNC]({
+            type: 'end',
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
-        }).then(() => {
-            console.log('[AD] ✅ Anúncio finalizado pelo Monetag');
-            // Atualizar progresso após delay para dar tempo do postback ser processado
+        }).then((result) => {
+            console.log('[AD] ✅ Anúncio finalizado pelo usuário!');
+            console.log('[AD] Resultado:', JSON.stringify(result));
+
+            // ENVIAR IMPRESSÃO AGORA - após o usuário terminar de assistir
+            sendImpressionToServer();
+
+            // Atualizar progresso após delay
             setTimeout(() => {
                 fetchStats();
                 TaskState.isProcessing = false;

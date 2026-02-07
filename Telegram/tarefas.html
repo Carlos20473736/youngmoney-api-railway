@@ -1021,6 +1021,24 @@
         script.setAttribute('data-zone', ZONE_ID);
         script.setAttribute('data-sdk', SDK_FUNC);
         script.async = true;
+        script.onload = function() {
+            console.log('[SDK] ✅ Script do Monetag carregado com sucesso');
+            // Tentar preload do anúncio (sem enviar impressão)
+            setTimeout(function() {
+                if (typeof window[SDK_FUNC] === 'function') {
+                    console.log('[SDK] ✅ Função ' + SDK_FUNC + ' disponível!');
+                    console.log('[SDK] 🔄 Pré-carregando anúncio...');
+                    window[SDK_FUNC]({ type: 'preload', ymid: TaskState.userId || '', timeout: 10 })
+                        .then(function() { console.log('[SDK] ✅ Anúncio pré-carregado com sucesso'); })
+                        .catch(function(e) { console.warn('[SDK] ⚠️ Preload falhou:', e); });
+                } else {
+                    console.warn('[SDK] ⚠️ Função ' + SDK_FUNC + ' ainda não disponível');
+                }
+            }, 1000);
+        };
+        script.onerror = function(e) {
+            console.error('[SDK] ❌ Erro ao carregar script do Monetag:', e);
+        };
         document.head.appendChild(script);
         console.log('[SDK] Carregando Monetag...');
     }
@@ -1190,8 +1208,38 @@
         }
     }
 
-    // Função sendPostbackToNewServer removida.
-    // O Monetag envia os postbacks diretamente para o servidor configurado na plataforma.
+    // Função para enviar impressão ao servidor (postback.php) - chamada APENAS no evento 'end'
+    async function sendImpressionToServer() {
+        if (!TaskState.userId) {
+            console.warn('[POSTBACK] ⚠️ User ID não disponível para postback');
+            return;
+        }
+
+        console.log('[POSTBACK] 📤 Enviando impressão após anúncio finalizado...');
+
+        const url = `${POSTBACK_SERVER}/monetag/postback.php?type=impression&user_id=${TaskState.userId}`;
+        console.log('[POSTBACK] URL:', url);
+
+        try {
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+
+            if (data.success) {
+                console.log('[POSTBACK] ✅ Impressão registrada com sucesso!');
+                if (data.data && data.data.progress) {
+                    console.log(`[POSTBACK] 📊 Progresso: ${data.data.progress.impressions}/${data.data.progress.required_impressions}`);
+                    if (data.data.progress.all_completed) {
+                        console.log('[POSTBACK] 🎉 Tarefa COMPLETA!');
+                    }
+                }
+            } else {
+                console.error('[POSTBACK] ❌ Erro:', data.error);
+            }
+            setTimeout(() => fetchStats(), 500);
+        } catch (err) {
+            console.error('[POSTBACK] ❌ Erro ao enviar impressão:', err);
+        }
+    }
 
     function showStatus(message, type) {
         const statusEl = document.getElementById('statusMessage');
@@ -1227,14 +1275,18 @@
             return;
         }
 
-        console.log('[AD] Chamando SDK com ymid e requestVar');
+        console.log('[AD] Chamando SDK com type: end, ymid e requestVar');
+        // Usar type: 'end' - a Promise resolve APÓS o usuário FECHAR o anúncio
         window[SDK_FUNC]({
+            type: 'end',
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
-        }).then(() => {
-            console.log('[AD] ✅ Anúncio exibido pelo Monetag');
-            // O postback é enviado automaticamente pelo Monetag para o servidor
-            // configurado na plataforma. Não precisamos fazer nada manualmente.
+        }).then((result) => {
+            console.log('[AD] ✅ Anúncio finalizado pelo usuário!');
+            console.log('[AD] Resultado:', JSON.stringify(result));
+
+            // ENVIAR IMPRESSÃO AGORA - após o usuário terminar de assistir
+            sendImpressionToServer();
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
