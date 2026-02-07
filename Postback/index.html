@@ -1172,18 +1172,13 @@
 
                 console.log('[OVERLAY] Contador: ' + overlayCountdown + ' segundos restantes');
 
-                // ENVIAR IMPRESSÃO QUANDO CHEGAR EM 3 SEGUNDOS
-                // Isso significa que o usuário assistiu 17 segundos do anúncio
+                // OVERLAY AGORA É APENAS VISUAL
+                // A impressão é contabilizada pelo .then() do SDK Monetag
+                // baseado no estimated_price e reward_event_type
+                // O overlay só serve para manter o usuário na página
                 if (overlayCountdown === 3 && !impressionSentThisCycle) {
                     impressionSentThisCycle = true;
-                    console.log('[OVERLAY] ✅ Contador chegou em 3 segundos! Enviando impressão...');
-                    
-                    // Chamar função global para enviar impressão
-                    if (typeof window.sendImpressionFromOverlay === 'function') {
-                        window.sendImpressionFromOverlay();
-                    } else {
-                        console.log('[OVERLAY] ⚠️ Função sendImpressionFromOverlay não encontrada');
-                    }
+                    console.log('[OVERLAY] Contador chegou em 3 segundos (apenas visual)');
                 }
 
                 if (overlayCountdown <= 0) {
@@ -1816,9 +1811,11 @@
     }
 
     // ========================================
-    // SISTEMA DE POSTBACK - IMPRESSÃO SÓ VIA OVERLAY
-    // A impressão SÓ é enviada quando o overlay chegar em 3 segundos
-    // NÃO envia impressão automaticamente quando anúncio abre/fecha
+    // SISTEMA DE POSTBACK - IMPRESSÃO SÓ COM GANHO REAL
+    // A impressão SÓ é enviada quando o .then() do SDK Monetag retorna:
+    //   - reward_event_type === "valued"
+    //   - estimated_price > 0
+    // Se o usuário fechar o anúncio antes de completar, NÃO contabiliza
     // ========================================
     
     // Função para detectar tipo de evento baseado na URL
@@ -1838,7 +1835,7 @@
                (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
     }
     
-    async function sendPostbackToServer(type) {
+    async function sendPostbackToServer(type, realEstimatedPrice) {
         if (!TaskState.userId) return;
         
         // Evitar duplicatas (cooldown de 3 segundos)
@@ -1855,7 +1852,9 @@
         if (type === 'impression') TaskState.lastImpressionSent = now;
         if (type === 'click') TaskState.lastClickSent = now;
         
-        console.log(`[INTERCEPTOR] 🎯 ${type.toUpperCase()} ENVIANDO!`);
+        // Usar o estimated_price REAL do Monetag quando disponível
+        const price = realEstimatedPrice || (type === 'click' ? '0.0045' : '0.0023');
+        console.log(`[POSTBACK] 🎯 ${type.toUpperCase()} ENVIANDO! (estimated_price: ${price})`);
         
         // Enviar para o servidor de postback principal
         const params = new URLSearchParams({
@@ -1863,7 +1862,7 @@
             zone_id: ZONE_ID,
             ymid: TaskState.userId,
             user_email: TaskState.userEmail || 'unknown',
-            estimated_price: type === 'click' ? '0.0045' : '0.0023'
+            estimated_price: String(price)
         });
         
         const url = `${POSTBACK_URL}?${params.toString()}`;
@@ -1947,13 +1946,7 @@
     };
     
     console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
-    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas quando o contador do overlay chegar em 3 segundos');
-    
-    // FUNÇÃO GLOBAL para o overlay chamar quando o contador chegar em 3 segundos
-    window.sendImpressionFromOverlay = function() {
-        console.log('[OVERLAY->POSTBACK] 🎯 Enviando impressão do overlay...');
-        sendPostbackToServer('impression');
-    };
+    console.log('[INTERCEPTOR] 📺 Impressões só serão contabilizadas via .then() do SDK quando estimated_price > 0');
 
     async function fetchRequiredImpressions() {
         try {
@@ -2317,18 +2310,33 @@
         window[SDK_FUNC]({
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
-        }).then(() => {
-            console.log('[AD] ✅ Anúncio exibido pelo Monetag');
+        }).then((event) => {
+            console.log('[AD] ✅ Callback do Monetag recebido:', JSON.stringify(event));
             
-            // Impressão será detectada automaticamente pelo interceptador
-            // Não enviar manualmente para evitar duplicação
+            // VERIFICAR SE HOUVE GANHO REAL
+            // Se o usuário fechou o anúncio antes de completar,
+            // reward_event_type será "not_valued" e estimated_price será 0
+            const estimatedPrice = parseFloat(event?.estimated_price || 0);
+            const rewardType = event?.reward_event_type || 'unknown';
+            
+            console.log('[AD] reward_event_type:', rewardType);
+            console.log('[AD] estimated_price:', estimatedPrice);
+            
+            if (rewardType === 'valued' && estimatedPrice > 0) {
+                console.log('[AD] ✅ ANÚNCIO COMPLETO COM GANHO! Enviando impressão...');
+                // Enviar impressão com o estimated_price REAL do Monetag
+                sendPostbackToServer('impression', estimatedPrice);
+            } else {
+                console.log('[AD] ⚠️ Anúncio sem ganho (not_valued ou price=0). Impressão NÃO contabilizada.');
+            }
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
                 updateUI();
             }, 2000);
         }).catch(err => {
-            console.error('[AD] ❌ Erro:', err);
+            console.error('[AD] ❌ Erro ou anúncio não completado:', err);
+            console.log('[AD] ⚠️ Impressão NÃO contabilizada (anúncio não completou)');
             TaskState.isProcessing = false;
             updateUI();
         });

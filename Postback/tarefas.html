@@ -1194,11 +1194,126 @@
     }
 
     // ========================================
-    // POSTBACK DO MONETAG
-    // O Monetag envia os postbacks diretamente para o servidor configurado
-    // na plataforma deles. Não precisamos interceptar nada aqui.
+    // SISTEMA DE POSTBACK - IMPRESSÃO SÓ COM GANHO REAL
+    // A impressão SÓ é enviada quando o .then() do SDK Monetag retorna:
+    //   - reward_event_type === "valued"
+    //   - estimated_price > 0
+    // Se o usuário fechar o anúncio antes de completar, NÃO contabiliza
     // ========================================
-    console.log('[POSTBACK] Usando postback oficial do Monetag (configurado na plataforma)');
+    
+    // Função para detectar tipo de evento baseado na URL
+    function detectEventType(url) {
+        if (url.includes('event_type=click') || url.includes('event_type%3Dclick')) return 'click';
+        if (url.includes('event_type=impression') || url.includes('event_type%3Dimpression')) return 'impression';
+        return null;
+    }
+    
+    // Função para verificar se é um postback do Monetag
+    function isMonetagPostback(url) {
+        return (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server')) && 
+               (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
+    }
+    
+    async function sendPostbackToServer(type, realEstimatedPrice) {
+        if (!TaskState.userId) return;
+        
+        const now = Date.now();
+        if (type === 'impression' && now - (TaskState.lastImpressionSent || 0) < 3000) {
+            console.log('[POSTBACK] Impressão ignorada (cooldown)');
+            return;
+        }
+        if (type === 'click' && now - (TaskState.lastClickSent || 0) < 3000) {
+            console.log('[POSTBACK] Clique ignorado (cooldown)');
+            return;
+        }
+        
+        if (type === 'impression') TaskState.lastImpressionSent = now;
+        if (type === 'click') TaskState.lastClickSent = now;
+        
+        const price = realEstimatedPrice || (type === 'click' ? '0.0045' : '0.0023');
+        console.log(`[POSTBACK] \ud83c\udfaf ${type.toUpperCase()} ENVIANDO! (estimated_price: ${price})`);
+        
+        const params = new URLSearchParams({
+            event_type: type,
+            zone_id: ZONE_ID,
+            ymid: TaskState.userId,
+            user_email: TaskState.userEmail || 'unknown',
+            estimated_price: String(price)
+        });
+        
+        const url = `${POSTBACK_URL}?${params.toString()}`;
+        console.log(`[POSTBACK] \ud83d\udce4 Enviando ${type} para:`, url);
+        
+        try {
+            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const data = await response.json();
+            console.log(`[POSTBACK] \u2705 ${type} registrado:`, data);
+            setTimeout(() => fetchStats(), 500);
+        } catch (err) {
+            console.error(`[POSTBACK] \u274c Erro ao enviar ${type}:`, err);
+        }
+    }
+    
+    // Interceptar fetch - bloquear postbacks automáticos de impressão
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0]?.url || args[0] || '';
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] \ud83d\udeab Postback do Monetag interceptado:', url);
+            const eventType = detectEventType(url);
+            if (eventType === 'click') {
+                sendPostbackToServer('click');
+            } else if (eventType === 'impression') {
+                console.log('[INTERCEPTOR] \ud83d\udcfa Impressão bloqueada - só contabiliza via .then() com estimated_price > 0');
+            }
+            return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
+        }
+        return originalFetch.apply(this, args);
+    };
+    
+    // Interceptar XMLHttpRequest
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] \ud83d\udeab XHR Postback interceptado:', url);
+            const eventType = detectEventType(url);
+            if (eventType === 'click') {
+                sendPostbackToServer('click');
+            } else if (eventType === 'impression') {
+                console.log('[INTERCEPTOR] \ud83d\udcfa Impressão bloqueada - só contabiliza via .then() com estimated_price > 0');
+            }
+            return originalXHROpen.call(this, method, 'about:blank', ...rest);
+        }
+        return originalXHROpen.call(this, method, url, ...rest);
+    };
+    
+    // Interceptar Image (pixel tracking)
+    const originalImage = window.Image;
+    window.Image = function() {
+        const img = new originalImage();
+        const originalSrcSetter = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
+        Object.defineProperty(img, 'src', {
+            set: function(value) {
+                if (typeof value === 'string' && isMonetagPostback(value)) {
+                    console.log('[INTERCEPTOR] \ud83d\udeab Image Postback interceptado:', value);
+                    const eventType = detectEventType(value);
+                    if (eventType === 'click') {
+                        sendPostbackToServer('click');
+                    } else if (eventType === 'impression') {
+                        console.log('[INTERCEPTOR] \ud83d\udcfa Impressão bloqueada - só contabiliza via .then() com estimated_price > 0');
+                    }
+                    return;
+                }
+                originalSrcSetter.call(this, value);
+            },
+            get: function() {
+                return this.getAttribute('src');
+            }
+        });
+        return img;
+    };
+    
+    console.log('[INTERCEPTOR] \ud83d\udd0d Interceptadores ativados - impressões só via .then() com estimated_price > 0');
 
     function loadMonetagSDK() {
         const script = document.createElement('script');
@@ -1395,7 +1510,7 @@
     }
 
     // Função sendPostbackToNewServer removida.
-    // O Monetag envia os postbacks diretamente para o servidor configurado na plataforma.
+    // Agora usamos sendPostbackToServer com verificação de estimated_price via .then() do SDK.
 
     function showStatus(message, type) {
         const statusEl = document.getElementById('statusMessage');
@@ -1438,10 +1553,24 @@
         window[SDK_FUNC]({
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
-        }).then(() => {
-            console.log('[AD] ✅ Anúncio exibido pelo Monetag');
-            // O postback é enviado automaticamente pelo Monetag para o servidor
-            // configurado na plataforma. Não precisamos fazer nada manualmente.
+        }).then((event) => {
+            console.log('[AD] ✅ Callback do Monetag recebido:', JSON.stringify(event));
+            
+            // VERIFICAR SE HOUVE GANHO REAL
+            // Se o usuário fechou o anúncio antes de completar,
+            // reward_event_type será "not_valued" e estimated_price será 0
+            const estimatedPrice = parseFloat(event?.estimated_price || 0);
+            const rewardType = event?.reward_event_type || 'unknown';
+            
+            console.log('[AD] reward_event_type:', rewardType);
+            console.log('[AD] estimated_price:', estimatedPrice);
+            
+            if (rewardType === 'valued' && estimatedPrice > 0) {
+                console.log('[AD] ✅ ANÚNCIO COMPLETO COM GANHO! Enviando impressão...');
+                sendPostbackToServer('impression', estimatedPrice);
+            } else {
+                console.log('[AD] ⚠️ Anúncio sem ganho (not_valued ou price=0). Impressão NÃO contabilizada.');
+            }
 
             setTimeout(() => {
                 TaskState.isProcessing = false;
@@ -1449,7 +1578,8 @@
                 fetchStats();
             }, 2000);
         }).catch(err => {
-            console.error('[AD] ❌ Erro:', err);
+            console.error('[AD] ❌ Erro ou anúncio não completado:', err);
+            console.log('[AD] ⚠️ Impressão NÃO contabilizada (anúncio não completou)');
             TaskState.isProcessing = false;
             updateUI();
         });
