@@ -1434,22 +1434,6 @@
             return;
         }
 
-        // ========================================
-        // BLOQUEAR FECHAMENTO DO TELEGRAM MINI APP
-        // Impede o usuário de fechar o app enquanto o anúncio está rodando
-        // ========================================
-        try {
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.enableClosingConfirmation();
-                if (typeof window.Telegram.WebApp.disableVerticalSwipes === 'function') {
-                    window.Telegram.WebApp.disableVerticalSwipes();
-                }
-                console.log('[TELEGRAM] 🔒 Fechamento bloqueado - anúncio iniciando');
-            }
-        } catch (e) {
-            console.log('[TELEGRAM] ⚠️ Não foi possível bloquear fechamento:', e);
-        }
-
         console.log('[AD] Chamando SDK com ymid e requestVar');
         window[SDK_FUNC]({
             ymid: TaskState.userId,
@@ -1459,18 +1443,6 @@
             // O postback é enviado automaticamente pelo Monetag para o servidor
             // configurado na plataforma. Não precisamos fazer nada manualmente.
 
-            // DESBLOQUEAR FECHAMENTO DO TELEGRAM MINI APP
-            // O anúncio foi completamente assistido, agora pode fechar
-            try {
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.disableClosingConfirmation();
-                    if (typeof window.Telegram.WebApp.enableVerticalSwipes === 'function') {
-                        window.Telegram.WebApp.enableVerticalSwipes();
-                    }
-                    console.log('[TELEGRAM] 🔓 Fechamento desbloqueado - anúncio completo');
-                }
-            } catch (e) {}
-
             setTimeout(() => {
                 TaskState.isProcessing = false;
                 updateUI();
@@ -1478,18 +1450,6 @@
             }, 2000);
         }).catch(err => {
             console.error('[AD] ❌ Erro:', err);
-            
-            // Desbloquear fechamento em caso de erro
-            try {
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.disableClosingConfirmation();
-                    if (typeof window.Telegram.WebApp.enableVerticalSwipes === 'function') {
-                        window.Telegram.WebApp.enableVerticalSwipes();
-                    }
-                    console.log('[TELEGRAM] 🔓 Fechamento desbloqueado - erro no anúncio');
-                }
-            } catch (e2) {}
-            
             TaskState.isProcessing = false;
             updateUI();
         });
