@@ -594,8 +594,7 @@
         <div class="task-description">
             Complete a tarefa abaixo para desbloquear a roleta e ganhar prêmios!
             <br><br>
-            • Assista <strong id="requiredImpressionsText">5 anúncios</strong> (impressões)
-            <br>• Clique em <strong id="requiredClicksText">1 anúncio</strong>
+            • Assista <strong id="requiredImpressionsText">10 anúncios</strong> (impressões)
         </div>
 
         <div class="progress-section">
@@ -609,15 +608,7 @@
                 </div>
             </div>
 
-            <div class="progress-item">
-                <div class="progress-label">
-                    <span><i class="fas fa-hand-pointer"></i> Cliques Realizados</span>
-                    <span id="clickCount">0/1</span>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar" id="clickBar" style="width: 0%"></div>
-                </div>
-            </div>
+
         </div>
     </div>
 
@@ -626,10 +617,6 @@
         <div class="stat-box">
             <div class="stat-value" id="statImpressions">0</div>
             <div class="stat-label">Impressões</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-value" id="statClicks">0</div>
-            <div class="stat-label">Cliques</div>
         </div>
     </div>
 
@@ -651,7 +638,6 @@
 
 <!-- ========================================
      SISTEMA DE OVERLAY FLUTUANTE DE 15 SEGUNDOS
-     + BLOQUEIO PERMANENTE QUANDO ATINGIR LIMITE DE CLIQUES (PONCHIBEC)
      ======================================== -->
 <script>
     (function() {
@@ -663,7 +649,7 @@
         let overlayInterval = null;
 
         console.log('[OVERLAY SYSTEM] Iniciado - Duração: ' + OVERLAY_DURATION + ' segundos');
-        console.log('[PONCHIBEC] Sistema de bloqueio de cliques ativado');
+
 
         function createFloatingOverlay() {
             if (overlayCreated) {
@@ -840,130 +826,6 @@
             return false;
         }
 
-        // ========================================
-        // OVERLAY PERMANENTE - BLOQUEIO DE CLIQUES (PONCHIBEC)
-        // Aparece quando o usuário atingiu o limite de cliques
-        // ========================================
-        let permanentBlockActive = false;
-
-        function createPermanentBlockOverlay() {
-            if (permanentBlockActive) {
-                console.log('[PONCHIBEC] Bloqueio permanente já ativo, ignorando...');
-                return;
-            }
-
-            permanentBlockActive = true;
-
-            console.log('[PONCHIBEC] 🔒 LIMITE DE CLIQUES ATINGIDO! Criando bloqueio permanente...');
-
-            // Remover overlay temporário se existir
-            const tempOverlay = document.getElementById('monetag-block-overlay');
-            if (tempOverlay) {
-                tempOverlay.remove();
-                overlayCreated = false;
-            }
-
-            const overlay = document.createElement('div');
-            overlay.id = 'ponchibec-block-overlay';
-            overlay.style.cssText = `
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                background: rgba(0, 0, 0, 0.85) !important;
-                z-index: 2147483647 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                animation: fadeInOverlay 0.3s ease !important;
-                pointer-events: auto !important;
-            `;
-
-            // Bloquear TODOS os eventos
-            ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'pointerdown', 'pointerup', 'keydown', 'keyup', 'keypress'].forEach(function(eventType) {
-                overlay.addEventListener(eventType, function(e) {
-                    e.stopPropagation();
-                    e.stopImmediatePropagation();
-                    e.preventDefault();
-                    console.log('[PONCHIBEC] Evento ' + eventType + ' BLOQUEADO permanentemente');
-                    return false;
-                }, true);
-            });
-
-            const message = document.createElement('div');
-            message.style.cssText = `
-                background: linear-gradient(135deg, rgba(20, 25, 45, 0.98) 0%, rgba(13, 18, 37, 0.98) 100%) !important;
-                padding: 2.5rem !important;
-                border-radius: 1.5rem !important;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.7), 0 0 50px rgba(16, 185, 129, 0.3) !important;
-                text-align: center !important;
-                max-width: 90% !important;
-                width: 350px !important;
-                animation: scaleInOverlay 0.4s ease !important;
-                pointer-events: auto !important;
-                border: 2px solid rgba(16, 185, 129, 0.5) !important;
-            `;
-
-            message.innerHTML = `
-                <div style="width: 4rem; height: 4rem; margin: 0 auto 1.5rem; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                    <svg style="width: 2rem; height: 2rem; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                </div>
-                <h2 style="margin: 0 0 0.75rem 0; color: #10b981; font-size: 1.5rem; font-weight: 700; font-family: 'Rajdhani', sans-serif;">Limite de Cliques Atingido!</h2>
-                <p style="margin: 0 0 1.5rem 0; color: #a0aec0; font-size: 0.95rem; font-family: 'Inter', sans-serif; line-height: 1.5;">Você já completou todos os cliques necessários. Agora complete as impressões restantes para desbloquear a roleta!</p>
-                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 0.75rem; padding: 1rem; margin-bottom: 1rem;">
-                    <p style="margin: 0; color: #10b981; font-size: 0.875rem; font-family: 'Inter', sans-serif;">🎯 Continue assistindo os anúncios para completar as impressões</p>
-                </div>
-                <button id="ponchibec-continue-btn" style="
-                    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-                    color: white;
-                    border: none;
-                    padding: 1rem 2rem;
-                    border-radius: 0.75rem;
-                    font-size: 1rem;
-                    font-weight: 600;
-                    font-family: 'Rajdhani', sans-serif;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
-                ">CONTINUAR ASSISTINDO</button>
-            `;
-
-            overlay.appendChild(message);
-            document.documentElement.appendChild(overlay);
-
-            // Botão para fechar o overlay e continuar
-            const continueBtn = document.getElementById('ponchibec-continue-btn');
-            if (continueBtn) {
-                continueBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    console.log('[PONCHIBEC] Usuário clicou em continuar');
-                    overlay.style.animation = 'fadeOutOverlay 0.3s ease';
-                    setTimeout(function() {
-                        overlay.remove();
-                        permanentBlockActive = false;
-                        console.log('[PONCHIBEC] Overlay de bloqueio removido');
-                    }, 300);
-                });
-            }
-
-            // Manter overlay sempre no topo
-            function keepPonchibecOnTop() {
-                const overlayEl = document.getElementById('ponchibec-block-overlay');
-                if (!overlayEl) return;
-                if (overlayEl.parentNode !== document.documentElement || overlayEl !== document.documentElement.lastElementChild) {
-                    document.documentElement.appendChild(overlayEl);
-                }
-                overlayEl.style.zIndex = '2147483647';
-            }
-
-            setInterval(keepPonchibecOnTop, 100);
-
-            console.log('[PONCHIBEC] 🔒 Bloqueio permanente ativado com sucesso!');
-        }
-
         function setupAdDetectionObserver() {
             let adDetected = false;
 
@@ -973,32 +835,11 @@
                 // Verificar se um anúncio apareceu
                 if (detectMonetagAd()) {
                     console.log('[OBSERVER] Anúncio Monetag detectado via MutationObserver!');
+                    adDetected = true;
 
-                    // VERIFICAR SE O USUÁRIO JÁ ATINGIU O LIMITE DE CLIQUES
-                    const userClicks = (typeof TaskState !== 'undefined' && TaskState.clicks) ? TaskState.clicks : 0;
-                    const requiredClicks = (typeof REQUIRED_CLICKS !== 'undefined') ? REQUIRED_CLICKS : 2;
-
-                    // Se atingiu o limite de cliques, mostrar bloqueio permanente (PONCHIBEC)
-                    if (userClicks >= requiredClicks) {
-                        adDetected = true;
-                        console.log('[PONCHIBEC] 🔒 Usuário atingiu limite de cliques (' + userClicks + '/' + requiredClicks + '). BLOQUEANDO!');
-                        createPermanentBlockOverlay();
-                    }
-                    // Se tem pelo menos 1 clique mas não atingiu o limite, mostrar overlay temporário
-                    else if (userClicks >= 1) {
-                        adDetected = true;
-                        console.log('[OBSERVER] Usuário tem ' + userClicks + ' clique(s). Mostrando overlay automático!');
-
-                        // Criar overlay se ainda não existe
-                        if (!overlayCreated) {
-                            createFloatingOverlay();
-                        }
-                    } else {
-                        console.log('[OBSERVER] Usuário ainda não tem cliques (' + userClicks + '). Overlay NÃO será exibido.');
-                        // Resetar para poder detectar novamente no próximo anúncio
-                        setTimeout(function() {
-                            adDetected = false;
-                        }, 2000);
+                    // Criar overlay se ainda não existe
+                    if (!overlayCreated) {
+                        createFloatingOverlay();
                     }
                 }
             });
@@ -1012,15 +853,15 @@
             });
 
             console.log('[OBSERVER] Observador de anúncios ativado');
-            console.log('[PONCHIBEC] Sistema de bloqueio de cliques configurado');
+    
         }
 
         function initOverlaySystem() {
             console.log('[OVERLAY SYSTEM] Inicializando sistema de overlay...');
-            console.log('[PONCHIBEC] Inicializando sistema de bloqueio de cliques...');
+    
             setupAdDetectionObserver();
             console.log('[OVERLAY SYSTEM] Sistema de overlay inicializado com sucesso!');
-            console.log('[PONCHIBEC] Sistema de bloqueio inicializado com sucesso!');
+
         }
 
         if (document.readyState === 'complete' || document.readyState === 'interactive') {
@@ -1031,8 +872,7 @@
 
         window.MontagOverlay = {
             show: createFloatingOverlay,
-            hide: removeOverlay,
-            showPermanentBlock: createPermanentBlockOverlay
+            hide: removeOverlay
         };
 
     })();
@@ -1060,19 +900,17 @@
     const PROFILE_ENDPOINT = `${YOUNGMONEY_API}/profile`;
 
     let REQUIRED_IMPRESSIONS = 5;
-    let REQUIRED_CLICKS = 1;
     const AUTO_REFRESH_INTERVAL = 3000;
 
     const TaskState = {
         userId: null,
         userEmail: null,
         impressions: 0,
-        clicks: 0,
-        currentClickId: null,
+
         isProcessing: false,
         isLoading: false,
         lastImpressions: 0,
-        lastClicks: 0,
+
         lastEventId: 0,
         requiredImpressionsLoaded: false,
         adScheduleBlocked: false,
@@ -1124,28 +962,19 @@
             if (data.success && data.data) {
                 // Carregar valores necessários
                 REQUIRED_IMPRESSIONS = data.data.required_impressions || 20;
-                REQUIRED_CLICKS = data.data.required_clicks || 2;
-                
                 // Carregar progresso atual do usuário
                 TaskState.impressions = data.data.impressions || 0;
-                TaskState.clicks = data.data.clicks || 0;
                 TaskState.requiredImpressionsLoaded = true;
 
                 console.log('[REQUIREMENTS] ✅ Valores carregados da API:');
                 console.log('[REQUIREMENTS]   - Impressões atuais:', TaskState.impressions);
-                console.log('[REQUIREMENTS]   - Cliques atuais:', TaskState.clicks);
                 console.log('[REQUIREMENTS]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
-                console.log('[REQUIREMENTS]   - Cliques necessários:', REQUIRED_CLICKS);
 
                 // Atualizar textos dinâmicos na tela
                 const reqImpText = document.getElementById('requiredImpressionsText');
-                const reqClickText = document.getElementById('requiredClicksText');
 
                 if (reqImpText) {
                     reqImpText.textContent = REQUIRED_IMPRESSIONS + ' anúncios';
-                }
-                if (reqClickText) {
-                    reqClickText.textContent = REQUIRED_CLICKS + (REQUIRED_CLICKS === 1 ? ' anúncio' : ' anúncios');
                 }
 
                 updateUI();
@@ -1254,8 +1083,6 @@
                 data.events.forEach(event => {
                     if (event.event_type === 'impression') {
                         TaskState.impressions++;
-                    } else if (event.event_type === 'click') {
-                        TaskState.clicks++;
                     }
                 });
 
@@ -1283,19 +1110,14 @@
 
             if (data.success && data.data) {
                 const newImpressions = data.data.impressions || 0;
-                const newClicks = data.data.clicks || 0;
-
-                const hasChanges = newImpressions !== TaskState.lastImpressions || newClicks !== TaskState.lastClicks;
+                const hasChanges = newImpressions !== TaskState.lastImpressions;
 
                 if (hasChanges) {
                     TaskState.impressions = newImpressions;
-                    TaskState.clicks = newClicks;
                     TaskState.lastImpressions = newImpressions;
-                    TaskState.lastClicks = newClicks;
                     
                     // Atualizar também os valores necessários caso tenham mudado
                     REQUIRED_IMPRESSIONS = data.data.required_impressions || REQUIRED_IMPRESSIONS;
-                    REQUIRED_CLICKS = data.data.required_clicks || REQUIRED_CLICKS;
                     
                     updateUI();
                 }
@@ -1322,7 +1144,6 @@
     function updateUI() {
         // Contadores (valores grandes nos boxes)
         document.getElementById('statImpressions').textContent = TaskState.impressions;
-        document.getElementById('statClicks').textContent = TaskState.clicks;
 
         // Progresso de impressões (barra)
         const impressionProgress = Math.min((TaskState.impressions / REQUIRED_IMPRESSIONS) * 100, 100);
@@ -1333,21 +1154,11 @@
             document.getElementById('impressionBar').classList.add('completed');
         }
 
-        // Progresso de cliques (barra)
-        const clickProgress = Math.min((TaskState.clicks / REQUIRED_CLICKS) * 100, 100);
-        document.getElementById('clickBar').style.width = clickProgress + '%';
-        document.getElementById('clickCount').textContent = `${TaskState.clicks}/${REQUIRED_CLICKS}`;
-
-        if (TaskState.clicks >= REQUIRED_CLICKS) {
-            document.getElementById('clickBar').classList.add('completed');
-        }
-
         // Botão
         const button = document.getElementById('adButton');
 
         const taskCompleted = TaskState.requiredImpressionsLoaded &&
-                              TaskState.impressions >= REQUIRED_IMPRESSIONS &&
-                              TaskState.clicks >= REQUIRED_CLICKS;
+                              TaskState.impressions >= REQUIRED_IMPRESSIONS;
 
         if (taskCompleted) {
             button.style.display = 'none';
@@ -1407,9 +1218,6 @@
 
         TaskState.isProcessing = true;
         updateUI();
-
-        TaskState.currentClickId = 'click_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        console.log('[AD] Click ID:', TaskState.currentClickId);
 
         if (typeof window[SDK_FUNC] !== 'function') {
             console.warn('[AD] SDK não está pronto');

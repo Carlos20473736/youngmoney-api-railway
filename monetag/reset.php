@@ -1,12 +1,10 @@
 <?php
 /**
- * Endpoint para resetar dados de MoniTag de um usuário
+ * Endpoint para resetar dados de MoniTag de um usuário (v3 - APENAS IMPRESSÕES)
  * 
  * Uso: GET /monetag/reset.php?user_id=2&admin_key=your_secret_key
  * 
- * CORREÇÃO DE TIMEZONE APLICADA:
- * - Define timezone de Brasília
- * - Configura timezone na conexão MySQL
+ * Lógica de cliques removida completamente
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -61,7 +59,6 @@ try {
     $deleted_events = $stmt->rowCount();
 
     // 2. Resetar contadores no usuário (se houver coluna)
-    // Verificar se a tabela users tem colunas de impressões e cliques
     $stmt = $pdo->query("DESCRIBE users");
     $columns = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
 

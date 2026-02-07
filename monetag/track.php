@@ -1,23 +1,18 @@
 <?php
 /**
- * MoniTag Postback Endpoint (CORRIGIDO v2)
+ * MoniTag Postback Endpoint (v3 - APENAS IMPRESSÕES)
  * Recebe postbacks do MoniTag via GET
  * URL: /monetag/track.php?event_type={event_type}&zone_id={zone_id}&sub_id={sub_id}&sub_id2={sub_id2}&ymid={ymid}&revenue={estimated_price}&request_var={request_var}
  * 
- * event_type: 'impression' (anúncio exibido) ou 'click' (anúncio clicado - NÃO é clique no botão de fechar)
+ * event_type: 'impression' (anúncio exibido)
  * zone_id: ID da zona de anúncios MoniTag
  * sub_id: user_id (numérico)
  * sub_id2: email do usuário
  * ymid: ID único da sessão do anúncio
- * revenue: valor estimado do clique/impressão
+ * revenue: valor estimado da impressão
  * request_var: parâmetro de validação da MoniTag
  * 
- * CORREÇÕES APLICADAS:
- * 1. Timezone padronizado para America/Sao_Paulo
- * 2. Validação de limite diário ANTES de inserir
- * 3. Logs de debug melhorados
- * 4. Removido CONVERT_TZ pois MySQL já está configurado para Brasília (-03:00)
- *    NOW() já insere em horário de Brasília, então DATE(created_at) já é correto
+ * APENAS IMPRESSÕES - Lógica de cliques removida completamente
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -56,13 +51,13 @@ $request_var = $_GET['request_var'] ?? $_POST['request_var'] ?? null;
 
 error_log("MoniTag Track - Parsed: event_type=$event_type, sub_id=$sub_id, sub_id2=$sub_id2, ymid=$ymid, request_var=$request_var");
 
-// Validar event_type
+// Validar event_type - APENAS IMPRESSÕES
 if (!$event_type) {
     sendError('event_type é obrigatório');
 }
 
-if (!in_array($event_type, ['impression', 'click'])) {
-    sendError('event_type deve ser impression ou click');
+if ($event_type !== 'impression') {
+    sendError('event_type deve ser impression');
 }
 
 // Validar zone_id
@@ -92,13 +87,12 @@ try {
     $conn = getDbConnection();
     
     // ========================================
-    // BUSCAR LIMITES DO USUÁRIO
+    // BUSCAR LIMITES DO USUÁRIO - APENAS IMPRESSÕES
     // ========================================
-    $required_impressions = 5; // valor padrão
-    $required_clicks = 1; // fixo
+    $required_impressions = 10; // valor padrão
     
     $user_settings_stmt = $conn->prepare("
-        SELECT required_impressions, required_clicks FROM user_required_impressions 
+        SELECT required_impressions FROM user_required_impressions 
         WHERE user_id = ?
     ");
     $user_settings_stmt->bind_param("i", $user_id);
@@ -107,67 +101,42 @@ try {
     
     if ($user_row = $user_settings_result->fetch_assoc()) {
         $required_impressions = (int)$user_row['required_impressions'];
-        $required_clicks = (int)($user_row['required_clicks'] ?? 1);
     }
     $user_settings_stmt->close();
     
     // ========================================
     // VERIFICAR LIMITE DIÁRIO ANTES DE INSERIR
-    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
-    // NOW() insere em horário de Brasília, DATE(created_at) já é correto
     // ========================================
     $today = date('Y-m-d');
     
     $check_limit_stmt = $conn->prepare("
         SELECT COUNT(*) as total FROM monetag_events 
-        WHERE user_id = ? AND event_type = ? AND DATE(created_at) = ?
+        WHERE user_id = ? AND event_type = 'impression' AND DATE(created_at) = ?
     ");
-    $check_limit_stmt->bind_param("iss", $user_id, $event_type, $today);
+    $check_limit_stmt->bind_param("is", $user_id, $today);
     $check_limit_stmt->execute();
     $limit_result = $check_limit_stmt->get_result();
     $current_count = (int)$limit_result->fetch_assoc()['total'];
     $check_limit_stmt->close();
     
-    // Definir limite baseado no tipo
-    $limit = ($event_type === 'click') ? $required_clicks : $required_impressions;
-    
     // Se já atingiu o limite, retornar sucesso mas sem registrar
-    if ($current_count >= $limit) {
-        error_log("MoniTag Track - Limite diário atingido: user_id=$user_id, event_type=$event_type, count=$current_count, limit=$limit");
+    if ($current_count >= $required_impressions) {
+        error_log("MoniTag Track - Limite diário atingido: user_id=$user_id, count=$current_count, limit=$required_impressions");
         
-        // Buscar progresso atual para retornar
-        // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília
-        $stmt = $conn->prepare("
-            SELECT 
-                COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
-                COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
-            FROM monetag_events
-            WHERE user_id = ? AND DATE(created_at) = ?
-        ");
-        $stmt->bind_param("is", $user_id, $today);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $progress = $result->fetch_assoc();
-        $stmt->close();
         $conn->close();
         
         sendSuccess([
             'event_registered' => false,
-            'message' => 'Limite diário já atingido para ' . $event_type,
+            'message' => 'Limite diário já atingido para impressões',
             'event_type' => $event_type,
             'user_id' => $user_id,
             'progress' => [
                 'impressions' => [
-                    'current' => (int)$progress['impressions'],
+                    'current' => $current_count,
                     'required' => $required_impressions,
-                    'completed' => (int)$progress['impressions'] >= $required_impressions
+                    'completed' => true
                 ],
-                'clicks' => [
-                    'current' => (int)$progress['clicks'],
-                    'required' => $required_clicks,
-                    'completed' => (int)$progress['clicks'] >= $required_clicks
-                ],
-                'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks
+                'all_completed' => true
             ]
         ]);
     }
@@ -177,16 +146,15 @@ try {
     // ========================================
     $check_stmt = $conn->prepare("
         SELECT id FROM monetag_events 
-        WHERE user_id = ? AND event_type = ? AND session_id = ? 
+        WHERE user_id = ? AND event_type = 'impression' AND session_id = ? 
         LIMIT 1
     ");
-    $check_stmt->bind_param("iss", $user_id, $event_type, $session_id);
+    $check_stmt->bind_param("is", $user_id, $session_id);
     $check_stmt->execute();
     $check_result = $check_stmt->get_result();
     
     if ($check_result->num_rows > 0) {
-        // Evento já foi registrado
-        error_log("MoniTag Track - Evento duplicado detectado: user_id=$user_id, event_type=$event_type, session_id=$session_id");
+        error_log("MoniTag Track - Evento duplicado detectado: user_id=$user_id, session_id=$session_id");
         $check_stmt->close();
         $conn->close();
         sendSuccess(['event_registered' => false, 'message' => 'Evento já foi registrado']);
@@ -199,24 +167,21 @@ try {
     // ========================================
     $stmt = $conn->prepare("
         INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
-        VALUES (?, ?, ?, ?, NOW())
+        VALUES (?, 'impression', ?, ?, NOW())
     ");
     $revenue_float = (float)$revenue;
-    $stmt->bind_param("issd", $user_id, $event_type, $session_id, $revenue_float);
+    $stmt->bind_param("isd", $user_id, $session_id, $revenue_float);
     $stmt->execute();
     $event_id = $stmt->insert_id;
     $stmt->close();
     
-    error_log("MoniTag Track - Event registered: ID=$event_id, user_id=$user_id, event_type=$event_type, zone_id=$zone_id, time=" . date('Y-m-d H:i:s'));
+    error_log("MoniTag Track - Event registered: ID=$event_id, user_id=$user_id, time=" . date('Y-m-d H:i:s'));
     
     // Buscar progresso atualizado do dia
-    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília
     $stmt = $conn->prepare("
-        SELECT 
-            COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
-            COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
+        SELECT COUNT(*) as impressions
         FROM monetag_events
-        WHERE user_id = ? AND DATE(created_at) = ?
+        WHERE user_id = ? AND event_type = 'impression' AND DATE(created_at) = ?
     ");
     $stmt->bind_param("is", $user_id, $today);
     $stmt->execute();
@@ -228,7 +193,7 @@ try {
     $response = [
         'event_registered' => true,
         'event_id' => $event_id,
-        'event_type' => $event_type,
+        'event_type' => 'impression',
         'user_id' => $user_id,
         'session_id' => $session_id,
         'progress' => [
@@ -237,12 +202,7 @@ try {
                 'required' => $required_impressions,
                 'completed' => (int)$progress['impressions'] >= $required_impressions
             ],
-            'clicks' => [
-                'current' => (int)$progress['clicks'],
-                'required' => $required_clicks,
-                'completed' => (int)$progress['clicks'] >= $required_clicks
-            ],
-            'all_completed' => (int)$progress['impressions'] >= $required_impressions && (int)$progress['clicks'] >= $required_clicks
+            'all_completed' => (int)$progress['impressions'] >= $required_impressions
         ]
     ];
     

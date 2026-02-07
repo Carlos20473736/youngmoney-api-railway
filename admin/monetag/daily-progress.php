@@ -1,11 +1,9 @@
 <?php
 /**
- * Daily Progress Endpoint - MoniTag Missions
+ * Daily Progress Endpoint - MoniTag Missions (v3 - APENAS IMPRESSÕES)
  * GET - Retorna progresso diário de todos os usuários
  * 
- * CORREÇÃO DE TIMEZONE v2:
- * - Removido CONVERT_TZ pois MySQL já está configurado para Brasília (-03:00)
- * - NOW() já insere em horário de Brasília, então DATE(created_at) já é correto
+ * Lógica de cliques removida completamente
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -19,15 +17,13 @@ require_once __DIR__ . '/../../database.php';
 try {
     $conn = getDbConnection();
     
-    // Metas diárias (configuráveis)
-    $REQUIRED_IMPRESSIONS = 5;
-    $REQUIRED_CLICKS = 1;
+    // Meta diária - APENAS IMPRESSÕES
+    $REQUIRED_IMPRESSIONS = 10;
     
     // Data de hoje no timezone de Brasília
     $today = date('Y-m-d');
     
-    // Buscar progresso diário de cada usuário
-    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
+    // Buscar progresso diário de cada usuário - APENAS IMPRESSÕES
     $stmt = $conn->prepare("
         SELECT 
             u.id as user_id,
@@ -35,7 +31,6 @@ try {
             u.email,
             u.points,
             COALESCE(SUM(CASE WHEN m.event_type = 'impression' AND DATE(m.created_at) = ? THEN 1 ELSE 0 END), 0) as impressions_today,
-            COALESCE(SUM(CASE WHEN m.event_type = 'click' AND DATE(m.created_at) = ? THEN 1 ELSE 0 END), 0) as clicks_today,
             MAX(CASE WHEN DATE(m.created_at) = ? THEN m.created_at END) as last_activity
         FROM users u
         LEFT JOIN monetag_events m ON u.id = m.user_id
@@ -44,7 +39,7 @@ try {
         LIMIT 100
     ");
     
-    $stmt->bind_param("sss", $today, $today, $today);
+    $stmt->bind_param("ss", $today, $today);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -52,11 +47,9 @@ try {
     
     while ($row = $result->fetch_assoc()) {
         $impressions = (int)$row['impressions_today'];
-        $clicks = (int)$row['clicks_today'];
         
         $impressions_completed = $impressions >= $REQUIRED_IMPRESSIONS;
-        $clicks_completed = $clicks >= $REQUIRED_CLICKS;
-        $mission_completed = $impressions_completed && $clicks_completed;
+        $mission_completed = $impressions_completed;
         
         $users[] = [
             'user_id' => (int)$row['user_id'],
@@ -68,12 +61,6 @@ try {
                 'required' => $REQUIRED_IMPRESSIONS,
                 'completed' => $impressions_completed,
                 'progress' => min(100, ($impressions / $REQUIRED_IMPRESSIONS) * 100)
-            ],
-            'clicks' => [
-                'current' => $clicks,
-                'required' => $REQUIRED_CLICKS,
-                'completed' => $clicks_completed,
-                'progress' => min(100, ($clicks / $REQUIRED_CLICKS) * 100)
             ],
             'mission_completed' => $mission_completed,
             'last_activity' => $row['last_activity']
@@ -89,8 +76,7 @@ try {
             'users' => $users,
             'total' => count($users),
             'requirements' => [
-                'impressions' => $REQUIRED_IMPRESSIONS,
-                'clicks' => $REQUIRED_CLICKS
+                'impressions' => $REQUIRED_IMPRESSIONS
             ],
             'stats' => [
                 'completed_today' => count(array_filter($users, fn($u) => $u['mission_completed'])),

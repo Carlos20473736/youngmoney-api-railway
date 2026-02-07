@@ -1,18 +1,14 @@
 <?php
 /**
- * Endpoint para randomizar o número de impressões e cliques necessários (CORRIGIDO)
+ * Endpoint para randomizar o número de impressões necessárias (v3 - APENAS IMPRESSÕES)
  * Deve ser chamado quando o ranking é resetado
  * 
  * GET /monetag/randomize_impressions.php
  * 
  * Randomiza:
- * - Impressões: 5 a 12 (CORRIGIDO)
- * - Cliques: 1 (FIXO)
+ * - Impressões: 5 a 12
  * 
- * CORREÇÕES APLICADAS:
- * 1. Timezone padronizado para America/Sao_Paulo
- * 2. Range de impressões corrigido para 5-12
- * 3. Logs de debug melhorados
+ * Lógica de cliques removida completamente
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -46,11 +42,10 @@ error_log("MoniTag Randomize - Iniciando randomização - Time: " . date('Y-m-d 
 try {
     $conn = getDbConnection();
     
-    // Gerar números aleatórios
-    $random_impressions = rand(5, 12); // CORRIGIDO: Entre 5 e 12 impressões
-    $random_clicks = 1; // FIXO em 1 clique
+    // Gerar número aleatório - APENAS IMPRESSÕES
+    $random_impressions = rand(5, 12);
     
-    error_log("MoniTag Randomize - Valores gerados: impressions=$random_impressions, clicks=$random_clicks");
+    error_log("MoniTag Randomize - Valor gerado: impressions=$random_impressions");
     
     // Atualizar configuração global de impressões
     $check_stmt = $conn->prepare("
@@ -80,48 +75,23 @@ try {
     }
     $check_stmt->close();
     
-    // Atualizar configuração global de cliques
-    $check_clicks_stmt = $conn->prepare("
-        SELECT id FROM roulette_settings 
-        WHERE setting_key = 'monetag_required_clicks'
-    ");
-    $check_clicks_stmt->execute();
-    $result_clicks = $check_clicks_stmt->get_result();
-    
-    if ($result_clicks->num_rows > 0) {
-        $stmt = $conn->prepare("
-            UPDATE roulette_settings 
-            SET setting_value = ?, updated_at = NOW()
-            WHERE setting_key = 'monetag_required_clicks'
-        ");
-        $stmt->bind_param("s", $random_clicks);
-        $stmt->execute();
-        $stmt->close();
-    } else {
-        $stmt = $conn->prepare("
-            INSERT INTO roulette_settings (setting_key, setting_value, description)
-            VALUES ('monetag_required_clicks', ?, 'Número de cliques necessários para desbloquear roleta')
-        ");
-        $stmt->bind_param("s", $random_clicks);
-        $stmt->execute();
-        $stmt->close();
-    }
-    $check_clicks_stmt->close();
+    // Remover configuração de cliques se existir
+    $conn->query("DELETE FROM roulette_settings WHERE setting_key = 'monetag_required_clicks'");
     
     $conn->close();
     
-    error_log("MoniTag Randomize - Sucesso: impressions=$random_impressions, clicks=$random_clicks");
+    error_log("MoniTag Randomize - Sucesso: impressions=$random_impressions");
     
     sendSuccess([
         'required_impressions' => $random_impressions,
-        'required_clicks' => $random_clicks,
-        'message' => 'Número de impressões e cliques randomizado com sucesso',
+        'required_clicks' => 0,
+        'message' => 'Número de impressões randomizado com sucesso',
         'timestamp' => date('Y-m-d H:i:s'),
         'timezone' => 'America/Sao_Paulo'
     ]);
     
 } catch (Exception $e) {
     error_log("MoniTag Randomize Error: " . $e->getMessage());
-    sendError('Erro ao randomizar impressões e cliques: ' . $e->getMessage(), 500);
+    sendError('Erro ao randomizar impressões: ' . $e->getMessage(), 500);
 }
 ?>

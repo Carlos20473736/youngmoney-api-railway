@@ -1,23 +1,17 @@
 <?php
 /**
- * API ÚNICA DE RESET COMPLETO - POSTBACK MONETAG + ROLETA (CORRIGIDO)
+ * API ÚNICA DE RESET COMPLETO - POSTBACK MONETAG + ROLETA (v3 - APENAS IMPRESSÕES)
  * 
  * Endpoint: GET /monetag/reset_postback.php
  * 
  * O que faz (TUDO DE UMA VEZ):
- * 1. Reseta os dados no servidor monetag-postback-server (impressões e cliques reais)
- * 2. Deleta todos os eventos de monetag_events (todos os usuários) - RESETA IMPRESSÕES E CLIQUES locais
- * 3. Reseta contadores de impressões/cliques dos usuários na tabela users
- * 4. Randomiza o número de impressões necessárias (5 a 12) E cliques necessários (1 FIXO)
+ * 1. Reseta os dados no servidor monetag-postback-server (impressões reais)
+ * 2. Deleta todos os eventos de monetag_events (todos os usuários) - RESETA IMPRESSÕES locais
+ * 3. Reseta contadores de impressões dos usuários na tabela users
+ * 4. Randomiza o número de impressões necessárias (5 a 12)
  * 5. Reseta os giros da roleta (deleta spin_history)
  * 
- * Usar no CronJob para resetar TUDO junto
- * 
- * CORREÇÕES APLICADAS:
- * 1. Timezone padronizado para America/Sao_Paulo
- * 2. Range de impressões corrigido para 5-12
- * 3. Cliques fixo em 1
- * 4. Logs de debug melhorados
+ * Lógica de cliques removida completamente
  */
 
 error_reporting(0);
@@ -51,7 +45,7 @@ function sendError($message, $code = 400) {
 
 /**
  * Função para chamar o reset do servidor monetag-postback-server
- * Este servidor armazena os dados reais de impressões e cliques
+ * Este servidor armazena os dados reais de impressões
  */
 function resetMonetagPostbackServer() {
     $url = 'https://monetag-postback-server-production.up.railway.app/api/reset';
@@ -119,13 +113,11 @@ try {
             'success' => false,
             'events_deleted' => 0,
             'impressions_deleted' => 0,
-            'clicks_deleted' => 0,
             'users_affected' => 0
         ],
         'monetag_local' => [
             'deleted_events' => 0,
             'deleted_impressions' => 0,
-            'deleted_clicks' => 0,
             'users_reset' => 0,
             'new_required_impressions' => 0
         ],
@@ -137,7 +129,7 @@ try {
     ];
     
     // ========================================
-    // 1. RESETAR SERVIDOR MONETAG-POSTBACK-SERVER (DADOS REAIS DE IMPRESSÕES E CLIQUES)
+    // 1. RESETAR SERVIDOR MONETAG-POSTBACK-SERVER
     // ========================================
     error_log("Reset Completo: Iniciando reset do servidor monetag-postback-server...");
     
@@ -149,42 +141,32 @@ try {
             'success' => true,
             'events_deleted' => $serverData['events_deleted'] ?? 0,
             'impressions_deleted' => $serverData['impressions_deleted'] ?? 0,
-            'clicks_deleted' => $serverData['clicks_deleted'] ?? 0,
             'users_affected' => $serverData['users_affected'] ?? 0
         ];
         error_log("Reset Completo: Servidor monetag-postback-server resetado com sucesso!");
         error_log("Reset Completo: Impressões deletadas (servidor): " . ($serverData['impressions_deleted'] ?? 0));
-        error_log("Reset Completo: Cliques deletados (servidor): " . ($serverData['clicks_deleted'] ?? 0));
     } else {
         $results['monetag_server']['error'] = $monetagServerResult['error'] ?? 'Erro ao conectar';
         error_log("Reset Completo: AVISO - Falha ao resetar servidor monetag-postback-server: " . ($monetagServerResult['error'] ?? 'Erro desconhecido'));
     }
     
     // ========================================
-    // 2. CONTAR E DELETAR TODOS OS EVENTOS DE MONETAG LOCAIS (IMPRESSÕES E CLIQUES)
+    // 2. CONTAR E DELETAR TODOS OS EVENTOS DE MONETAG LOCAIS
     // ========================================
     
-    // Primeiro, contar impressões e cliques separadamente para o log
     $count_impressions = $conn->query("SELECT COUNT(*) as total FROM monetag_events WHERE event_type = 'impression'");
-    $count_clicks = $conn->query("SELECT COUNT(*) as total FROM monetag_events WHERE event_type = 'click'");
     
     if ($count_impressions) {
         $row = $count_impressions->fetch_assoc();
         $results['monetag_local']['deleted_impressions'] = (int)($row['total'] ?? 0);
     }
     
-    if ($count_clicks) {
-        $row = $count_clicks->fetch_assoc();
-        $results['monetag_local']['deleted_clicks'] = (int)($row['total'] ?? 0);
-    }
-    
-    // Deletar TODOS os eventos (impressões e cliques)
+    // Deletar TODOS os eventos
     $delete_events = $conn->query("DELETE FROM monetag_events");
     $results['monetag_local']['deleted_events'] = $conn->affected_rows;
     
     error_log("Reset Completo: Deletados {$results['monetag_local']['deleted_events']} eventos de monetag_events (local)");
     error_log("Reset Completo: Impressões deletadas (local): {$results['monetag_local']['deleted_impressions']}");
-    error_log("Reset Completo: Cliques deletados (local): {$results['monetag_local']['deleted_clicks']}");
     
     // ========================================
     // 3. RESETAR CONTADORES DOS USUÁRIOS NA TABELA USERS
@@ -207,41 +189,25 @@ try {
         $update_query = 'UPDATE users SET ' . implode(', ', $updates);
         $conn->query($update_query);
         $results['monetag_local']['users_reset'] = $conn->affected_rows;
-        error_log("Reset Completo: Resetados contadores de {$results['monetag_local']['users_reset']} usuários (impressões e cliques zerados)");
+        error_log("Reset Completo: Resetados contadores de {$results['monetag_local']['users_reset']} usuários");
     }
     
     // ========================================
-    // 4. RANDOMIZAR IMPRESSÕES (5-12) E CLIQUES (1 FIXO) NECESSÁRIOS POR USUÁRIO
+    // 4. RANDOMIZAR IMPRESSÕES (5-12) NECESSÁRIAS POR USUÁRIO
     // ========================================
     
-    // Criar tabela user_required_impressions se não existir (com coluna required_clicks)
+    // Criar tabela user_required_impressions se não existir
     $conn->query("
         CREATE TABLE IF NOT EXISTS user_required_impressions (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL UNIQUE,
             required_impressions INT DEFAULT 5,
-            required_clicks INT DEFAULT 1,
+            required_clicks INT DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_user_id (user_id)
         )
     ");
-    
-    // Adicionar coluna required_clicks se não existir (usando try-catch para ignorar erro se já existir)
-    try {
-        $conn->query("
-            ALTER TABLE user_required_impressions 
-            ADD COLUMN required_clicks INT DEFAULT 1 AFTER required_impressions
-        ");
-    } catch (Exception $e) {
-        // Coluna já existe, ignorar erro
-        error_log("Coluna required_clicks já existe ou erro: " . $e->getMessage());
-    }
-    // Ignorar erro se coluna já existir (MySQL error 1060)
-    if ($conn->errno == 1060) {
-        // Coluna já existe, continuar normalmente
-        error_log("Coluna required_clicks já existe, continuando...");
-    }
     
     // Buscar todos os usuários
     $users_result = $conn->query("SELECT id FROM users");
@@ -249,55 +215,50 @@ try {
     $randomized_details = [];
     
     while ($user = $users_result->fetch_assoc()) {
-        $user_id = $user['id'];
-        $random_impressions = rand(5, 12); // CORRIGIDO: Aleatório entre 5 e 12 para impressões
-        $random_clicks = 1; // FIXO em 1 clique
+        $uid = $user['id'];
+        $random_impressions = rand(5, 12);
         
-        // Inserir ou atualizar impressões e cliques necessários do usuário
+        // Inserir ou atualizar impressões necessárias do usuário (cliques = 0)
         $stmt = $conn->prepare("
             INSERT INTO user_required_impressions (user_id, required_impressions, required_clicks, updated_at)
-            VALUES (?, ?, ?, NOW())
+            VALUES (?, ?, 0, NOW())
             ON DUPLICATE KEY UPDATE 
                 required_impressions = VALUES(required_impressions),
-                required_clicks = VALUES(required_clicks),
+                required_clicks = 0,
                 updated_at = NOW()
         ");
-        $stmt->bind_param("iii", $user_id, $random_impressions, $random_clicks);
+        $stmt->bind_param("ii", $uid, $random_impressions);
         $stmt->execute();
         $stmt->close();
         
         $users_randomized++;
-        if ($users_randomized <= 20) { // Mostrar apenas os primeiros 20 no log
+        if ($users_randomized <= 20) {
             $randomized_details[] = [
-                'user_id' => $user_id, 
-                'required_impressions' => $random_impressions,
-                'required_clicks' => $random_clicks
+                'user_id' => $uid, 
+                'required_impressions' => $random_impressions
             ];
         }
     }
     
     $results['monetag_local']['users_randomized'] = $users_randomized;
-    $results['monetag_local']['randomized_impressions_range'] = '5-12'; // CORRIGIDO
-    $results['monetag_local']['randomized_clicks_range'] = '1 (fixo)';
+    $results['monetag_local']['randomized_impressions_range'] = '5-12';
     $results['monetag_local']['randomized_sample'] = $randomized_details;
     
-    error_log("Reset Completo: Impressões randomizadas (5-12) e Cliques fixos (1) para $users_randomized usuários");
+    error_log("Reset Completo: Impressões randomizadas (5-12) para $users_randomized usuários");
     
     // ========================================
     // 5. RESETAR ROLETA (DELETAR TODOS OS SPINS)
     // ========================================
-    // Contar quantos spins serão deletados
     $count_result = $conn->query("SELECT COUNT(*) as total FROM spin_history");
     $count_row = $count_result->fetch_assoc();
     $spins_to_delete = $count_row['total'] ?? 0;
     
-    // Deletar TODOS os registros de spin (reset completo)
     $conn->query("DELETE FROM spin_history");
     $results['roulette']['spins_deleted'] = $conn->affected_rows;
     
     error_log("Reset Completo: Deletados {$results['roulette']['spins_deleted']} spins da roleta");
     
-    // Registrar log do reset (se a tabela existir)
+    // Registrar log do reset
     $log_stmt = $conn->prepare("
         INSERT INTO spin_reset_logs 
         (spins_deleted, reset_datetime, triggered_by) 

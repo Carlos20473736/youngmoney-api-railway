@@ -1,4 +1,11 @@
 <?php
+/**
+ * MoniTag Stats Endpoint (v3 - APENAS IMPRESSÕES)
+ * Retorna estatísticas de impressões de um usuário
+ * 
+ * Lógica de cliques removida completamente
+ */
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
@@ -59,21 +66,11 @@ try {
     $stmtImpressions->execute();
     $impressions = $stmtImpressions->get_result()->fetch_assoc()['total'];
     
-    // Buscar estatísticas de cliques
-    $stmtClicks = $conn->prepare("
-        SELECT COUNT(*) as total 
-        FROM monetag_events 
-        WHERE user_id = ? AND event_type = 'click'
-    ");
-    $stmtClicks->bind_param("i", $userId);
-    $stmtClicks->execute();
-    $clicks = $stmtClicks->get_result()->fetch_assoc()['total'];
-    
     echo json_encode([
         'success' => true,
         'data' => [
             'impressions' => (int)$impressions,
-            'clicks' => (int)$clicks,
+            'clicks' => 0,
             'email' => $email,
             'user_id' => $userId
         ]

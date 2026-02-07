@@ -1,16 +1,10 @@
 <?php
 /**
- * MoniTag Progress Endpoint (CORRIGIDO v2)
+ * MoniTag Progress Endpoint (v3 - APENAS IMPRESSÕES)
  * GET - Retorna progresso diário do usuário (SEM AUTENTICAÇÃO)
  * 
- * Agora cada usuário tem seu próprio número de impressões (5-12) e cliques (1) necessários
- * 
- * CORREÇÕES APLICADAS:
- * 1. Timezone padronizado para America/Sao_Paulo
- * 2. Range de impressões corrigido para 5-12
- * 3. Logs de debug melhorados
- * 4. Removido CONVERT_TZ pois MySQL já está configurado para Brasília (-03:00)
- *    NOW() já insere em horário de Brasília, então DATE(created_at) já é correto
+ * Cada usuário tem seu próprio número de impressões necessárias (fixo em 10)
+ * Lógica de cliques removida completamente
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -52,13 +46,12 @@ error_log("MoniTag Progress - user_id=$user_id, time=" . date('Y-m-d H:i:s'));
 try {
     $conn = getDbConnection();
     
-    // Buscar número de impressões necessárias DO USUÁRIO (randomizado por usuário)
+    // Buscar número de impressões necessárias DO USUÁRIO
     $required_impressions = 10; // valor padrão
-    $required_clicks = 0; // Removido - apenas impressões
     
     // Primeiro, tentar buscar da tabela user_required_impressions
     $user_settings_stmt = $conn->prepare("
-        SELECT required_impressions, required_clicks FROM user_required_impressions 
+        SELECT required_impressions FROM user_required_impressions 
         WHERE user_id = ?
     ");
     $user_settings_stmt->bind_param("i", $user_id);
@@ -68,31 +61,24 @@ try {
     if ($user_row = $user_settings_result->fetch_assoc()) {
         // Usuário tem valor personalizado
         $required_impressions = (int)$user_row['required_impressions'];
-        // Cliques removidos - apenas impressões
-        $required_clicks = 0;
     } else {
-        // Usuário não tem valor ainda, criar um aleatório (impressões: 10)
-        $required_impressions = 10; // Apenas impressões
-        $required_clicks = 0; // Removido - apenas impressões
-        
+        // Usuário não tem valor ainda, criar um
         $insert_stmt = $conn->prepare("
             INSERT INTO user_required_impressions (user_id, required_impressions, required_clicks)
-            VALUES (?, ?, ?)
+            VALUES (?, ?, 0)
             ON DUPLICATE KEY UPDATE 
                 required_impressions = VALUES(required_impressions),
-                required_clicks = VALUES(required_clicks)
+                required_clicks = 0
         ");
-        $insert_stmt->bind_param("iii", $user_id, $required_impressions, $required_clicks);
+        $insert_stmt->bind_param("ii", $user_id, $required_impressions);
         $insert_stmt->execute();
         $insert_stmt->close();
         
-        error_log("MoniTag Progress - Novo usuário: impressions=$required_impressions, clicks=$required_clicks");
+        error_log("MoniTag Progress - Novo usuário: impressions=$required_impressions");
     }
     $user_settings_stmt->close();
     
-    // Buscar progresso do dia
-    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
-    // NOW() insere em horário de Brasília, DATE(created_at) já é correto
+    // Buscar progresso do dia - APENAS IMPRESSÕES
     $today = date('Y-m-d');
     $stmt = $conn->prepare("
         SELECT 
@@ -107,14 +93,16 @@ try {
     $stmt->close();
     $conn->close();
     
+    $impressions = (int)$progress['impressions'];
+    
     $response = [
-        'impressions' => (int)$progress['impressions'],
+        'impressions' => $impressions,
         'clicks' => 0,
         'required_impressions' => $required_impressions,
         'required_clicks' => 0,
-        'impressions_completed' => (int)$progress['impressions'] >= $required_impressions,
-        'clicks_completed' => false,
-        'all_completed' => (int)$progress['impressions'] >= $required_impressions,
+        'impressions_completed' => $impressions >= $required_impressions,
+        'clicks_completed' => true,
+        'all_completed' => $impressions >= $required_impressions,
         'server_time' => date('Y-m-d H:i:s'),
         'timezone' => 'America/Sao_Paulo'
     ];
