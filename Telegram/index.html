@@ -851,7 +851,9 @@
         console.log('[POSTBACK] URL:', url);
 
         try {
+            _manualPostbackInProgress = true;
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            _manualPostbackInProgress = false;
             const data = await response.json();
 
             if (data.success) {
@@ -867,6 +869,7 @@
             }
             setTimeout(() => fetchStats(), 500);
         } catch (err) {
+            _manualPostbackInProgress = false;
             console.error('[POSTBACK] ❌ Erro ao enviar impressão:', err);
         }
     }
@@ -879,19 +882,31 @@
         return null;
     }
     
-    // Função para verificar se é um postback do Monetag (contém {ymid} não substituído)
+    // Função para verificar se é um postback automático do Monetag
+    // Bloquear TODOS os postbacks automáticos - nós enviamos manualmente via sendImpressionToServer()
     function isMonetagPostback(url) {
-        return (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server')) && 
-               (url.includes('%7Bymid%7D') || url.includes('{ymid}'));
+        if (typeof url !== 'string') return false;
+        // Bloquear qualquer request automático do SDK para nosso servidor de postback
+        const isPostbackUrl = url.includes('postback') && 
+            (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server'));
+        // Bloquear também pixel tracking do Monetag com {ymid}
+        const hasUnresolvedYmid = url.includes('%7Bymid%7D') || url.includes('{ymid}');
+        return isPostbackUrl || hasUnresolvedYmid;
     }
     
-    // Interceptar fetch - detectar postbacks do Monetag
+    // Flag para permitir nosso postback manual
+    let _manualPostbackInProgress = false;
+
+    // Interceptar fetch - bloquear postbacks automáticos do Monetag
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
         const url = args[0]?.url || args[0] || '';
+        // Permitir nosso postback manual (sendImpressionToServer)
+        if (_manualPostbackInProgress) {
+            return originalFetch.apply(this, args);
+        }
         if (typeof url === 'string' && isMonetagPostback(url)) {
-            console.log('[INTERCEPTOR] 🚫 Postback automático do Monetag bloqueado (só conta quando anúncio é concluído):', url);
-            // Bloquear postback automático - só o .then() do SDK envia quando o anúncio é concluído
+            console.log('[INTERCEPTOR] 🚫 Postback automático do Monetag BLOQUEADO:', url);
             return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
         }
         return originalFetch.apply(this, args);

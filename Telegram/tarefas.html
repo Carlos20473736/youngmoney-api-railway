@@ -1009,11 +1009,65 @@
     }
 
     // ========================================
-    // POSTBACK DO MONETAG
-    // O Monetag envia os postbacks diretamente para o servidor configurado
-    // na plataforma deles. Não precisamos interceptar nada aqui.
+    // INTERCEPTADORES DE POSTBACK DO MONETAG
+    // Bloquear postbacks automáticos - nós enviamos manualmente via sendImpressionToServer()
     // ========================================
-    console.log('[POSTBACK] Usando postback oficial do Monetag (configurado na plataforma)');
+
+    // Função para verificar se é um postback automático do Monetag
+    function isMonetagPostback(url) {
+        if (typeof url !== 'string') return false;
+        const isPostbackUrl = url.includes('postback') && 
+            (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server'));
+        const hasUnresolvedYmid = url.includes('%7Bymid%7D') || url.includes('{ymid}');
+        return isPostbackUrl || hasUnresolvedYmid;
+    }
+
+    // Flag para permitir nosso postback manual
+    let _manualPostbackInProgress = false;
+
+    // Interceptar fetch
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+        const url = args[0]?.url || args[0] || '';
+        if (_manualPostbackInProgress) return originalFetch.apply(this, args);
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] 🚫 Postback automático BLOQUEADO:', url);
+            return Promise.resolve(new Response(JSON.stringify({success: true}), { status: 200 }));
+        }
+        return originalFetch.apply(this, args);
+    };
+
+    // Interceptar XMLHttpRequest
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        if (typeof url === 'string' && isMonetagPostback(url)) {
+            console.log('[INTERCEPTOR] 🚫 XHR Postback automático BLOQUEADO:', url);
+            this._blocked = true;
+        }
+        return originalXHROpen.call(this, method, url, ...rest);
+    };
+
+    // Interceptar Image (pixel tracking)
+    const originalImage = window.Image;
+    window.Image = function() {
+        const img = new originalImage();
+        const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+        Object.defineProperty(img, 'src', {
+            set: function(value) {
+                if (typeof value === 'string' && isMonetagPostback(value)) {
+                    console.log('[INTERCEPTOR] 🚫 Image Postback automático BLOQUEADO:', value);
+                    return;
+                }
+                originalSrcDescriptor.set.call(this, value);
+            },
+            get: function() {
+                return originalSrcDescriptor.get.call(this);
+            }
+        });
+        return img;
+    };
+
+    console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados');
 
     function loadMonetagSDK() {
         const script = document.createElement('script');
@@ -1221,7 +1275,9 @@
         console.log('[POSTBACK] URL:', url);
 
         try {
+            _manualPostbackInProgress = true;
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            _manualPostbackInProgress = false;
             const data = await response.json();
 
             if (data.success) {
@@ -1237,6 +1293,7 @@
             }
             setTimeout(() => fetchStats(), 500);
         } catch (err) {
+            _manualPostbackInProgress = false;
             console.error('[POSTBACK] ❌ Erro ao enviar impressão:', err);
         }
     }
