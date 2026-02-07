@@ -1549,12 +1549,15 @@
             return;
         }
 
-        console.log('[AD] Chamando SDK com ymid e requestVar');
+        console.log('[AD] Chamando SDK com type: end, ymid e requestVar');
+        // Usar type: 'end' - a Promise resolve APÓS o usuário FECHAR/FINALIZAR o anúncio
+        // Sem type: 'end', a Promise resolve ao INICIAR, causando impressão duplicada
         window[SDK_FUNC]({
+            type: 'end',
             ymid: TaskState.userId,
             requestVar: TaskState.userEmail
         }).then((event) => {
-            console.log('[AD] ✅ Callback do Monetag recebido:', JSON.stringify(event));
+            console.log('[AD] ✅ Anúncio FINALIZADO pelo usuário! Callback recebido:', JSON.stringify(event));
             
             // VERIFICAR SE HOUVE GANHO REAL
             // Se o usuário fechou o anúncio antes de completar,
