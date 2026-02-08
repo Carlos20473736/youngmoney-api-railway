@@ -40,7 +40,7 @@ if (preg_match('/^\/assets\//', $path) || preg_match('/^\/__manus__\//', $path))
 // APIs PHP - verificar se é uma rota de API
 $apiPaths = ['/api/', '/user/', '/ranking/', '/pix/', '/monetag/', '/admin/', '/admin-panel/', 
              '/invite/', '/history/', '/settings/', '/withdraw/', '/notifications/', 
-             '/database/', '/middleware/', '/migrations/', '/routes/'];
+             '/database/', '/middleware/', '/migrations/', '/routes/', '/uploads/'];
 
 foreach ($apiPaths as $apiPath) {
     if (strpos($path, $apiPath) === 0) {

@@ -21,6 +21,7 @@ import Database from "./pages/Database";
 import Monetag from "./pages/Monetag";
 import AllowedInstallers from "./pages/AllowedInstallers";
 import AppUpdate from "./pages/AppUpdate";
+import ApkManager from "./pages/ApkManager";
 
 function Router() {
   return (
@@ -70,6 +71,12 @@ function Router() {
       <Route path={"/app-update"}>
         <DashboardLayout>
           <AppUpdate />
+        </DashboardLayout>
+      </Route>
+      
+      <Route path={"/apk-manager"}>
+        <DashboardLayout>
+          <ApkManager />
         </DashboardLayout>
       </Route>
       

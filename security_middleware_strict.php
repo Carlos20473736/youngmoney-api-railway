@@ -50,7 +50,9 @@ $maintenanceExemptEndpoints = [
     '/api/v1/app/check-update.php',
     '/api/v1/app/version.php',
     '/api/v1/cron/',
-    '/api/v1/reset/'
+    '/api/v1/reset/',
+    '/api/v1/apk/',
+    '/uploads/apk/'
 ];
 
 // Verificar se é endpoint isento de manutenção
@@ -235,7 +237,9 @@ $publicEndpoints = [
     '/health',
     '/health.php',
     '/api/v1/cron/',
-    '/api/v1/reset/'
+    '/api/v1/reset/',
+    '/api/v1/apk/',
+    '/uploads/apk/'
 ];
 
 // Verificar se é endpoint público

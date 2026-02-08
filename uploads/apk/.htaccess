@@ -1,0 +1,8 @@
+# Permitir download direto de arquivos APK
+<Files "*.apk">
+    ForceType application/vnd.android.package-archive
+    Header set Content-Disposition attachment
+</Files>
+
+# Bloquear listagem de diretório
+Options -Indexes

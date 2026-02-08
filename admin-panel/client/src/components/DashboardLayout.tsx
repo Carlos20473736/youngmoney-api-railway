@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, PanelLeft, Users, DollarSign, Trophy, Settings, ScrollText, Dices, Bell, ShieldBan, Shield, Database, Coins, Cog, Smartphone, Download } from "lucide-react";
+import { LayoutDashboard, PanelLeft, Users, DollarSign, Trophy, Settings, ScrollText, Dices, Bell, ShieldBan, Shield, Database, Coins, Cog, Smartphone, Download, FileArchive } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -28,6 +28,7 @@ const menuItems = [
   { icon: Coins, label: "Monetag", path: "/monetag" },
   { icon: Smartphone, label: "Instalação", path: "/installers" },
   { icon: Download, label: "Atualização App", path: "/app-update" },
+  { icon: FileArchive, label: "APK Download", path: "/apk-manager" },
   { icon: ShieldBan, label: "Blacklist", path: "/blacklist" },
   { icon: Shield, label: "Segurança", path: "/security" },
   { icon: Cog, label: "Config. Sistema", path: "/system-settings" },

@@ -14,3 +14,8 @@ build/
 *.swp
 *.swo
 *~
+
+# APK uploads (arquivos grandes, não versionar)
+uploads/apk/*.apk
+!uploads/apk/.gitkeep
+!uploads/apk/.htaccess

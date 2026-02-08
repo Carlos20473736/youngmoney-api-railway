@@ -19,6 +19,9 @@ COPY Caddyfile /etc/frankenphp/Caddyfile
 # Criar diretório de logs
 RUN mkdir -p /var/log && touch /var/log/php_errors.log && chmod 666 /var/log/php_errors.log
 
+# Criar diretório de uploads para APK com permissões
+RUN mkdir -p /app/uploads/apk && chmod -R 777 /app/uploads
+
 # Expor porta (Railway usa PORT dinâmica, Caddyfile usa {$PORT:80})
 EXPOSE 80
 

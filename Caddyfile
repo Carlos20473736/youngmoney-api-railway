@@ -21,9 +21,18 @@
         file_server
     }
     
+    # Servir arquivos APK diretamente para download
+    @apkfiles path /uploads/apk/*.apk
+    handle @apkfiles {
+        root * /app
+        header Content-Type application/vnd.android.package-archive
+        header Content-Disposition attachment
+        file_server
+    }
+    
     # PHP API endpoints - processar primeiro
     @phpapi {
-        path /api/* /user/* /ranking/* /pix/* /monetag/* /admin/* /admin-panel/* /invite/* /history/* /settings/* /withdraw/* /notifications/* /database/* /middleware/* /migrations/* /routes/*
+        path /api/* /user/* /ranking/* /pix/* /monetag/* /admin/* /admin-panel/* /invite/* /history/* /settings/* /withdraw/* /notifications/* /database/* /middleware/* /migrations/* /routes/* /uploads/*
     }
     handle @phpapi {
         php_server
