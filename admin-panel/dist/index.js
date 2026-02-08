@@ -1,3 +1,5 @@
+import { createRequire } from "module"; import { fileURLToPath } from "url"; import { dirname as esmDirname } from "path"; const require = createRequire(import.meta.url); const __filename = fileURLToPath(import.meta.url); const __dirname = esmDirname(__filename); if (typeof import.meta.dirname === "undefined") { Object.defineProperty(import.meta, "dirname", { value: __dirname }); }
+
 // server/_core/index.ts
 import "dotenv/config";
 import express2 from "express";
