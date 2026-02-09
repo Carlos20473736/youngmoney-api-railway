@@ -259,6 +259,71 @@
             50% { opacity: 1; }
         }
 
+        /* YMID do usuario */
+        .ymid-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            padding: 0.5rem 1rem;
+            margin: 0.5rem 1.25rem 0;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(167, 139, 250, 0.08) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.25);
+            border-radius: 0.75rem;
+            z-index: 1;
+        }
+
+        .ymid-label {
+            color: #a78bfa;
+            font-size: 0.75rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+        }
+
+        .ymid-value {
+            color: #a78bfa;
+            font-size: 0.75rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 10rem;
+        }
+
+        .ymid-copy-btn {
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 0.375rem;
+            color: #a78bfa;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.625rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .ymid-copy-btn:active {
+            background: rgba(139, 92, 246, 0.4);
+            transform: scale(0.95);
+        }
+
+        .ymid-copy-btn.copied {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .ymid-copy-btn svg {
+            width: 0.75rem;
+            height: 0.75rem;
+        }
+
         /* Contador de giros */
         .spins-counter {
             text-align: center;
@@ -765,7 +830,7 @@
                 opacity: 0;
             }
         }
-    
+
         /* ========== MODAL AVISO TELEGRAM ========== */
         .telegram-modal-overlay {
             position: fixed;
@@ -1645,6 +1710,19 @@
     <div class="header-title"></div>
 </div>
 
+<!-- YMID do usuario -->
+<div class="ymid-container" id="ymidContainer">
+    <span class="ymid-label">YMID:</span>
+    <span class="ymid-value" id="ymidValue">Carregando...</span>
+    <button class="ymid-copy-btn" id="ymidCopyBtn" onclick="copyYmid()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        Copiar
+    </button>
+</div>
+
 <!-- Contador de giros -->
 <div class="spins-counter">
     <div class="spins-today-text" id="spinsToday">Giros hoje: 0/10</div>
@@ -1964,7 +2042,7 @@
         try {
             // PRIMEIRO: Buscar os requisitos da API (required_impressions)
             console.log('[ROLETA-TASK] Buscando requisitos da API...');
-            const requirementsUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
+            const requirementsUrl = `https://youngmoney-bot-production-110d.up.railway.app/api/youngmoney/monetag/progress?ymid=${userId}`;
             console.log('[ROLETA-TASK] URL requisitos:', requirementsUrl);
 
             const reqResponse = await fetch(requirementsUrl, {
@@ -1984,7 +2062,7 @@
             }
 
             // SEGUNDO: Buscar as estatísticas do usuário
-            const statsUrl = `https://monetag-postback-server-production.up.railway.app/api/stats/user/${userId}`;
+            const statsUrl = `https://youngmoney-bot-production-110d.up.railway.app/api/youngmoney/monetag/progress?ymid=${userId}`;
             console.log('[ROLETA-TASK] Chamando API de stats...');
             console.log('[ROLETA-TASK] URL:', statsUrl);
 
@@ -2003,15 +2081,15 @@
             console.log('[ROLETA-TASK] Resposta completa da API:', JSON.stringify(data));
 
             if (data.success) {
-                // A API retorna: total_impressions (apenas impressões)
-                const impressions = data.total_impressions || 0;
+                // A API retorna: all_completed (se todas as tarefas foram concluídas)
+                taskCompleted = data.data?.all_completed || false;
 
                 console.log('[ROLETA-TASK] ✅ Dados obtidos com sucesso!');
-                console.log('[ROLETA-TASK]   - Impressões: ' + impressions);
+                console.log('[ROLETA-TASK]   - Impressões: ' + (data.data?.impressions || 0));
+                console.log('[ROLETA-TASK]   - Cliques: ' + (data.data?.clicks || 0));
 
-                // Verificar se tarefa foi concluída - APENAS IMPRESSÕES
-                taskCompleted = impressions >= REQUIRED_IMPRESSIONS;
-                console.log('[ROLETA-TASK] Verificação: ' + impressions + ' >= ' + REQUIRED_IMPRESSIONS + ' = ' + taskCompleted);
+                // Verificar se tarefa foi concluída
+                console.log('[ROLETA-TASK] Verificação: all_completed = ' + taskCompleted);
 
                 // Se tarefa foi concluída, esconder botão de anúncio e desbloquear roleta
                 if (taskCompleted) {
@@ -2501,10 +2579,10 @@
         }
     }
 
-    // Se não conseguiu do Android, usar dados genéricos
+    // Se não conseguiu do Android, manter null
     if (!userId) {
-        userId = 'app_user_' + Date.now();
-        console.log('[MONETAG] Usando User ID genérico:', userId);
+        userId = null;
+        console.log('[MONETAG] User ID não disponível');
     }
     if (!userEmail) {
         userEmail = 'guest@youngmoney.com';
@@ -2823,6 +2901,116 @@
 
     // Verificar se existe cooldown salvo ao carregar a página
     checkSavedCooldown();
+
+    // ========================================
+    // YMID DISPLAY E COPIA
+    // ========================================
+    function displayYmid() {
+        let ymid = null;
+
+        // 1. Tentar usar userId injetado pelo Java (onPageFinished)
+        if (window._injectedUserId && window._injectedUserId.trim() !== '') {
+            ymid = window._injectedUserId.trim();
+            console.log('[YMID] Usando ID injetado pelo Java:', ymid);
+        }
+
+        // 2. Tentar obter do Android.getUserId()
+        if (!ymid && typeof Android !== 'undefined' && Android.getUserId) {
+            try {
+                var rawId = Android.getUserId();
+                if (rawId && rawId.trim() !== '') {
+                    ymid = rawId.trim();
+                    console.log('[YMID] Usando ID do Android.getUserId():', ymid);
+                }
+            } catch (e) {
+                console.warn('[YMID] Erro ao obter YMID via Android:', e);
+            }
+        }
+
+        // 3. Fallback: usar userId global (se for numerico/real)
+        if (!ymid && userId && userId.trim() !== '' && !userId.startsWith('app_user_')) {
+            ymid = userId.trim();
+            console.log('[YMID] Usando userId global:', ymid);
+        }
+
+        // Se ainda nao tem, mostrar N/A
+        if (!ymid) {
+            ymid = 'N/A';
+            console.log('[YMID] Nenhum ID disponivel, mostrando N/A');
+        }
+
+        const ymidEl = document.getElementById('ymidValue');
+        if (ymidEl) {
+            ymidEl.textContent = ymid;
+            ymidEl.setAttribute('data-ymid', ymid);
+        }
+        console.log('[YMID] YMID final exibido:', ymid);
+    }
+
+    function copyYmid() {
+        const ymidEl = document.getElementById('ymidValue');
+        const copyBtn = document.getElementById('ymidCopyBtn');
+        if (!ymidEl) return;
+
+        const ymid = ymidEl.getAttribute('data-ymid') || ymidEl.textContent;
+
+        // Tentar copiar via Android
+        if (typeof Android !== 'undefined' && Android.copyToClipboard) {
+            try {
+                Android.copyToClipboard(ymid);
+                showCopiedFeedback(copyBtn);
+                return;
+            } catch (e) {
+                console.warn('[YMID] Erro ao copiar via Android:', e);
+            }
+        }
+
+        // Fallback: copiar via navigator.clipboard
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(ymid).then(function() {
+                showCopiedFeedback(copyBtn);
+            }).catch(function() {
+                fallbackCopy(ymid, copyBtn);
+            });
+        } else {
+            fallbackCopy(ymid, copyBtn);
+        }
+    }
+
+    function fallbackCopy(text, copyBtn) {
+        var textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showCopiedFeedback(copyBtn);
+        } catch (e) {
+            console.error('[YMID] Falha ao copiar:', e);
+        }
+        document.body.removeChild(textArea);
+    }
+
+    function showCopiedFeedback(btn) {
+        if (!btn) return;
+        btn.classList.add('copied');
+        var originalHTML = btn.innerHTML;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copiado!';
+        setTimeout(function() {
+            btn.classList.remove('copied');
+            btn.innerHTML = originalHTML;
+        }, 2000);
+    }
+
+    // Exibir YMID ao carregar
+    displayYmid();
+
+    // Expor funcoes
+    window.copyYmid = copyYmid;
+    window.displayYmid = displayYmid;
 
     console.log('[ROLETA] Funções expostas: spin(prizeValue), updateSpinsCounter(), setPrizeValues(array)');
     console.log('[ROLETA] Valores iniciais (padrão):', segments.map(s => s.value));
