@@ -1962,12 +1962,33 @@
         }
 
         try {
-            // Buscar progresso da tarefa via API YoungMoney
-            console.log('[ROLETA-TASK] Buscando progresso da tarefa...');
-            const progressUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
-            console.log('[ROLETA-TASK] URL progresso:', progressUrl);
+            // PRIMEIRO: Buscar os requisitos da API (required_impressions)
+            console.log('[ROLETA-TASK] Buscando requisitos da API...');
+            const requirementsUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
+            console.log('[ROLETA-TASK] URL requisitos:', requirementsUrl);
 
-            const response = await fetch(progressUrl, {
+            const reqResponse = await fetch(requirementsUrl, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (reqResponse.ok) {
+                const reqData = await reqResponse.json();
+                console.log('[ROLETA-TASK] Resposta requisitos:', JSON.stringify(reqData));
+
+                if (reqData.success && reqData.data) {
+                    REQUIRED_IMPRESSIONS = reqData.data.required_impressions || 5;
+                    console.log('[ROLETA-TASK] ✅ Requisitos carregados da API:');
+                    console.log('[ROLETA-TASK]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
+                }
+            }
+
+            // SEGUNDO: Buscar as estatísticas do usuário
+            const statsUrl = `https://monetag-postback-server-production.up.railway.app/api/stats/user/${userId}`;
+            console.log('[ROLETA-TASK] Chamando API de stats...');
+            console.log('[ROLETA-TASK] URL:', statsUrl);
+
+            const response = await fetch(statsUrl, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -1982,13 +2003,15 @@
             console.log('[ROLETA-TASK] Resposta completa da API:', JSON.stringify(data));
 
             if (data.success) {
-                // A API retorna: all_completed (se todas as tarefas foram concluídas)
-                taskCompleted = data.data?.all_completed || data.all_completed || false;
+                // A API retorna: total_impressions (apenas impressões)
+                const impressions = data.total_impressions || 0;
 
                 console.log('[ROLETA-TASK] ✅ Dados obtidos com sucesso!');
-                console.log('[ROLETA-TASK]   - Tarefa concluída: ' + taskCompleted);
-                console.log('[ROLETA-TASK]   - Impressões: ' + (data.data?.impressions || data.impressions || 0));
-                console.log('[ROLETA-TASK]   - Cliques: ' + (data.data?.clicks || data.clicks || 0));
+                console.log('[ROLETA-TASK]   - Impressões: ' + impressions);
+
+                // Verificar se tarefa foi concluída - APENAS IMPRESSÕES
+                taskCompleted = impressions >= REQUIRED_IMPRESSIONS;
+                console.log('[ROLETA-TASK] Verificação: ' + impressions + ' >= ' + REQUIRED_IMPRESSIONS + ' = ' + taskCompleted);
 
                 // Se tarefa foi concluída, esconder botão de anúncio e desbloquear roleta
                 if (taskCompleted) {
