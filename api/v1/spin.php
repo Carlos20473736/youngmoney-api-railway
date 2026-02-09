@@ -131,8 +131,51 @@ try {
         $greeting = 'BOA NOITE';
     }
     
-    // Se for GET, apenas retornar giros restantes e valores da roleta
+    // Se for GET, retornar giros restantes, valores da roleta E status da tarefa monetag
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        // ========================================
+        // VERIFICAR PROGRESSO DA TAREFA MONETAG
+        // ========================================
+        $required_impressions = 10; // valor padrão
+        $current_impressions = 0;
+        $task_completed = false;
+        
+        try {
+            // Buscar número de impressões necessárias do usuário
+            $user_settings_stmt = $conn->prepare("
+                SELECT required_impressions FROM user_required_impressions 
+                WHERE user_id = ?
+            ");
+            $user_settings_stmt->bind_param("i", $userId);
+            $user_settings_stmt->execute();
+            $user_settings_result = $user_settings_stmt->get_result();
+            
+            if ($user_row = $user_settings_result->fetch_assoc()) {
+                $required_impressions = (int)$user_row['required_impressions'];
+            }
+            $user_settings_stmt->close();
+            
+            // Buscar progresso do dia - APENAS IMPRESSÕES
+            $today = date('Y-m-d');
+            $stmt = $conn->prepare("
+                SELECT COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions
+                FROM monetag_events
+                WHERE user_id = ? AND DATE(created_at) = ?
+            ");
+            $stmt->bind_param("is", $userId, $today);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $progress = $result->fetch_assoc();
+            $stmt->close();
+            
+            $current_impressions = (int)$progress['impressions'];
+            $task_completed = $current_impressions >= $required_impressions;
+            
+            error_log("[SPIN GET] Tarefa monetag - user_id=$userId, impressions=$current_impressions, required=$required_impressions, completed=$task_completed");
+        } catch (Exception $e) {
+            error_log("[SPIN GET] Erro ao verificar tarefa monetag: " . $e->getMessage());
+        }
+        
         echo json_encode([
             'status' => 'success',
             'data' => [
@@ -142,7 +185,12 @@ try {
                 'max_daily_spins' => $maxDailySpins,
                 'prize_values' => $prizeValues,
                 'server_time' => $currentDateTime,
-                'server_timestamp' => time()
+                'server_timestamp' => time(),
+                'task_completed' => $task_completed,
+                'monetag_progress' => [
+                    'impressions' => $current_impressions,
+                    'required_impressions' => $required_impressions
+                ]
             ]
         ]);
         exit;
@@ -243,3 +291,4 @@ try {
     ]);
 }
 ?>
+
