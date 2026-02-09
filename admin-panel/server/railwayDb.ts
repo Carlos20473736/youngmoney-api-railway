@@ -566,6 +566,123 @@ export async function updateDailyTask(id: number, data: { task_name?: string; po
   }
 }
 
+// ============= PROGRESSO DE TAREFAS DO USUÁRIO =============
+
+/**
+ * Verifica se um usuário completou uma tarefa específica
+ * @param userId ID do usuário
+ * @param taskType Tipo de tarefa (ex: 'impression', 'roulette_spin', etc)
+ * @returns true se a tarefa foi completada, false caso contrário
+ */
+export async function checkUserTaskCompletion(userId: number, taskType: string) {
+  try {
+    const rows = await executeRawQuery(
+      `SELECT is_completed, completed_at FROM daily_tasks WHERE user_id = ? AND task_type = ? AND DATE(created_at) = CURDATE()`,
+      [userId, taskType]
+    );
+    
+    if (rows.length === 0) {
+      console.log(`[Railway DB] Task '${taskType}' not found for user ${userId}`);
+      return false;
+    }
+    
+    const isCompleted = rows[0]?.is_completed === 1 || rows[0]?.is_completed === true;
+    console.log(`[Railway DB] Task '${taskType}' for user ${userId}: ${isCompleted ? 'COMPLETED' : 'PENDING'}`);
+    return isCompleted;
+  } catch (error) {
+    console.error("[Railway DB] Error checking task completion:", error);
+    return false;
+  }
+}
+
+/**
+ * Marca uma tarefa como completa para um usuário
+ * @param userId ID do usuário
+ * @param taskType Tipo de tarefa
+ * @param pointsAwarded Pontos a serem concedidos
+ * @returns true se atualizado com sucesso
+ */
+export async function completeUserTask(userId: number, taskType: string, pointsAwarded: number = 0) {
+  try {
+    // Verificar se tarefa já existe para hoje
+    const existingTask = await executeRawQuery(
+      `SELECT id FROM daily_tasks WHERE user_id = ? AND task_type = ? AND DATE(created_at) = CURDATE()`,
+      [userId, taskType]
+    );
+    
+    if (existingTask.length > 0) {
+      // Atualizar tarefa existente
+      await executeRawQuery(
+        `UPDATE daily_tasks SET is_completed = 1, completed_at = NOW(), points_awarded = ? WHERE id = ?`,
+        [pointsAwarded, existingTask[0].id]
+      );
+      console.log(`[Railway DB] Task '${taskType}' marked as completed for user ${userId}`);
+    } else {
+      // Criar nova tarefa
+      await executeRawQuery(
+        `INSERT INTO daily_tasks (user_id, task_type, is_completed, points_awarded, completed_at, created_at) VALUES (?, ?, 1, ?, NOW(), NOW())`,
+        [userId, taskType, pointsAwarded]
+      );
+      console.log(`[Railway DB] New task '${taskType}' created and marked as completed for user ${userId}`);
+    }
+    
+    // Adicionar pontos ao usuário se especificado
+    if (pointsAwarded > 0) {
+      await executeRawQuery(
+        `UPDATE users SET points = points + ? WHERE id = ?`,
+        [pointsAwarded, userId]
+      );
+      console.log(`[Railway DB] Added ${pointsAwarded} points to user ${userId} for task '${taskType}'`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("[Railway DB] Error completing task:", error);
+    return false;
+  }
+}
+
+/**
+ * Obtém o progresso de uma tarefa específica para um usuário
+ * @param userId ID do usuário
+ * @param taskType Tipo de tarefa
+ * @returns Objeto com informações do progresso
+ */
+export async function getUserTaskProgress(userId: number, taskType: string) {
+  try {
+    const rows = await executeRawQuery(
+      `SELECT id, task_type, is_completed, points_awarded, completed_at, created_at FROM daily_tasks WHERE user_id = ? AND task_type = ? AND DATE(created_at) = CURDATE()`,
+      [userId, taskType]
+    );
+    
+    if (rows.length === 0) {
+      return {
+        found: false,
+        completed: false,
+        points: 0,
+        completedAt: null
+      };
+    }
+    
+    const task = rows[0];
+    return {
+      found: true,
+      completed: task.is_completed === 1 || task.is_completed === true,
+      points: task.points_awarded || 0,
+      completedAt: task.completed_at,
+      createdAt: task.created_at
+    };
+  } catch (error) {
+    console.error("[Railway DB] Error fetching task progress:", error);
+    return {
+      found: false,
+      completed: false,
+      points: 0,
+      completedAt: null
+    };
+  }
+}
+
 // ============= NOTIFICAÇÕES =============
 
 export async function getNotifications(limit = 100) {

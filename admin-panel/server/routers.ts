@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
+import { taskProgressRouter } from "./taskProgressRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -11,6 +12,7 @@ const adminProcedure = publicProcedure;
 
 export const appRouter = router({
   system: systemRouter,
+  taskProgress: taskProgressRouter,
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
