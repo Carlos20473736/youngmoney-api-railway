@@ -203,6 +203,7 @@ try {
     ];
     
     // Buscar Top 10 do ranking (apenas usuários com pontos > 0, PIX cadastrado e SEM cooldown ativo)
+    // IMPORTANTE: Usuários em cooldown NÃO aparecem no ranking
     $topRankingResult = $mysqli->query("
         SELECT u.id, u.name, u.email, u.daily_points, u.pix_key, u.pix_key_type 
         FROM users u
@@ -214,6 +215,16 @@ try {
         ORDER BY u.daily_points DESC 
         LIMIT 10
     ");
+    
+    // IMPORTANTE: Bloquear acúmulo de pontos para usuários em cooldown
+    // Isso garante que durante o cooldown, o usuário não acumule pontos
+    $blockCooldownResult = $mysqli->query("
+        SELECT user_id FROM ranking_cooldowns WHERE cooldown_until > NOW()
+    ");
+    $blockedUserIds = [];
+    while ($row = $blockCooldownResult->fetch_assoc()) {
+        $blockedUserIds[] = $row['user_id'];
+    }
     
     $prizesAwarded = [];
     $cooldownsCreated = [];
@@ -321,17 +332,22 @@ try {
     // Coletar IDs do top 10 que já foram processados
     $top10UserIds = array_column($prizesAwarded, 'user_id');
     
-    // Resetar APENAS os usuários do top 10
+    // Resetar APENAS os usuarios do top 10 que NAO estao em cooldown
     $usersAffected = 0;
     if (!empty($top10UserIds)) {
-        $placeholders = implode(',', array_fill(0, count($top10UserIds), '?'));
-        $types = str_repeat('i', count($top10UserIds));
+        // Filtrar usuarios que estao em cooldown
+        $top10UserIdsFiltered = array_diff($top10UserIds, $blockedUserIds);
         
-        $stmt = $mysqli->prepare("UPDATE users SET daily_points = 0 WHERE id IN ($placeholders)");
-        $stmt->bind_param($types, ...$top10UserIds);
-        $stmt->execute();
-        $usersAffected = $stmt->affected_rows;
-        $stmt->close();
+        if (!empty($top10UserIdsFiltered)) {
+            $placeholders = implode(',', array_fill(0, count($top10UserIdsFiltered), '?'));
+            $types = str_repeat('i', count($top10UserIdsFiltered));
+            
+            $stmt = $mysqli->prepare("UPDATE users SET daily_points = 0 WHERE id IN ($placeholders)");
+            $stmt->bind_param($types, ...$top10UserIdsFiltered);
+            $stmt->execute();
+            $usersAffected = $stmt->affected_rows;
+            $stmt->close();
+        }
     }
     
     // Log: Usuários do 11º em diante MANTÊM seus pontos
