@@ -238,12 +238,12 @@ try {
         if (!$cooldownCheck['allowed']) {
             echo json_encode([
                 'status' => 'error',
-                'message' => 'Voce esta em cooldown de ranking. Nao pode acumular pontos agora.',
+                'message' => 'Voce esta em cooldown de ranking. Nao pode acumular pontos no ranking agora.',
                 'data' => [
                     'reason' => $cooldownCheck['reason'],
                     'cooldown_info' => $cooldownCheck['cooldown_info'],
-                    'can_still_checkin' => false,
-                    'note' => 'Voce nao pode fazer check-in durante o cooldown'
+                    'can_still_checkin' => true,
+                    'note' => 'Voce pode fazer check-in, mas os pontos nao serao adicionados ao ranking diario'
                 ]
             ]);
             exit;
