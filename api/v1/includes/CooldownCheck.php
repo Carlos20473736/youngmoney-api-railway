@@ -5,8 +5,8 @@
  * Função para verificar se um usuário está em cooldown e bloquear acúmulo de daily_points
  * 
  * Cooldown:
- * - Top 1-3: 24 horas
- * - Top 4-10: 2 horas
+ * - Top 1-3: 24 horas - BLOQUEIA acúmulo de pontos
+ * - Top 4-10: 2 horas - APENAS bloqueio visual (pontos continuam acumulando)
  */
 
 /**
@@ -85,53 +85,61 @@ function getTimeRemaining($cooldownUntil) {
 }
 
 /**
- * Bloqueia adição de daily_points se usuário está em cooldown
+ * Bloqueia adicao de daily_points APENAS para Top 1-3
+ * Top 4-10 podem continuar acumulando pontos normalmente
  * 
- * @param mysqli $conn - Conexão com banco de dados
- * @param int $userId - ID do usuário
+ * @param mysqli $conn - Conexao com banco de dados
+ * @param int $userId - ID do usuario
  * @param int $pointsToAdd - Pontos que seriam adicionados
- * @param string $description - Descrição da atividade
+ * @param string $description - Descricao da atividade
  * @return array - ['allowed' => bool, 'reason' => string, 'cooldown_info' => array]
  */
 function shouldBlockDailyPoints($conn, $userId, $pointsToAdd, $description) {
     $cooldownCheck = checkUserCooldown($conn, $userId);
     
     if ($cooldownCheck['in_cooldown']) {
-        // Registrar tentativa de acúmulo durante cooldown
-        $stmt = $conn->prepare("
-            INSERT INTO cooldown_violations (user_id, position, attempted_points, description, created_at)
-            VALUES (?, ?, ?, ?, NOW())
-        ");
-        $stmt->bind_param("iis", $userId, $cooldownCheck['position'], $pointsToAdd, $description);
-        $stmt->execute();
-        $stmt->close();
-        
-        return [
-            'allowed' => false,
-            'reason' => 'Usuário está em cooldown de ranking',
-            'cooldown_info' => [
-                'position' => $cooldownCheck['position'],
-                'cooldown_hours' => $cooldownCheck['cooldown_hours'],
-                'cooldown_until' => $cooldownCheck['cooldown_until'],
-                'time_remaining' => $cooldownCheck['time_remaining']
-            ]
-        ];
+        // APENAS bloquear para posicoes 1-3 (Top 3)
+        // Posicoes 4-10 podem continuar acumulando pontos
+        if ($cooldownCheck['position'] >= 1 && $cooldownCheck['position'] <= 3) {
+            // Registrar tentativa de acumulo durante cooldown
+            $stmt = $conn->prepare("
+                INSERT INTO cooldown_violations (user_id, position, attempted_points, description, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            ");
+            $stmt->bind_param("iis", $userId, $cooldownCheck['position'], $pointsToAdd, $description);
+            $stmt->execute();
+            $stmt->close();
+            
+            return [
+                'allowed' => false,
+                'reason' => 'Usuario esta em cooldown de ranking (Top 3)',
+                'cooldown_info' => [
+                    'position' => $cooldownCheck['position'],
+                    'cooldown_hours' => $cooldownCheck['cooldown_hours'],
+                    'cooldown_until' => $cooldownCheck['cooldown_until'],
+                    'time_remaining' => $cooldownCheck['time_remaining']
+                ]
+            ];
+        } else {
+            // Posicoes 4-10: Permitir acumulo de pontos (apenas bloqueio visual no ranking)
+            return ['allowed' => true];
+        }
     }
     
     return ['allowed' => true];
 }
 
 /**
- * Cria tabela de violações de cooldown se não existir
+ * Cria tabela de violacoes de cooldown se nao existir
  * 
- * @param mysqli $conn - Conexão com banco de dados
+ * @param mysqli $conn - Conexao com banco de dados
  */
 function createCooldownViolationsTable($conn) {
     $conn->query("
         CREATE TABLE IF NOT EXISTS cooldown_violations (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
-            position INT NOT NULL COMMENT 'Posição que o usuário estava quando entrou em cooldown',
+            position INT NOT NULL COMMENT 'Posicao que o usuario estava quando entrou em cooldown',
             attempted_points INT NOT NULL COMMENT 'Pontos que tentou acumular',
             description VARCHAR(255) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
