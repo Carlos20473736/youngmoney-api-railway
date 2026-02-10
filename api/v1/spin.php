@@ -35,7 +35,6 @@ require_once __DIR__ . '/../../middleware/auto_reset.php';
 require_once __DIR__ . '/../../includes/security_validation_helper.php';
 require_once __DIR__ . '/../../includes/auth_helper.php';
 require_once __DIR__ . '/middleware/MaintenanceCheck.php';
-require_once __DIR__ . '/includes/CooldownCheck.php';
 
 // Obter conexão
 $conn = getDbConnection();
@@ -207,25 +206,6 @@ try {
                 'spins_today' => $spinsToday,
                 'max_daily_spins' => $maxDailySpins,
                 'server_time' => $currentDateTime
-            ]
-        ]);
-        exit;
-    }
-    
-    // ========================================
-    // VERIFICAR COOLDOWN ANTES DE ADICIONAR PONTOS
-    // ========================================
-    $cooldownCheck = shouldBlockDailyPoints($conn, $userId, 0, 'Spin - Tentativa durante cooldown');
-    
-    if (!$cooldownCheck['allowed']) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Voce esta em cooldown de ranking. Nao pode acumular pontos no ranking agora.',
-            'data' => [
-                'reason' => $cooldownCheck['reason'],
-                'cooldown_info' => $cooldownCheck['cooldown_info'],
-                'can_still_spin' => true,
-                'note' => 'Voce pode girar, mas os pontos nao serao adicionados ao ranking diario'
             ]
         ]);
         exit;
