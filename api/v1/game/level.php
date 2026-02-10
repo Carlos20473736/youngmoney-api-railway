@@ -28,6 +28,7 @@ try {
     require_once __DIR__ . '/../../../db_config.php';
     require_once __DIR__ . '/../../../includes/auth_helper.php';
     require_once __DIR__ . '/../middleware/MaintenanceCheck.php';
+    require_once __DIR__ . '/../includes/CooldownCheck.php';
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Include error: ' . $e->getMessage()]);
@@ -195,16 +196,29 @@ if ($method === 'GET') {
             $stmtReset->close();
             error_log("[LEVEL.PHP] Reset candy_level_progress for user $userId to level $newLevel");
             
-            // CORREÇÃO: Creditar os pontos ao usuário quando o level termina
+            // CORRECCAO: Creditar os pontos ao usuario quando o level termina
             if ($lastLevelScore > 0) {
+                // ========================================
+                // VERIFICAR COOLDOWN ANTES DE ADICIONAR PONTOS
+                // ========================================
+                $cooldownCheck = shouldBlockDailyPoints($conn, $userId, 0, 'Game Level - Tentativa durante cooldown');
+                
                 $pointsAdded = $lastLevelScore;
                 
-                // Adicionar pontos ao ranking do usuário (daily_points para o ranking diário)
-                $stmtPoints = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
-                $stmtPoints->bind_param("iii", $pointsAdded, $pointsAdded, $userId);
-                $stmtPoints->execute();
-                $stmtPoints->close();
-                
+                if (!$cooldownCheck['allowed']) {
+                    // Bloquear adicao de daily_points, mas permitir pontos gerais
+                    $stmtPoints = $conn->prepare("UPDATE users SET points = points + ? WHERE id = ?");
+                    $stmtPoints->bind_param("ii", $pointsAdded, $userId);
+                    $stmtPoints->execute();
+                    $stmtPoints->close();
+                    error_log("[LEVEL.PHP] User $userId in cooldown - only general points added: $pointsAdded");
+                } else {
+                    // Adicionar pontos ao ranking do usuario (daily_points para o ranking diario)
+                    $stmtPoints = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
+                    $stmtPoints->bind_param("iii", $pointsAdded, $pointsAdded, $userId);
+                    $stmtPoints->execute();
+                    $stmtPoints->close();
+                }                
                 // Registrar no histórico de pontos
                 $description = "Candy Crush - Level " . ($newLevel - 1) . " completado: " . $lastLevelScore . " pontos";
                 $stmtHistory = $conn->prepare("INSERT INTO points_history (user_id, points, description, created_at) VALUES (?, ?, ?, NOW())");
