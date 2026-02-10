@@ -99,7 +99,13 @@ try {
     // Isso cobre casos onde o cron falhou na janela normal
     $missed_reset = (!$already_reset_today && $current_hour >= 0);
     
-    if ($already_reset_today) {
+    // Verificar se foi solicitado reset forçado
+    $force_reset = isset($_GET['force']) && $_GET['force'] === '1';
+    
+    if ($force_reset) {
+        $should_reset = true;
+        $reason = 'Reset forçado executado!';
+    } elseif ($already_reset_today) {
         $should_reset = false;
         $reason = 'Reset já foi executado hoje às ' . date('H:i:s', strtotime($last_reset_time));
     } elseif ($is_reset_window) {
