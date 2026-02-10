@@ -206,12 +206,8 @@ if ($method === 'GET') {
                 $pointsAdded = $lastLevelScore;
                 
                 if (!$cooldownCheck['allowed']) {
-                    // Bloquear adicao de daily_points, mas permitir pontos gerais
-                    $stmtPoints = $conn->prepare("UPDATE users SET points = points + ? WHERE id = ?");
-                    $stmtPoints->bind_param("ii", $pointsAdded, $userId);
-                    $stmtPoints->execute();
-                    $stmtPoints->close();
-                    error_log("[LEVEL.PHP] User $userId in cooldown - only general points added: $pointsAdded");
+                    // Bloquear TODOS os pontos durante cooldown
+                    error_log("[LEVEL.PHP] User $userId in cooldown - NO points added: $pointsAdded");
                 } else {
                     // Adicionar pontos ao ranking do usuario (daily_points para o ranking diario)
                     $stmtPoints = $conn->prepare("UPDATE users SET daily_points = daily_points + ?, points = points + ? WHERE id = ?");
