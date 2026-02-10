@@ -15,7 +15,6 @@ error_reporting(0);
 require_once __DIR__ . "/../../database.php";
 require_once __DIR__ . "/../../includes/auth_helper.php";
 require_once __DIR__ . '/middleware/MaintenanceCheck.php';
-require_once __DIR__ . '/includes/CooldownCheck.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -226,25 +225,6 @@ try {
                 'message' => 'Você já fez check-in hoje! Volte amanhã.',
                 'server_date' => $todayDate,
                 'server_time' => date('H:i:s')
-            ]);
-            exit;
-        }
-        
-        // ========================================
-        // VERIFICAR COOLDOWN ANTES DE ADICIONAR PONTOS
-        // ========================================
-        $cooldownCheck = shouldBlockDailyPoints($conn, $userId, 0, 'Check-in - Tentativa durante cooldown');
-        
-        if (!$cooldownCheck['allowed']) {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Voce esta em cooldown de ranking. Nao pode acumular pontos no ranking agora.',
-                'data' => [
-                    'reason' => $cooldownCheck['reason'],
-                    'cooldown_info' => $cooldownCheck['cooldown_info'],
-                    'can_still_checkin' => true,
-                    'note' => 'Voce pode fazer check-in, mas os pontos nao serao adicionados ao ranking diario'
-                ]
             ]);
             exit;
         }

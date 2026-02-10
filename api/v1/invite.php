@@ -18,7 +18,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../db_config.php';
 require_once __DIR__ . '/../../includes/auth_helper.php';
 require_once __DIR__ . '/middleware/MaintenanceCheck.php';
-require_once __DIR__ . '/includes/CooldownCheck.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -299,25 +298,6 @@ switch ($method) {
         $pointsForInvited = $codePoints['invited'];
         
         error_log("[INVITE] Code: $inviteCode - Inviter gets: $pointsForInviter, Invited gets: $pointsForInvited");
-        
-        // ========================================
-        // VERIFICAR COOLDOWN ANTES DE ADICIONAR PONTOS
-        // ========================================
-        $cooldownCheckInviter = shouldBlockDailyPoints($conn, $inviter['id'], 0, 'Convite - Tentativa durante cooldown');
-        $cooldownCheckInvited = shouldBlockDailyPoints($conn, $userId, 0, 'Convite - Tentativa durante cooldown');
-        
-        if (!$cooldownCheckInviter['allowed'] || !$cooldownCheckInvited['allowed']) {
-            http_response_code(400);
-            echo json_encode([
-                'success' => false,
-                'error' => 'Um dos usuários esta em cooldown de ranking',
-                'data' => [
-                    'inviter_in_cooldown' => !$cooldownCheckInviter['allowed'],
-                    'invited_in_cooldown' => !$cooldownCheckInvited['allowed']
-                ]
-            ]);
-            exit;
-        }
         
         // Iniciar transação
         $conn->begin_transaction();
