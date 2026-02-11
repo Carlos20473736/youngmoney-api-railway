@@ -1,11 +1,12 @@
 <?php
 /**
- * Spin Wheel API v2
- * Usa nova tabela user_spins para rastrear giros disponíveis
+ * Spin Wheel API
+ * Backend decide valor aleatório e valida giros diários
  * 
- * Endpoint: POST /api/v1/spin_v2.php
+ * Endpoint: POST /api/v1/spin.php
  */
 
+// Suprimir warnings e notices do PHP
 error_reporting(0);
 ini_set('display_errors', '0');
 
@@ -14,17 +15,20 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+// Handle preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
+// Aceitar GET e POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     echo json_encode(['status' => 'error', 'message' => 'Método não permitido']);
     exit;
 }
 
+// Incluir configuração do banco de dados
 require_once __DIR__ . '/../../database.php';
 require_once __DIR__ . '/../../includes/HeadersValidator.php';
 require_once __DIR__ . '/../../middleware/auto_reset.php';
@@ -33,9 +37,12 @@ require_once __DIR__ . '/../../includes/auth_helper.php';
 require_once __DIR__ . '/middleware/MaintenanceCheck.php';
 require_once __DIR__ . '/includes/CooldownCheck.php';
 
+// Obter conexão
 $conn = getDbConnection();
 
-// Verificação de manutenção e versão
+// ========================================
+// VERIFICAÇÃO DE MANUTENÇÃO E VERSÃO
+// ========================================
 $method = $_SERVER['REQUEST_METHOD'];
 $requestData = ($method === 'POST') 
     ? json_decode(file_get_contents('php://input'), true) ?? []
@@ -43,18 +50,23 @@ $requestData = ($method === 'POST')
 $userEmail = $requestData['email'] ?? null;
 $appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
 checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
+// ========================================
 
-// Autenticar usuário
+// Autenticar usuário usando auth_helper (mesma lógica do profile.php)
 $user = getAuthenticatedUser($conn);
 if (!$user) {
     sendUnauthorizedError();
 }
 
+
+// Verificar e fazer reset automático se necessário
 checkAndResetRanking($conn);
 
-// Buscar valores da roleta
+// Função removida - agora usa auth_helper.php
+
+// Buscar valores da roleta e configurações do banco de dados
 $prizeValues = [];
-$maxDailySpins = 10;
+$maxDailySpins = 10; // Valor padrão
 
 try {
     $stmt = $conn->prepare("SELECT setting_key, setting_value FROM roulette_settings ORDER BY setting_key");
@@ -65,41 +77,52 @@ try {
         $key = $row['setting_key'];
         $value = (int)$row['setting_value'];
         
+        // Se for max_daily_spins, armazenar separadamente
         if ($key === 'max_daily_spins') {
             $maxDailySpins = $value;
-        } elseif (strpos($key, 'prize_') === 0) {
+        } 
+        // Se for prize_*, adicionar ao array de prêmios
+        elseif (strpos($key, 'prize_') === 0) {
             $prizeValues[] = $value;
         }
     }
     $stmt->close();
     
+    // Se não encontrou valores, usar padrão
     if (empty($prizeValues)) {
         $prizeValues = [100, 250, 500, 750, 1000, 1500, 2000, 5000];
     }
 } catch (Exception $e) {
+    // Em caso de erro, usar valores padrão
     $prizeValues = [100, 250, 500, 750, 1000, 1500, 2000, 5000];
     $maxDailySpins = 10;
 }
 
 try {
+    // Usuário já autenticado acima
     $userId = $user['id'];
-    date_default_timezone_set('America/Sao_Paulo');
+    
+    // Obter data atual no servidor (timezone configurável)
+    date_default_timezone_set('America/Sao_Paulo'); // GMT-3 (Brasília)
     $currentDate = date('Y-m-d');
     $currentDateTime = date('Y-m-d H:i:s');
     
-    // Contar giros disponíveis (não usados) do usuário
+    // Verificar giros do usuário HOJE (data real)
+    // CORREÇÃO v2: Removido CONVERT_TZ - MySQL já está em Brasília (-03:00)
     $stmt = $conn->prepare("
-        SELECT COUNT(*) as available_spins 
-        FROM user_spins 
-        WHERE user_id = ? AND is_used = 0
+        SELECT COUNT(*) as spins_today 
+        FROM spin_history 
+        WHERE user_id = ? AND DATE(created_at) = ?
     ");
-    $stmt->bind_param("i", $userId);
+    $stmt->bind_param("is", $userId, $currentDate);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
-    $availableSpins = (int)$row['available_spins'];
+    $spinsToday = (int)$row['spins_today'];
     
-    // Determinar saudação
+    $spinsRemaining = $maxDailySpins - $spinsToday;
+    
+    // Determinar saudação baseada no horário
     $hour = (int)date('H');
     if ($hour >= 5 && $hour < 12) {
         $greeting = 'BOM DIA';
@@ -109,199 +132,191 @@ try {
         $greeting = 'BOA NOITE';
     }
     
-    // GET: Retornar giros disponíveis
+    // Se for GET, retornar giros restantes, valores da roleta E status da tarefa monetag
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        $required_impressions = 10;
+        // ========================================
+        // VERIFICAR PROGRESSO DA TAREFA MONETAG
+        // ========================================
+        $required_impressions = 10; // valor padrão
         $current_impressions = 0;
         $task_completed = false;
         
         try {
+            // Buscar número de impressões necessárias do usuário
             $user_settings_stmt = $conn->prepare("
                 SELECT required_impressions FROM user_required_impressions 
                 WHERE user_id = ?
             ");
             $user_settings_stmt->bind_param("i", $userId);
             $user_settings_stmt->execute();
-            $settings_result = $user_settings_stmt->get_result();
+            $user_settings_result = $user_settings_stmt->get_result();
             
-            if ($settings_result->num_rows > 0) {
-                $settings_row = $settings_result->fetch_assoc();
-                $required_impressions = (int)$settings_row['required_impressions'];
+            if ($user_row = $user_settings_result->fetch_assoc()) {
+                $required_impressions = (int)$user_row['required_impressions'];
             }
             $user_settings_stmt->close();
             
-            $impressions_stmt = $conn->prepare("
-                SELECT COUNT(*) as total FROM monetag_impressions 
-                WHERE user_id = ?
+            // Buscar progresso do dia - APENAS IMPRESSÕES
+            $today = date('Y-m-d');
+            $stmt = $conn->prepare("
+                SELECT COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions
+                FROM monetag_events
+                WHERE user_id = ? AND DATE(created_at) = ?
             ");
-            $impressions_stmt->bind_param("i", $userId);
-            $impressions_stmt->execute();
-            $impressions_result = $impressions_stmt->get_result();
-            $impressions_row = $impressions_result->fetch_assoc();
-            $current_impressions = (int)$impressions_row['total'];
-            $task_completed = ($current_impressions >= $required_impressions);
-            $impressions_stmt->close();
+            $stmt->bind_param("is", $userId, $today);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $progress = $result->fetch_assoc();
+            $stmt->close();
+            
+            $current_impressions = (int)$progress['impressions'];
+            $task_completed = $current_impressions >= $required_impressions;
+            
+            error_log("[SPIN GET] Tarefa monetag - user_id=$userId, impressions=$current_impressions, required=$required_impressions, completed=$task_completed");
         } catch (Exception $e) {
-            error_log("[SPIN] Erro ao buscar progresso Monetag: " . $e->getMessage());
+            error_log("[SPIN GET] Erro ao verificar tarefa monetag: " . $e->getMessage());
         }
         
         echo json_encode([
             'status' => 'success',
             'data' => [
                 'greeting' => $greeting,
-                'available_spins' => $availableSpins,
+                'spins_remaining' => $spinsRemaining,
+                'spins_today' => $spinsToday,
                 'max_daily_spins' => $maxDailySpins,
                 'prize_values' => $prizeValues,
-                'monetag_task' => [
-                    'required_impressions' => $required_impressions,
-                    'current_impressions' => $current_impressions,
-                    'completed' => $task_completed
-                ],
+                'server_time' => $currentDateTime,
+                'server_timestamp' => time(),
+                'task_completed' => $task_completed,
+                'monetag_progress' => [
+                    'impressions' => $current_impressions,
+                    'required_impressions' => $required_impressions
+                ]
+            ]
+        ]);
+        exit;
+    }
+    
+    // Verificar se ainda tem giros disponíveis (apenas para POST)
+    if ($spinsToday >= $maxDailySpins) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Você já usou todos os giros de hoje. Volte amanhã!',
+            'data' => [
+                'spins_remaining' => 0,
+                'spins_today' => $spinsToday,
+                'max_daily_spins' => $maxDailySpins,
                 'server_time' => $currentDateTime
             ]
         ]);
         exit;
     }
     
-    // POST: Usar um giro
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Verificar se tem giros disponíveis
-        if ($availableSpins <= 0) {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Você não tem giros disponíveis. Volte amanhã!',
-                'data' => [
-                    'available_spins' => 0,
-                    'max_daily_spins' => $maxDailySpins,
-                    'server_time' => $currentDateTime
-                ]
-            ]);
-            exit;
-        }
+    // ========================================
+    // VERIFICAR COOLDOWN ANTES DE ADICIONAR PONTOS
+    // ========================================
+    $cooldownCheck = shouldBlockDailyPoints($conn, $userId, 0, 'Spin - Tentativa durante cooldown');
+    
+    if (!$cooldownCheck['allowed']) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Voce esta em cooldown de ranking. Nao pode acumular pontos agora.',
+            'data' => [
+                'reason' => $cooldownCheck['reason'],
+                'cooldown_info' => $cooldownCheck['cooldown_info'],
+                'can_still_spin' => false,
+                'note' => 'Voce nao pode girar durante o cooldown'
+            ]
+        ]);
+        exit;
+    }
+    
+    // Sortear prêmio aleatório
+    $prizeIndex = array_rand($prizeValues);
+    $prizeValue = $prizeValues[$prizeIndex];
+    
+    // Iniciar transação
+    $conn->begin_transaction();
+    
+    try {
+        // 1. Registrar giro no histórico
+        $stmt = $conn->prepare("
+            INSERT INTO spin_history (user_id, prize_value, created_at)
+            VALUES (?, ?, ?)
+        ");
+        $stmt->bind_param("iis", $userId, $prizeValue, $currentDateTime);
+        $stmt->execute();
         
-        // Verificar cooldown
-        $cooldownCheck = shouldBlockDailyPoints($conn, $userId, 0, 'Spin - Tentativa durante cooldown');
+        // 1.5. Registrar giro em user_spins (para preservar no reset)
+        $stmt = $conn->prepare("
+            INSERT INTO user_spins (user_id, prize_value, is_used, used_at, created_at)
+            VALUES (?, ?, 1, NOW(), ?)
+        ");
+        $stmt->bind_param("iis", $userId, $prizeValue, $currentDateTime);
+        $stmt->execute();
         
-        if (!$cooldownCheck['allowed']) {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Você está em cooldown de ranking. Não pode acumular pontos agora.',
-                'data' => [
-                    'reason' => $cooldownCheck['reason'],
-                    'cooldown_info' => $cooldownCheck['cooldown_info'],
-                    'can_still_spin' => false
-                ]
-            ]);
-            exit;
-        }
+        // 2. Adicionar pontos ao saldo do usuário (total E daily_points para ranking)
+        $stmt = $conn->prepare("
+            UPDATE users 
+            SET points = points + ?,
+                daily_points = daily_points + ?,
+                updated_at = ?
+            WHERE id = ?
+        ");
+        $stmt->bind_param("iisi", $prizeValue, $prizeValue, $currentDateTime, $userId);
+        $stmt->execute();
         
-        // Sortear prêmio
-        $prizeIndex = array_rand($prizeValues);
-        $prizeValue = $prizeValues[$prizeIndex];
+        // 3. Registrar no histórico de pontos
+        $stmt = $conn->prepare("
+            INSERT INTO points_history (user_id, points, description, created_at)
+            VALUES (?, ?, ?, NOW())
+        ");
+        $description = "Roleta da Sorte - Ganhou {$prizeValue} pontos";
+        $stmt->bind_param("iis", $userId, $prizeValue, $description);
+        $stmt->execute();
         
-        // Iniciar transação
-        $conn->begin_transaction();
+        // Commit da transação
+        $conn->commit();
         
-        try {
-            // 1. Buscar um giro disponível para marcar como usado
-            $stmt = $conn->prepare("
-                SELECT id FROM user_spins 
-                WHERE user_id = ? AND is_used = 0 
-                LIMIT 1
-            ");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $spinRow = $result->fetch_assoc();
-            $spinId = $spinRow['id'] ?? null;
-            $stmt->close();
-            
-            if (!$spinId) {
-                throw new Exception("Nenhum giro disponível encontrado");
-            }
-            
-            // 2. Marcar giro como usado
-            $stmt = $conn->prepare("
-                UPDATE user_spins 
-                SET is_used = 1, used_at = NOW() 
-                WHERE id = ?
-            ");
-            $stmt->bind_param("i", $spinId);
-            $stmt->execute();
-            $stmt->close();
-            
-            // 3. Registrar no histórico de giros
-            $stmt = $conn->prepare("
-                INSERT INTO spin_history (user_id, prize_value, created_at)
-                VALUES (?, ?, ?)
-            ");
-            $stmt->bind_param("iis", $userId, $prizeValue, $currentDateTime);
-            $stmt->execute();
-            $stmt->close();
-            
-            // 4. Adicionar pontos ao usuário
-            $stmt = $conn->prepare("
-                UPDATE users 
-                SET points = points + ?,
-                    daily_points = daily_points + ?,
-                    updated_at = ?
-                WHERE id = ?
-            ");
-            $stmt->bind_param("iisi", $prizeValue, $prizeValue, $currentDateTime, $userId);
-            $stmt->execute();
-            $stmt->close();
-            
-            // 5. Registrar no histórico de pontos
-            $stmt = $conn->prepare("
-                INSERT INTO points_history (user_id, points, description, created_at)
-                VALUES (?, ?, ?, NOW())
-            ");
-            $description = "Roleta da Sorte - Ganhou {$prizeValue} pontos";
-            $stmt->bind_param("iis", $userId, $prizeValue, $description);
-            $stmt->execute();
-            $stmt->close();
-            
-            // Commit
-            $conn->commit();
-            
-            // Obter saldo atualizado
-            $stmt = $conn->prepare("SELECT points FROM users WHERE id = ?");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $userData = $result->fetch_assoc();
-            $newBalance = $userData['points'];
-            $stmt->close();
-            
-            echo json_encode([
-                'status' => 'success',
-                'message' => "Você ganhou {$prizeValue} pontos!",
-                'data' => [
-                    'greeting' => $greeting,
-                    'prize_value' => $prizeValue,
-                    'prize_index' => $prizeIndex,
-                    'available_spins' => $availableSpins - 1,
-                    'max_daily_spins' => $maxDailySpins,
-                    'new_balance' => $newBalance,
-                    'server_time' => $currentDateTime
-                ]
-            ]);
-            
-        } catch (Exception $e) {
-            $conn->rollback();
-            http_response_code(500);
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Erro ao processar giro: ' . $e->getMessage()
-            ]);
-        }
+        // Calcular giros restantes
+        $spinsRemaining = $maxDailySpins - ($spinsToday + 1);
+        
+        // Obter saldo atualizado
+        $stmt = $conn->prepare("SELECT points FROM users WHERE id = ?");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $userData = $result->fetch_assoc();
+        $newBalance = $userData['points'];
+        
+        // Retornar sucesso
+        echo json_encode([
+            'status' => 'success',
+            'message' => "Você ganhou {$prizeValue} pontos!",
+            'data' => [
+                'greeting' => $greeting,
+                'prize_value' => $prizeValue,
+                'prize_index' => $prizeIndex,
+                'spins_remaining' => $spinsRemaining,
+                'spins_today' => $spinsToday + 1,
+                'max_daily_spins' => $maxDailySpins,
+                'new_balance' => $newBalance,
+                'server_time' => $currentDateTime,
+                'server_timestamp' => time()
+            ]
+        ]);
+        
+    } catch (Exception $e) {
+        $conn->rollback();
+        throw $e;
     }
     
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Erro: ' . $e->getMessage()
+        'message' => 'Erro ao processar giro: ' . $e->getMessage()
     ]);
 }
 ?>
+
