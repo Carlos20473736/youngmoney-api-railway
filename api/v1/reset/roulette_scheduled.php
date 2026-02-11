@@ -1,19 +1,15 @@
 <?php
 /**
- * API de Reset da Rouleta
+ * API de Reset da Rouleta v2
  * 
- * Endpoint: GET/POST /api/v1/reset/roulette_scheduled.php
+ * Endpoint: GET/POST /api/v1/reset/roulette_scheduled_v2.php
  * 
- * Função: Reseta os giros da rouleta IMEDIATAMENTE ao ser chamado
+ * Função: Reseta os giros da rouleta MANTENDO giros não usados
  * 
  * Lógica:
- * - Deleta TODOS os registros de spin_history
+ * - Deleta APENAS giros usados (is_used = 1) de user_spins
+ * - Mantém giros não usados (is_used = 0)
  * - Permite que usuários façam novos giros
- * 
- * Segurança:
- * - Token obrigatório via query parameter ou header
- * - Validação de conexão com banco de dados
- * - Transação para garantir consistência
  */
 
 error_reporting(0);
@@ -24,7 +20,6 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-// Handle preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
@@ -34,7 +29,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $token = $_GET['token'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 $expectedToken = getenv('RESET_TOKEN') ?: 'ym_reset_roulette_scheduled_2024_secure';
 
-// Remover "Bearer " se presente
 if (strpos($token, 'Bearer ') === 0) {
     $token = substr($token, 7);
 }
@@ -49,11 +43,9 @@ if (empty($token) || $token !== $expectedToken) {
     exit;
 }
 
-// Configurar timezone
 date_default_timezone_set('America/Sao_Paulo');
 
 try {
-    // Conectar ao banco de dados usando MySQLi
     $db_host = $_ENV['MYSQLHOST'] ?? getenv('MYSQLHOST') ?: 'localhost';
     $db_user = $_ENV['MYSQLUSER'] ?? getenv('MYSQLUSER') ?: 'root';
     $db_pass = $_ENV['MYSQLPASSWORD'] ?? getenv('MYSQLPASSWORD') ?: '';
@@ -72,36 +64,48 @@ try {
     
     $conn->set_charset("utf8mb4");
     
-    // Obter data e hora atual
     $current_date = date('Y-m-d');
-    $current_time = date('H:i:s');
     $current_datetime = date('Y-m-d H:i:s');
     
     // Iniciar transação
     $conn->begin_transaction();
     
     try {
-        // Contar quantos registros de spin serão deletados
-        $result = $conn->query("SELECT COUNT(*) as total FROM spin_history");
+        // 1. Contar giros usados que serão deletados
+        $result = $conn->query("
+            SELECT COUNT(*) as total FROM user_spins 
+            WHERE is_used = 1
+        ");
         $row = $result->fetch_assoc();
-        $spinsDeleted = $row['total'] ?? 0;
+        $usedSpinsDeleted = $row['total'] ?? 0;
         
-        // Deletar TODOS os registros de spin (reset completo)
-        $deleteResult = $conn->query("DELETE FROM spin_history");
+        // 2. Contar giros não usados que serão mantidos
+        $result = $conn->query("
+            SELECT COUNT(*) as total FROM user_spins 
+            WHERE is_used = 0
+        ");
+        $row = $result->fetch_assoc();
+        $unusedSpinsKept = $row['total'] ?? 0;
+        
+        // 3. Deletar APENAS giros usados (is_used = 1)
+        $deleteResult = $conn->query("
+            DELETE FROM user_spins 
+            WHERE is_used = 1
+        ");
         
         if (!$deleteResult) {
             throw new Exception("Delete failed: " . $conn->error);
         }
         
-        // Registrar log do reset
+        // 4. Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO spin_reset_logs 
             (spins_deleted, reset_datetime, triggered_by) 
-            VALUES (?, NOW(), 'api_roulette_scheduled')
+            VALUES (?, NOW(), 'api_roulette_scheduled_v2')
         ");
         
         if ($stmt) {
-            $stmt->bind_param("i", $spinsDeleted);
+            $stmt->bind_param("i", $usedSpinsDeleted);
             $stmt->execute();
             $stmt->close();
         }
@@ -114,9 +118,10 @@ try {
             'success' => true,
             'message' => 'Reset da rouleta executado com sucesso!',
             'data' => [
-                'reset_type' => 'roulette_immediate',
-                'description' => 'Todos os giros foram deletados',
-                'spins_deleted' => $spinsDeleted,
+                'reset_type' => 'roulette_v2',
+                'description' => 'Giros usados deletados, giros não usados mantidos',
+                'used_spins_deleted' => $usedSpinsDeleted,
+                'unused_spins_kept' => $unusedSpinsKept,
                 'reset_date' => $current_date,
                 'reset_datetime' => $current_datetime,
                 'timezone' => 'America/Sao_Paulo (GMT-3)',
