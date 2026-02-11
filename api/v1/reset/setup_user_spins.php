@@ -2,7 +2,7 @@
 /**
  * Setup Rápido: user_spins (Versão Otimizada)
  * 
- * Endpoint: GET /admin/setup_user_spins_fast.php?token=seu_token
+ * Endpoint: GET /api/v1/reset/setup_user_spins.php?token=seu_token
  * 
  * Versão otimizada com:
  * - Sem transações longas
@@ -11,6 +11,8 @@
  * - Feedback em tempo real
  */
 
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
 set_time_limit(300); // 5 minutos
 header('Content-Type: application/json; charset=utf-8');
 header('X-Accel-Buffering: no'); // Desabilitar buffering
@@ -193,10 +195,13 @@ try {
     ], JSON_UNESCAPED_UNICODE) . "\n";
     
 } catch (Exception $e) {
+    http_response_code(500);
     log_step("❌ ERRO: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine()
     ], JSON_UNESCAPED_UNICODE) . "\n";
 }
 ?>
