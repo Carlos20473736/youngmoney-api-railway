@@ -181,7 +181,7 @@ if ($method === 'POST') {
     
     if ($action === 'reset') {
         // Reset manual (apenas para admin/teste)
-        $stmt = $conn->prepare("UPDATE user_battery SET battery_percent = 300, last_reset_date = ? WHERE user_id = ?");
+        $stmt = $conn->prepare("UPDATE user_battery SET battery_percent = 100, last_reset_date = ? WHERE user_id = ?");
         $stmt->bind_param("si", $today, $userId);
         $stmt->execute();
         $stmt->close();
