@@ -95,13 +95,13 @@ $stmt->close();
 
 if (!$batteryRecord) {
     // Criar registro inicial com 100%
-    $stmt = $conn->prepare("INSERT INTO user_battery (user_id, battery_percent, last_reset_date) VALUES (?, 300, ?)");
+    $stmt = $conn->prepare("INSERT INTO user_battery (user_id, battery_percent, last_reset_date) VALUES (?, 100, ?)");
     $stmt->bind_param("is", $userId, $today);
     $stmt->execute();
     $stmt->close();
     
     $batteryRecord = [
-        'battery_percent' => 300,
+        'battery_percent' => 100,
         'last_reset_date' => $today
     ];
     error_log("[BATTERY] Created new battery record for user $userId");
@@ -110,12 +110,12 @@ if (!$batteryRecord) {
 // Verificar se precisa resetar a bateria (novo dia)
 if ($batteryRecord['last_reset_date'] !== $today) {
     // Resetar bateria para 100%
-    $stmt = $conn->prepare("UPDATE user_battery SET battery_percent = 300, last_reset_date = ? WHERE user_id = ?");
+    $stmt = $conn->prepare("UPDATE user_battery SET battery_percent = 100, last_reset_date = ? WHERE user_id = ?");
     $stmt->bind_param("si", $today, $userId);
     $stmt->execute();
     $stmt->close();
     
-    $batteryRecord['battery_percent'] = 300;
+    $batteryRecord['battery_percent'] = 100;
     $batteryRecord['last_reset_date'] = $today;
     
     error_log("[BATTERY] Reset battery for user $userId - new day");
@@ -190,9 +190,9 @@ if ($method === 'POST') {
         
         echo json_encode([
             'status' => 'success',
-            'battery' => 300,
+            'battery' => 100,
             'can_play' => true,
-            'message' => 'Battery reset to 300%'
+            'message' => 'Battery reset to 100%'
         ]);
         exit;
     }
