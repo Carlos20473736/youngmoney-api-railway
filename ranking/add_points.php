@@ -1,4 +1,15 @@
 <?php
+/**
+ * Add Points Endpoint
+ * POST - Adiciona pontos ao usuário
+ * 
+ * NOVA LÓGICA v3:
+ * - Usuários em cooldown PODEM pontuar normalmente (daily_points acumula)
+ * - Usuários em cooldown NÃO aparecem no ranking (filtrado na listagem)
+ * - Usuários em cooldown NÃO recebem pagamentos
+ * - Usuários em cooldown NÃO têm reset de pontos
+ */
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -34,14 +45,35 @@ try {
     
     $hasPixKey = !empty($pixData['pix_key']);
     
-    // Sempre adicionar pontos totais
-    // Só adicionar daily_points (ranking) se tiver chave PIX
+    // Verificar se usuário está em cooldown (apenas para informar, NÃO para bloquear)
+    date_default_timezone_set('America/Sao_Paulo');
+    $now = date('Y-m-d H:i:s');
+    
+    $stmt = $conn->prepare("
+        SELECT id, position, cooldown_until 
+        FROM ranking_cooldowns 
+        WHERE user_id = ? AND cooldown_until > ?
+        ORDER BY cooldown_until DESC 
+        LIMIT 1
+    ");
+    $stmt->bind_param("is", $user['id'], $now);
+    $stmt->execute();
+    $cooldownResult = $stmt->get_result();
+    $cooldownData = $cooldownResult->fetch_assoc();
+    $stmt->close();
+    
+    $inCooldown = !empty($cooldownData);
+    
+    // NOVA LÓGICA v3: Sempre adicionar pontos (totais E daily_points)
+    // Mesmo em cooldown, o usuário pontua normalmente
+    // A diferença é que em cooldown ele NÃO aparece no ranking
     if ($hasPixKey) {
-        // Usuário tem chave PIX - adiciona pontos totais E daily_points (ranking)
+        // Usuário tem chave PIX - adiciona pontos totais E daily_points
+        // Mesmo em cooldown, os pontos são adicionados normalmente
         $stmt = $conn->prepare("UPDATE users SET points = points + ?, daily_points = daily_points + ? WHERE id = ?");
         $stmt->bind_param("iii", $points, $points, $user['id']);
     } else {
-        // Usuário NÃO tem chave PIX - adiciona apenas pontos totais (não entra no ranking)
+        // Usuário NÃO tem chave PIX - adiciona apenas pontos totais
         $stmt = $conn->prepare("UPDATE users SET points = points + ? WHERE id = ?");
         $stmt->bind_param("ii", $points, $user['id']);
     }
@@ -83,6 +115,15 @@ try {
         $response['ranking_eligible'] = false;
     } else {
         $response['ranking_eligible'] = true;
+    }
+    
+    // Informar se está em cooldown (pontos foram adicionados, mas não aparece no ranking)
+    if ($inCooldown) {
+        $response['in_cooldown'] = true;
+        $response['cooldown_message'] = 'Você está em countdown. Seus pontos foram adicionados normalmente, mas você não aparecerá no ranking até o countdown terminar.';
+        $response['cooldown_until'] = $cooldownData['cooldown_until'];
+    } else {
+        $response['in_cooldown'] = false;
     }
     
     sendSuccess($response);

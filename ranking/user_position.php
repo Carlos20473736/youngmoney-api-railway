@@ -3,6 +3,12 @@
  * User Position Endpoint
  * GET - Retorna a posição do usuário no ranking
  * Inclui informação de cooldown se o usuário estiver bloqueado
+ * 
+ * NOVA LÓGICA v3:
+ * - Usuários em cooldown PONTUAM normalmente
+ * - Usuários em cooldown NÃO aparecem no ranking (posição = 0)
+ * - Usuários em cooldown NÃO têm reset de pontos
+ * - Mostra os pontos acumulados mesmo em cooldown
  */
 
 header('Content-Type: application/json');
@@ -103,7 +109,7 @@ try {
         ];
     }
     
-    // Verificar se o usuário tem chave PIX
+    // Verificar se o usuário tem chave PIX e buscar pontos
     $stmt = $conn->prepare("SELECT pix_key, daily_points FROM users WHERE id = ?");
     $stmt->bind_param("i", $userId);
     $stmt->execute();
@@ -115,6 +121,7 @@ try {
     $dailyPoints = (int)($pixData['daily_points'] ?? 0);
     
     // Se usuário está em cooldown, retornar info de cooldown
+    // NOTA v3: Mostra os pontos acumulados (não são resetados em cooldown)
     if ($inCooldown) {
         $conn->close();
         sendSuccess([

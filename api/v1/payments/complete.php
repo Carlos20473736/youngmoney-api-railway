@@ -130,21 +130,29 @@ try {
         $updated_count = 0;
         $completed_payments = [];
         
-        // Se payment_ids é 'all', atualizar todos os pendentes
+        // NOVA LÓGICA v3: Verificar cooldown antes de completar pagamento
+        // Usuários em countdown NÃO recebem pagamento
+        $now_dt = date('Y-m-d H:i:s');
+        
+        // Se payment_ids é 'all', atualizar todos os pendentes (exceto usuários em cooldown)
         if ($payment_ids === 'all') {
+            // NOVA LÓGICA v3: Excluir usuários em cooldown
             $stmt = $conn->prepare("
-                UPDATE pix_payments 
-                SET status = 'completed', 
-                    transaction_id = ?,
-                    updated_at = NOW()
-                WHERE status = 'pending'
+                UPDATE pix_payments pp
+                SET pp.status = 'completed', 
+                    pp.transaction_id = ?,
+                    pp.updated_at = NOW()
+                WHERE pp.status = 'pending'
+                AND pp.user_id NOT IN (
+                    SELECT rc.user_id FROM ranking_cooldowns rc WHERE rc.cooldown_until > ?
+                )
             ");
             
             if (!$stmt) {
                 throw new Exception("Prepare failed: " . $conn->error);
             }
             
-            $stmt->bind_param("s", $transaction_id);
+            $stmt->bind_param("ss", $transaction_id, $now_dt);
             
             if (!$stmt->execute()) {
                 throw new Exception("Execute failed: " . $stmt->error);
@@ -201,6 +209,27 @@ try {
             $payment_ids = array_map('intval', $payment_ids);
             
             foreach ($payment_ids as $payment_id) {
+                // NOVA LÓGICA v3: Verificar se usuário do pagamento está em cooldown
+                $stmt_check = $conn->prepare("
+                    SELECT pp.user_id, 
+                           CASE WHEN rc.id IS NOT NULL THEN 1 ELSE 0 END as in_cooldown
+                    FROM pix_payments pp
+                    LEFT JOIN ranking_cooldowns rc ON pp.user_id = rc.user_id AND rc.cooldown_until > ?
+                    WHERE pp.id = ?
+                ");
+                if ($stmt_check) {
+                    $stmt_check->bind_param("si", $now_dt, $payment_id);
+                    $stmt_check->execute();
+                    $check_result = $stmt_check->get_result();
+                    $check_row = $check_result->fetch_assoc();
+                    $stmt_check->close();
+                    
+                    if ($check_row && (int)$check_row['in_cooldown'] === 1) {
+                        // Usuário em countdown - pular pagamento
+                        continue;
+                    }
+                }
+                
                 $stmt = $conn->prepare("
                     UPDATE pix_payments 
                     SET status = 'completed', 

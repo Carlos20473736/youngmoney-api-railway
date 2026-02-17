@@ -2,11 +2,13 @@
 /**
  * Verificação de Cooldown para Ranking
  * 
- * Função para verificar se um usuário está em cooldown e bloquear acúmulo de daily_points
+ * Função para verificar se um usuário está em cooldown
  * 
- * Cooldown:
- * - Top 1-3: 24 horas - BLOQUEIA acúmulo de pontos
- * - Top 4-10: 2 horas - APENAS bloqueio visual (pontos continuam acumulando)
+ * NOVA LÓGICA (v3):
+ * - Usuários em cooldown PODEM pontuar normalmente (daily_points continua acumulando)
+ * - Usuários em cooldown NÃO aparecem no ranking
+ * - Usuários em cooldown NÃO recebem pagamentos pendentes
+ * - Usuários em cooldown NÃO têm reset de pontos
  */
 
 /**
@@ -85,8 +87,13 @@ function getTimeRemaining($cooldownUntil) {
 }
 
 /**
- * Bloqueia adicao de daily_points APENAS para Top 1-3
- * Top 4-10 podem continuar acumulando pontos normalmente
+ * NOVA LÓGICA v3: Usuários em cooldown SEMPRE podem pontuar
+ * 
+ * Cooldown agora significa:
+ * - NÃO aparece no ranking
+ * - NÃO recebe pagamentos
+ * - NÃO tem reset de pontos
+ * - MAS PODE pontuar normalmente (daily_points continua acumulando)
  * 
  * @param mysqli $conn - Conexao com banco de dados
  * @param int $userId - ID do usuario
@@ -95,37 +102,8 @@ function getTimeRemaining($cooldownUntil) {
  * @return array - ['allowed' => bool, 'reason' => string, 'cooldown_info' => array]
  */
 function shouldBlockDailyPoints($conn, $userId, $pointsToAdd, $description) {
-    $cooldownCheck = checkUserCooldown($conn, $userId);
-    
-    if ($cooldownCheck['in_cooldown']) {
-        // APENAS bloquear para posicoes 1-3 (Top 3)
-        // Posicoes 4-10 podem continuar acumulando pontos
-        if ($cooldownCheck['position'] >= 1 && $cooldownCheck['position'] <= 3) {
-            // Registrar tentativa de acumulo durante cooldown
-            $stmt = $conn->prepare("
-                INSERT INTO cooldown_violations (user_id, position, attempted_points, description, created_at)
-                VALUES (?, ?, ?, ?, NOW())
-            ");
-            $stmt->bind_param("iis", $userId, $cooldownCheck['position'], $pointsToAdd, $description);
-            $stmt->execute();
-            $stmt->close();
-            
-            return [
-                'allowed' => false,
-                'reason' => 'Usuario esta em cooldown de ranking (Top 3)',
-                'cooldown_info' => [
-                    'position' => $cooldownCheck['position'],
-                    'cooldown_hours' => $cooldownCheck['cooldown_hours'],
-                    'cooldown_until' => $cooldownCheck['cooldown_until'],
-                    'time_remaining' => $cooldownCheck['time_remaining']
-                ]
-            ];
-        } else {
-            // Posicoes 4-10: Permitir acumulo de pontos (apenas bloqueio visual no ranking)
-            return ['allowed' => true];
-        }
-    }
-    
+    // NOVA LÓGICA: Nunca bloquear pontuação, mesmo em cooldown
+    // Usuário em cooldown pontua normalmente, mas não aparece no ranking
     return ['allowed' => true];
 }
 

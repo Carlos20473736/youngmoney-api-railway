@@ -207,13 +207,25 @@ try {
     
     $top10UserIds = array_column($prizesAwarded, 'user_id');
     
+    // NOVA LÓGICA v3: Buscar usuários em cooldown para NÃO resetar seus pontos
+    $cooldownUserIds = [];
+    $cooldownCheckResult = $mysqli->query("SELECT user_id FROM ranking_cooldowns WHERE cooldown_until > NOW()");
+    if ($cooldownCheckResult) {
+        while ($row = $cooldownCheckResult->fetch_assoc()) {
+            $cooldownUserIds[] = (int)$row['user_id'];
+        }
+    }
+    
+    // Filtrar: NÃO resetar pontos de quem está em cooldown
+    $top10UserIdsFiltered = array_values(array_diff($top10UserIds, $cooldownUserIds));
+    
     $usersAffected = 0;
-    if (!empty($top10UserIds)) {
-        $placeholders = implode(',', array_fill(0, count($top10UserIds), '?'));
-        $types = str_repeat('i', count($top10UserIds));
+    if (!empty($top10UserIdsFiltered)) {
+        $placeholders = implode(',', array_fill(0, count($top10UserIdsFiltered), '?'));
+        $types = str_repeat('i', count($top10UserIdsFiltered));
         
         $stmt = $mysqli->prepare("UPDATE users SET daily_points = 0 WHERE id IN ($placeholders)");
-        $stmt->bind_param($types, ...$top10UserIds);
+        $stmt->bind_param($types, ...$top10UserIdsFiltered);
         $stmt->execute();
         $usersAffected = $stmt->affected_rows;
         $stmt->close();

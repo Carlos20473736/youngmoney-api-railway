@@ -120,7 +120,11 @@ try {
     $total_payments = $row['total'] ?? 0;
     $stmt->close();
     
-    // Buscar pagamentos com informações do usuário
+    // NOVA LÓGICA v3: Buscar pagamentos com informações do usuário
+    // Excluir usuários em cooldown ativo dos pagamentos pendentes
+    // Servidor verifica se é uma pessoa em countdown e não paga
+    $now_dt = date('Y-m-d H:i:s');
+    
     $stmt = $conn->prepare("
         SELECT 
             pp.id,
@@ -136,9 +140,14 @@ try {
             pp.updated_at,
             u.name,
             u.email,
-            u.phone
+            u.phone,
+            CASE 
+                WHEN rc.id IS NOT NULL THEN 1
+                ELSE 0
+            END as user_in_cooldown
         FROM pix_payments pp
         JOIN users u ON pp.user_id = u.id
+        LEFT JOIN ranking_cooldowns rc ON pp.user_id = rc.user_id AND rc.cooldown_until > ?
         WHERE pp.status = ?
         ORDER BY pp.position ASC, pp.created_at DESC
         LIMIT ? OFFSET ?
@@ -148,14 +157,34 @@ try {
         throw new Exception("Prepare failed: " . $conn->error);
     }
     
-    $stmt->bind_param("sii", $status, $limit, $offset);
+    $stmt->bind_param("ssii", $now_dt, $status, $limit, $offset);
     $stmt->execute();
     $result = $stmt->get_result();
     
     $payments = [];
+    $skipped_cooldown = [];
     $total_amount = 0;
     
     while ($row = $result->fetch_assoc()) {
+        $userInCooldown = (int)$row['user_in_cooldown'] === 1;
+        
+        // NOVA LÓGICA v3: Se o usuário está em cooldown, pular pagamento
+        // Servidor verifica: "Essa pessoa está em countdown, não irei pagar. Irei ver a próxima."
+        if ($userInCooldown) {
+            $skipped_cooldown[] = [
+                'id' => (int)$row['id'],
+                'position' => (int)$row['position'],
+                'user' => [
+                    'id' => (int)$row['user_id'],
+                    'name' => $row['name'],
+                    'email' => $row['email']
+                ],
+                'amount' => (float)$row['amount'],
+                'reason' => 'Usuário em countdown - pagamento não será processado'
+            ];
+            continue;
+        }
+        
         $payments[] = [
             'id' => (int)$row['id'],
             'position' => (int)$row['position'],
@@ -233,6 +262,11 @@ try {
             ],
             'statistics' => $statistics,
             'payments' => $payments,
+            'skipped_cooldown' => [
+                'count' => count($skipped_cooldown),
+                'details' => $skipped_cooldown,
+                'description' => 'Usuários em countdown que tiveram pagamento pulado'
+            ],
             'timezone' => 'America/Sao_Paulo (GMT-3)',
             'timestamp' => time()
         ]

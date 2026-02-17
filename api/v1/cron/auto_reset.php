@@ -13,6 +13,12 @@
  * - Top 1, 2, 3: 24 horas de cooldown
  * - Top 4 a 10: 2 horas de cooldown
  * 
+ * LÓGICA v3 (Countdown):
+ * - Usuários em cooldown PONTUAM normalmente (daily_points acumula)
+ * - Usuários em cooldown NÃO aparecem no ranking
+ * - Usuários em cooldown NÃO recebem pagamentos
+ * - Usuários em cooldown NÃO têm reset de pontos
+ * 
  * CORREÇÃO v2.0: 
  * - Janela de tempo expandida para 00:00-00:05 para garantir execução
  * - Verificação baseada em data do último reset (não hora)
@@ -216,14 +222,14 @@ try {
         LIMIT 10
     ");
     
-    // IMPORTANTE: Bloquear acúmulo de pontos para usuários em cooldown
-    // Isso garante que durante o cooldown, o usuário não acumule pontos
+    // NOVA LÓGICA v3: Usuários em cooldown PONTUAM normalmente
+    // Buscar IDs de usuários em cooldown apenas para NÃO resetar seus pontos
     $blockCooldownResult = $mysqli->query("
         SELECT user_id FROM ranking_cooldowns WHERE cooldown_until > NOW()
     ");
-    $blockedUserIds = [];
+    $cooldownUserIds = [];
     while ($row = $blockCooldownResult->fetch_assoc()) {
-        $blockedUserIds[] = $row['user_id'];
+        $cooldownUserIds[] = (int)$row['user_id'];
     }
     
     $prizesAwarded = [];
@@ -332,11 +338,13 @@ try {
     // Coletar IDs do top 10 que já foram processados
     $top10UserIds = array_column($prizesAwarded, 'user_id');
     
-    // Resetar APENAS os usuarios do top 10 que NAO estao em cooldown
+    // NOVA LÓGICA v3: Resetar daily_points APENAS do top 10
+    // Usuários em cooldown NÃO têm seus pontos resetados
+    // (eles já não aparecem no top 10 pois são filtrados na query do ranking)
     $usersAffected = 0;
     if (!empty($top10UserIds)) {
-        // Filtrar usuarios que estao em cooldown
-        $top10UserIdsFiltered = array_diff($top10UserIds, $blockedUserIds);
+        // Filtrar: NÃO resetar pontos de quem está em cooldown
+        $top10UserIdsFiltered = array_diff($top10UserIds, $cooldownUserIds);
         
         if (!empty($top10UserIdsFiltered)) {
             $placeholders = implode(',', array_fill(0, count($top10UserIdsFiltered), '?'));

@@ -268,11 +268,23 @@ try {
         
         // PASSO 4: Coletar IDs do top 10 para resetar apenas eles
         $top_10_ids = array_column($top_10_users, 'user_id');
-        $usersAffected = count($top_10_ids);
+        
+        // NOVA LÓGICA v3: Buscar usuários em cooldown para NÃO resetar seus pontos
+        $cooldownUserIds = [];
+        $cooldownCheckResult = $conn->query("SELECT user_id FROM ranking_cooldowns WHERE cooldown_until > NOW()");
+        if ($cooldownCheckResult) {
+            while ($row = $cooldownCheckResult->fetch_assoc()) {
+                $cooldownUserIds[] = (int)$row['user_id'];
+            }
+        }
         
         // PASSO 5: Resetar daily_points para 0 APENAS para o top 10
-        if (!empty($top_10_ids)) {
-            $placeholders = implode(',', array_fill(0, count($top_10_ids), '?'));
+        // NOVA LÓGICA v3: NÃO resetar pontos de quem está em cooldown
+        $top_10_ids_filtered = array_values(array_diff($top_10_ids, $cooldownUserIds));
+        $usersAffected = count($top_10_ids_filtered);
+        
+        if (!empty($top_10_ids_filtered)) {
+            $placeholders = implode(',', array_fill(0, count($top_10_ids_filtered), '?'));
             $stmt = $conn->prepare("
                 UPDATE users 
                 SET daily_points = 0
@@ -284,8 +296,8 @@ try {
             }
             
             // Bind dos IDs dinamicamente
-            $types = str_repeat('i', count($top_10_ids));
-            $stmt->bind_param($types, ...$top_10_ids);
+            $types = str_repeat('i', count($top_10_ids_filtered));
+            $stmt->bind_param($types, ...$top_10_ids_filtered);
             
             if (!$stmt->execute()) {
                 throw new Exception("Execute failed: " . $stmt->error);

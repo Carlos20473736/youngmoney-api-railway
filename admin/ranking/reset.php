@@ -138,18 +138,28 @@ try {
         }
         $stmt->close();
         
-        // 2. Resetar daily_points APENAS do top 10 (demais mantêm seus pontos)
+        // NOVA LÓGICA v3: Buscar usuários em cooldown para NÃO resetar seus pontos
+        $cooldownUserIds = [];
+        $cooldownCheckResult = $conn->query("SELECT user_id FROM ranking_cooldowns WHERE cooldown_until > NOW()");
+        if ($cooldownCheckResult) {
+            while ($row = $cooldownCheckResult->fetch_assoc()) {
+                $cooldownUserIds[] = (int)$row['user_id'];
+            }
+        }
+        
+        // 2. Resetar daily_points APENAS do top 10 (exceto quem está em cooldown)
+        $top_10_ids_filtered = array_values(array_diff($top_10_ids, $cooldownUserIds));
         $users_reset = 0;
-        if (!empty($top_10_ids)) {
-            $placeholders = implode(',', array_fill(0, count($top_10_ids), '?'));
+        if (!empty($top_10_ids_filtered)) {
+            $placeholders = implode(',', array_fill(0, count($top_10_ids_filtered), '?'));
             $stmt = $conn->prepare("
                 UPDATE users 
                 SET daily_points = 0 
                 WHERE id IN ($placeholders)
             ");
             
-            $types = str_repeat('i', count($top_10_ids));
-            $stmt->bind_param($types, ...$top_10_ids);
+            $types = str_repeat('i', count($top_10_ids_filtered));
+            $stmt->bind_param($types, ...$top_10_ids_filtered);
             $stmt->execute();
             $users_reset = $stmt->affected_rows;
             $stmt->close();

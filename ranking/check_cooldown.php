@@ -94,7 +94,8 @@ try {
             'minutes_remaining' => $minutesRemaining,
             'total_hours_remaining' => $totalHours,
             'time_message' => $timeMessage,
-            'message' => "Parabéns! Você ficou em {$row['position']}º lugar e ganhou R$ " . number_format($row['prize_amount'], 2, ',', '.') . "! Você poderá participar do ranking novamente em {$timeMessage}."
+            'can_earn_points' => true,
+            'message' => "Parabéns! Você ficou em {$row['position']}º lugar e ganhou R$ " . number_format($row['prize_amount'], 2, ',', '.') . "! Você pode continuar pontuando normalmente, mas não aparecerá no ranking até o countdown terminar em {$timeMessage}."
         ]);
     } else {
         // Usuário não está em cooldown

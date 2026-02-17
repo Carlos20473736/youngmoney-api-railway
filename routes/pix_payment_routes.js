@@ -198,13 +198,32 @@ router.post('/process-top10-payments', async (req, res) => {
                 10: 1.00
             };
 
+            // NOVA LÓGICA v3: Buscar usuários em cooldown para não pagar
+            const [cooldownUsers] = await connection.execute(
+                'SELECT user_id FROM ranking_cooldowns WHERE cooldown_until > NOW()'
+            );
+            const cooldownUserIds = cooldownUsers.map(r => r.user_id);
+
             // Processar pagamentos
             const payments = [];
             const failedPayments = [];
+            const skippedCooldown = [];
 
             for (const user of topUsers) {
                 const position = user.position;
                 const amount = paymentValues[position] || 0;
+
+                // NOVA LÓGICA v3: Verificar se usuário está em cooldown
+                if (cooldownUserIds.includes(user.id)) {
+                    skippedCooldown.push({
+                        user_id: user.id,
+                        username: user.username,
+                        position: position,
+                        amount: amount,
+                        reason: 'Usuário em countdown - pagamento não será processado'
+                    });
+                    continue;
+                }
 
                 // Validar se usuário tem chave PIX
                 if (!user.pix_key || !user.pix_key_type) {
@@ -260,7 +279,8 @@ router.post('/process-top10-payments', async (req, res) => {
                     total_payments: payments.length,
                     total_amount: payments.reduce((sum, p) => sum + p.amount, 0),
                     payments: payments,
-                    failed_payments: failedPayments
+                    failed_payments: failedPayments,
+                    skipped_cooldown: skippedCooldown
                 }
             });
 

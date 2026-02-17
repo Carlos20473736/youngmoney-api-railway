@@ -133,18 +133,32 @@ try {
     
     // Zerar pontos diários dos usuários encontrados
     $userIds = array_column($affectedUsers, 'id');
-    $placeholders = implode(',', array_fill(0, count($userIds), '?'));
-    $types = str_repeat('i', count($userIds));
     
-    $stmt = $conn->prepare("
-        UPDATE users 
-        SET daily_points = 0 
-        WHERE id IN ($placeholders)
-    ");
-    $stmt->bind_param($types, ...$userIds);
-    $stmt->execute();
-    $rowsAffected = $stmt->affected_rows;
-    $stmt->close();
+    // NOVA LÓGICA v3: NÃO resetar pontos de quem está em cooldown
+    $cooldownUserIds = [];
+    $cooldownCheckResult = $conn->query("SELECT user_id FROM ranking_cooldowns WHERE cooldown_until > NOW()");
+    if ($cooldownCheckResult) {
+        while ($row = $cooldownCheckResult->fetch_assoc()) {
+            $cooldownUserIds[] = (int)$row['user_id'];
+        }
+    }
+    $userIds = array_values(array_diff($userIds, $cooldownUserIds));
+    
+    $rowsAffected = 0;
+    if (!empty($userIds)) {
+        $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+        $types = str_repeat('i', count($userIds));
+        
+        $stmt = $conn->prepare("
+            UPDATE users 
+            SET daily_points = 0 
+            WHERE id IN ($placeholders)
+        ");
+        $stmt->bind_param($types, ...$userIds);
+        $stmt->execute();
+        $rowsAffected = $stmt->affected_rows;
+        $stmt->close();
+    }
     
     // Log da operação
     error_log("[ADMIN] Pontos diários zerados para " . count($affectedUsers) . " usuários: " . json_encode(array_column($affectedUsers, 'name')));
