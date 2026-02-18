@@ -22,7 +22,7 @@
     }
     
     # Servir arquivos APK diretamente para download
-    @apkfiles path /uploads/apk/*.apk
+    @apkfiles path *.apk
     handle @apkfiles {
         root * /app
         header Content-Type application/vnd.android.package-archive
