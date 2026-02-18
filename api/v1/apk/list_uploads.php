@@ -1,0 +1,1 @@
+<?php header('Content-Type: text/plain'); echo 'Current Dir: ' . __DIR__ . '\n'; echo 'Uploads Dir: ' . realpath(__DIR__ . '/../../../uploads/apk/') . '\n'; echo 'Files in uploads/apk/:\n'; print_r(glob(__DIR__ . '/../../../uploads/apk/*.apk')); echo '\nFiles in api/v1/apk/:\n'; print_r(glob(__DIR__ . '/*.apk')); ?>
