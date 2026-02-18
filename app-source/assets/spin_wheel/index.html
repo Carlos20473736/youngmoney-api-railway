@@ -1984,17 +1984,49 @@
     let spinsCounterLoaded = false;
     let taskCheckLoaded = false;
     let taskCompleted = false;
+    let loadingTimeoutId = null;
 
     function checkAndHideLoading() {
         if (prizeValuesLoaded && spinsCounterLoaded && taskCheckLoaded) {
             console.log('[ROLETA] ✅ Todos os dados carregados! Escondendo loading...');
             const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingTimeoutId) {
+                clearTimeout(loadingTimeoutId);
+                loadingTimeoutId = null;
+            }
             setTimeout(() => {
                 loadingOverlay.classList.add('hidden');
             }, 300);
         } else {
             console.log('[ROLETA] ⏳ Aguardando dados... Valores:', prizeValuesLoaded, '| Contador:', spinsCounterLoaded, '| Tarefa:', taskCheckLoaded);
         }
+    }
+
+    // ========================================
+    // TIMEOUT PARA ESCONDER LOADING
+    // ========================================
+    // Se após 8 segundos o loading ainda não foi escondido, esconder com valores padrão
+    function setupLoadingTimeout() {
+        loadingTimeoutId = setTimeout(() => {
+            console.warn('[ROLETA] ⚠️ TIMEOUT: Dados não carregaram em 8 segundos. Usando valores padrão...');
+            
+            // Definir valores padrão se não foram carregados
+            if (!prizeValuesLoaded) {
+                console.log('[ROLETA] Carregando valores padrão da roleta...');
+                setPrizeValues([100, 250, 500, 750, 1000, 1500, 2000, 5000]);
+            }
+            
+            if (!spinsCounterLoaded) {
+                console.log('[ROLETA] Carregando contador padrão...');
+                updateSpinsCounter(0, 0, 10);
+            }
+            
+            if (!taskCheckLoaded) {
+                console.log('[ROLETA] Marcando verificação de tarefa como completa (timeout)...');
+                taskCheckLoaded = true;
+                checkAndHideLoading();
+            }
+        }, 8000);
     }
 
     // ========================================
@@ -2034,6 +2066,16 @@
             if (typeof Android !== 'undefined') {
                 console.error('[ROLETA-TASK] Métodos disponíveis:', Object.keys(Android));
             }
+            console.warn('[ROLETA-TASK] ⚠️ Usando fallback: carregando valores padrão...');
+            
+            // Fallback: carregar valores padrão
+            if (!prizeValuesLoaded) {
+                setPrizeValues([100, 250, 500, 750, 1000, 1500, 2000, 5000]);
+            }
+            if (!spinsCounterLoaded) {
+                updateSpinsCounter(0, 0, 10);
+            }
+            
             taskCheckLoaded = true;
             checkAndHideLoading();
             return;
@@ -2042,7 +2084,7 @@
         try {
             // PRIMEIRO: Buscar os requisitos da API (required_impressions)
             console.log('[ROLETA-TASK] Buscando requisitos da API...');
-            const requirementsUrl = `https://youngmoney-bot-production-110d.up.railway.app/api/youngmoney/monetag/progress?ymid=${userId}`;
+            const requirementsUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
             console.log('[ROLETA-TASK] URL requisitos:', requirementsUrl);
 
             const reqResponse = await fetch(requirementsUrl, {
@@ -2062,7 +2104,7 @@
             }
 
             // SEGUNDO: Buscar as estatísticas do usuário
-            const statsUrl = `https://youngmoney-bot-production-110d.up.railway.app/api/youngmoney/monetag/progress?ymid=${userId}`;
+            const statsUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
             console.log('[ROLETA-TASK] Chamando API de stats...');
             console.log('[ROLETA-TASK] URL:', statsUrl);
 
@@ -2141,6 +2183,9 @@
 
     // Chamar verificação de tarefa ao carregar
     checkTaskCompletion();
+    
+    // Configurar timeout para esconder loading após 8 segundos
+    setupLoadingTimeout();
 
     // Atualizar contador de giros
     function updateSpinsCounter(spins, spinsToday, maxSpins) {
