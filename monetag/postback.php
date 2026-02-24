@@ -1,13 +1,11 @@
 <?php
 /**
- * MoniTag Postback Endpoint (v3 - APENAS IMPRESSÕES)
+ * MoniTag Postback Endpoint (v4 - IMPRESSÕES E CLIQUES)
  * Recebe postbacks do frontend via GET
  * URL: /monetag/postback.php?type={type}&user_id={user_id}
  * 
- * type: 'impression'
+ * type: 'impression' ou 'click'
  * user_id: ID do usuário
- * 
- * Lógica de cliques removida completamente
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -41,13 +39,13 @@ $user_id = $_GET['user_id'] ?? $_POST['user_id'] ?? null;
 
 error_log("MoniTag Postback - Parsed: type=$type, user_id=$user_id");
 
-// Validar type - APENAS IMPRESSÕES
+// Validar type - IMPRESSÕES E CLIQUES
 if (!$type) {
     sendError('type é obrigatório');
 }
 
-if ($type !== 'impression') {
-    sendError('type deve ser impression');
+if ($type !== 'impression' && $type !== 'click') {
+    sendError('type deve ser impression ou click');
 }
 
 // Validar user_id
@@ -64,9 +62,10 @@ try {
     $conn = getDbConnection();
     
     // ========================================
-    // BUSCAR LIMITES DO USUÁRIO - APENAS IMPRESSÕES
+    // BUSCAR LIMITES DO USUÁRIO
     // ========================================
     $required_impressions = 10;
+    $required_clicks = 4;
     
     $user_settings_stmt = $conn->prepare("
         SELECT required_impressions FROM user_required_impressions 
@@ -86,35 +85,52 @@ try {
     // ========================================
     $today = date('Y-m-d');
     
+    // Verificar limite do tipo específico (impression ou click)
     $check_limit_stmt = $conn->prepare("
         SELECT COUNT(*) as total FROM monetag_events 
-        WHERE user_id = ? AND event_type = 'impression' AND DATE(created_at) = ?
+        WHERE user_id = ? AND event_type = ? AND DATE(created_at) = ?
     ");
-    $check_limit_stmt->bind_param("is", $user_id, $today);
+    $check_limit_stmt->bind_param("iss", $user_id, $type, $today);
     $check_limit_stmt->execute();
     $limit_result = $check_limit_stmt->get_result();
     $current_count = (int)$limit_result->fetch_assoc()['total'];
     $check_limit_stmt->close();
     
+    // Definir limite baseado no tipo
+    $current_limit = ($type === 'click') ? $required_clicks : $required_impressions;
+    
     // Se já atingiu o limite, retornar sucesso mas sem registrar
-    if ($current_count >= $required_impressions) {
-        error_log("MoniTag Postback - Limite diário atingido: user_id=$user_id, count=$current_count, limit=$required_impressions");
+    if ($current_count >= $current_limit) {
+        error_log("MoniTag Postback - Limite diário atingido: user_id=$user_id, type=$type, count=$current_count, limit=$current_limit");
+        
+        // Buscar contagens atualizadas
+        $imp_stmt = $conn->prepare("SELECT COUNT(*) as total FROM monetag_events WHERE user_id = ? AND event_type = 'impression' AND DATE(created_at) = ?");
+        $imp_stmt->bind_param("is", $user_id, $today);
+        $imp_stmt->execute();
+        $impressions_count = (int)$imp_stmt->get_result()->fetch_assoc()['total'];
+        $imp_stmt->close();
+        
+        $click_stmt = $conn->prepare("SELECT COUNT(*) as total FROM monetag_events WHERE user_id = ? AND event_type = 'click' AND DATE(created_at) = ?");
+        $click_stmt->bind_param("is", $user_id, $today);
+        $click_stmt->execute();
+        $clicks_count = (int)$click_stmt->get_result()->fetch_assoc()['total'];
+        $click_stmt->close();
         
         $conn->close();
         
         sendSuccess([
             'event_registered' => false,
-            'message' => 'Limite diário já atingido para impressões',
+            'message' => "Limite diário já atingido para $type",
             'event_type' => $type,
             'user_id' => $user_id,
             'progress' => [
-                'impressions' => $current_count,
-                'clicks' => 0,
+                'impressions' => $impressions_count,
+                'clicks' => $clicks_count,
                 'required_impressions' => $required_impressions,
-                'required_clicks' => 0,
-                'impressions_completed' => true,
-                'clicks_completed' => true,
-                'all_completed' => true
+                'required_clicks' => $required_clicks,
+                'impressions_completed' => $impressions_count >= $required_impressions,
+                'clicks_completed' => $clicks_count >= $required_clicks,
+                'all_completed' => ($impressions_count >= $required_impressions) && ($clicks_count >= $required_clicks)
             ]
         ]);
     }
@@ -124,44 +140,54 @@ try {
     // ========================================
     $stmt = $conn->prepare("
         INSERT INTO monetag_events (user_id, event_type, session_id, revenue, created_at)
-        VALUES (?, 'impression', ?, 0, NOW())
+        VALUES (?, ?, ?, 0, NOW())
     ");
-    $stmt->bind_param("is", $user_id, $session_id);
+    $stmt->bind_param("iss", $user_id, $type, $session_id);
     $stmt->execute();
     $event_id = $stmt->insert_id;
     $stmt->close();
     
-    error_log("MoniTag Postback - Event registered: ID=$event_id, user_id=$user_id, time=" . date('Y-m-d H:i:s'));
+    error_log("MoniTag Postback - Event registered: ID=$event_id, user_id=$user_id, type=$type, time=" . date('Y-m-d H:i:s'));
     
     // Buscar progresso atualizado do dia
-    $stmt = $conn->prepare("
+    $imp_stmt = $conn->prepare("
         SELECT COUNT(*) as impressions
         FROM monetag_events
         WHERE user_id = ? AND event_type = 'impression' AND DATE(created_at) = ?
     ");
-    $stmt->bind_param("is", $user_id, $today);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $progress = $result->fetch_assoc();
-    $stmt->close();
-    $conn->close();
+    $imp_stmt->bind_param("is", $user_id, $today);
+    $imp_stmt->execute();
+    $imp_result = $imp_stmt->get_result();
+    $impressions = (int)$imp_result->fetch_assoc()['impressions'];
+    $imp_stmt->close();
     
-    $impressions = (int)$progress['impressions'];
+    $click_stmt = $conn->prepare("
+        SELECT COUNT(*) as clicks
+        FROM monetag_events
+        WHERE user_id = ? AND event_type = 'click' AND DATE(created_at) = ?
+    ");
+    $click_stmt->bind_param("is", $user_id, $today);
+    $click_stmt->execute();
+    $click_result = $click_stmt->get_result();
+    $clicks = (int)$click_result->fetch_assoc()['clicks'];
+    $click_stmt->close();
+    
+    $conn->close();
     
     $response = [
         'event_registered' => true,
         'event_id' => $event_id,
-        'event_type' => 'impression',
+        'event_type' => $type,
         'user_id' => $user_id,
         'session_id' => $session_id,
         'progress' => [
             'impressions' => $impressions,
-            'clicks' => 0,
+            'clicks' => $clicks,
             'required_impressions' => $required_impressions,
-            'required_clicks' => 0,
+            'required_clicks' => $required_clicks,
             'impressions_completed' => $impressions >= $required_impressions,
-            'clicks_completed' => true,
-            'all_completed' => $impressions >= $required_impressions
+            'clicks_completed' => $clicks >= $required_clicks,
+            'all_completed' => ($impressions >= $required_impressions) && ($clicks >= $required_clicks)
         ]
     ];
     
