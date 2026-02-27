@@ -3,122 +3,235 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graninha Bot - 100% Legit</title>
+    <title>Pix Assistindo - Young Money</title>
     <link rel="stylesheet" href="pix-style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- PROTEÇÃO DE ROTAS - BLOQUEIA ACESSO SEM ID NA URL -->
     <script src="route-protection.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎮 Graninha Bot</h1>
-            <p class="subtitle">Automação 100% Legit com Simulação de Vídeos</p>
-        </header>
-
-        <div class="config-section" id="configSection">
-            <h2>⚙️ Configuração</h2>
-            <form id="configForm">
-                <div class="form-group">
-                    <label for="bearerToken">Bearer Token:</label>
-                    <input 
-                        type="text" 
-                        id="bearerToken" 
-                        placeholder="519800|YIxuAVV3BzcWqjkolsoo31MtlDquv2EUBeiTC82K"
-                        required
-                    >
-                    <small>Obtenha usando HTTP Catcher no app Graninha</small>
+    <div class="app-wrapper">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon-wrapper">
+                    <!-- Ícone Pix SVG -->
+                    <svg class="pix-icon" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M393.8 353.8c-26.2 0-50.8-10.2-69.3-28.7l-68.5-68.5-68.5 68.5c-18.5 18.5-43.1 28.7-69.3 28.7H100l86.8 86.8c38 38 99.6 38 137.6 0L411.2 353.8h-17.4z" fill="url(#pix-grad-1)"/>
+                        <path d="M118.2 158.2c26.2 0 50.8 10.2 69.3 28.7l68.5 68.5 68.5-68.5c18.5-18.5 43.1-28.7 69.3-28.7h17.4l-86.8-86.8c-38-38-99.6-38-137.6 0L100 158.2h18.2z" fill="url(#pix-grad-2)"/>
+                        <path d="M440.6 186.9l-47.4-47.4c2.4 5.6 3.8 11.8 3.8 18.3 0 12.8-5 24.8-14 33.9l-75.4 75.4c-3.2 3.2-3.2 8.4 0 11.6l75.4 75.4c9 9 14 21.1 14 33.9 0 6.5-1.3 12.7-3.8 18.3l47.4-47.4c38-38 38-99.6 0-137.6v-34.4z" fill="url(#pix-grad-3)"/>
+                        <path d="M134.4 277.1l-75.4-75.4c-9-9-14-21.1-14-33.9 0-6.5 1.3-12.7 3.8-18.3l-47.4 47.4c-38 38-38 99.6 0 137.6l47.4 47.4c-2.4-5.6-3.8-11.8-3.8-18.3 0-12.8 5-24.8 14-33.9l75.4-75.4c3.2-3.2 3.2-8.4 0-11.6v-.6z" fill="url(#pix-grad-4)"/>
+                        <defs>
+                            <linearGradient id="pix-grad-1" x1="100" y1="353.8" x2="411.2" y2="440.6" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#00DCAA"/>
+                                <stop offset="1" stop-color="#00B894"/>
+                            </linearGradient>
+                            <linearGradient id="pix-grad-2" x1="100" y1="71.4" x2="411.2" y2="158.2" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#00DCAA"/>
+                                <stop offset="1" stop-color="#00B894"/>
+                            </linearGradient>
+                            <linearGradient id="pix-grad-3" x1="307.8" y1="139.5" x2="440.6" y2="406.3" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#00B894"/>
+                                <stop offset="1" stop-color="#00DCAA"/>
+                            </linearGradient>
+                            <linearGradient id="pix-grad-4" x1="1.4" y1="149.5" x2="134.4" y2="382.5" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#00DCAA"/>
+                                <stop offset="1" stop-color="#00B894"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
                 </div>
-
-                <div class="form-group">
-                    <label for="exId">EX ID:</label>
-                    <input 
-                        type="text" 
-                        id="exId" 
-                        placeholder="114739186742449509260"
-                        required
-                    >
-                    <small>ID do usuário encontrado nas requisições</small>
+                <div class="logo-text">
+                    <span class="logo-title">Pix Assistindo</span>
+                    <span class="logo-subtitle">Young Money</span>
                 </div>
-
-                <!-- Secret Key oculto (valor padrão) -->
-                <input type="hidden" id="secretKey" value="0NtCe2obYa13c3Bc1UEbVVj4p8IEDW">
-
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" id="autoLoop" checked>
-                        Ativar loop infinito (intervalo realista de 5-15 minutos)
-                    </label>
-                </div>
-
-                <button type="submit" class="btn btn-primary">
-                    🚀 Iniciar Bot
-                </button>
-            </form>
-        </div>
-
-        <div class="status-section" id="statusSection" style="display: none;">
-            <div class="status-header">
-                <h2>📊 Status</h2>
-                <button class="btn btn-secondary" id="stopBtn">⏹️ Parar</button>
             </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Dashboard
+                </a>
+                <a href="#" class="nav-item" onclick="document.getElementById('logContainer').scrollIntoView({behavior:'smooth'})">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    Logs
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="session-timer-box">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span id="sessionTimer">00:00:00</span>
+                </div>
+            </div>
+        </aside>
 
-            <div class="stats-grid">
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header Bar -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-desc">Gerencie suas simulações de anúncios</p>
+                </div>
+                <div class="top-bar-right">
+                    <div class="status-badge" id="statusBadge">
+                        <span class="status-dot stopped" id="statusDot"></span>
+                        <span class="status-text" id="statusText">Parado</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Cards -->
+            <section class="stats-row">
                 <div class="stat-card">
-                    <div class="stat-label">Saldo Inicial</div>
-                    <div class="stat-value" id="saldoInicial">-</div>
+                    <div class="stat-card-icon requests">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Requisições</span>
+                        <span class="stat-card-value" id="requestCount">0</span>
+                    </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Saldo Atual</div>
-                    <div class="stat-value" id="saldoAtual">-</div>
+                    <div class="stat-card-icon success">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Sucessos</span>
+                        <span class="stat-card-value" id="successCount">0</span>
+                    </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Ganho Total</div>
-                    <div class="stat-value success" id="ganhoTotal">+0</div>
+                    <div class="stat-card-icon errors">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Erros</span>
+                        <span class="stat-card-value" id="errorCount">0</span>
+                    </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">Ações Executadas</div>
-                    <div class="stat-value" id="acoesExecutadas">0</div>
+                    <div class="stat-card-icon earnings">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <div class="stat-card-info">
+                        <span class="stat-card-label">Ganhos Totais</span>
+                        <span class="stat-card-value" id="totalEarnings">R$ 0.00000</span>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="progress-section">
-                <h3>Progresso</h3>
-                <div class="progress-item">
-                    <span>Raspadinhas</span>
-                    <span id="progressRaspadinha">-</span>
+            <!-- Config + User Info Row -->
+            <section class="content-grid">
+                <!-- Config Panel -->
+                <div class="panel config-panel">
+                    <div class="panel-header">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        <h2>Configuração</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="email">E-mail da conta</label>
+                            <div class="input-wrapper">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                <input type="email" id="email" placeholder="seu@email.com" autocomplete="email">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="tipoAnuncio">Tipo de Anúncio</label>
+                            <div class="input-wrapper">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                <select id="tipoAnuncio" class="select-input">
+                                    <option value="rewarded">Recompensado</option>
+                                    <option value="interstitial">Intersticial</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="interval">Intervalo (segundos)</label>
+                            <div class="slider-container">
+                                <input type="range" id="interval" min="5" max="120" value="30">
+                                <span class="slider-value" id="intervalValue">30</span>
+                            </div>
+                        </div>
+                        <div class="control-buttons">
+                            <button class="btn btn-primary" id="startBtn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                Iniciar
+                            </button>
+                            <button class="btn btn-danger" id="stopBtn" disabled>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+                                Parar
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="progress-item">
-                    <span>Roleta</span>
-                    <span id="progressRoleta">-</span>
-                </div>
-                <div class="progress-item">
-                    <span>Quiz</span>
-                    <span id="progressQuiz">-</span>
-                </div>
-                <div class="progress-item">
-                    <span>Jogos (33 IDs)</span>
-                    <span id="progressJogos">-</span>
-                </div>
-            </div>
-        </div>
 
-        <div class="logs-section">
-            <div class="logs-header">
-                <h2>📝 Logs</h2>
-                <button class="btn btn-small" id="clearLogsBtn">Limpar</button>
-            </div>
-            <div class="logs-container" id="logsContainer">
-                <div class="log-entry info">
-                    <span class="log-time">--:--:--</span>
-                    <span class="log-message">Aguardando configuração...</span>
+                <!-- User Info Panel -->
+                <div class="panel user-info-panel">
+                    <div class="panel-header">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <h2>Informações do Usuário</h2>
+                    </div>
+                    <div class="panel-body" id="userInfoContainer">
+                        <div class="empty-state">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <p>Inicie a simulação para ver os dados</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <footer>
-            <p>⚠️ Use por sua conta e risco. Este bot automatiza ações no app Graninha.</p>
-            <p>Versão 3.1 - 100% Legit - Valores Aleatórios Corrigidos - CORS Fix</p>
-        </footer>
+            <!-- Mission + Rewards Row -->
+            <section class="content-grid">
+                <!-- Mission Panel -->
+                <div class="panel mission-panel">
+                    <div class="panel-header">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                        <h2>Missão</h2>
+                    </div>
+                    <div class="panel-body" id="missionContainer">
+                        <div class="empty-state">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+                            <p>Dados da missão aparecerão aqui</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rewards Panel -->
+                <div class="panel rewards-panel">
+                    <div class="panel-header">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6l3-3"/><path d="M12 2v6l-3-3"/><circle cx="12" cy="14" r="8"/></svg>
+                        <h2>Recompensas</h2>
+                    </div>
+                    <div class="panel-body" id="rewardsContainer">
+                        <div class="empty-state">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><circle cx="12" cy="14" r="8"/><path d="M12 2v6"/></svg>
+                            <p>Carregando configurações...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Log Panel -->
+            <section class="panel log-panel">
+                <div class="panel-header">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    <h2>Terminal de Logs</h2>
+                    <div class="log-actions">
+                        <button class="btn btn-ghost btn-sm" id="autoScrollBtn">Auto Scroll</button>
+                        <button class="btn btn-ghost btn-sm" id="clearBtn">Limpar</button>
+                    </div>
+                </div>
+                <div class="log-container" id="logContainer">
+                    <div class="log-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        <p>Aguardando início da simulação...</p>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <!-- BLOQUEIO BASEADO NA API DO MONETAG -->
@@ -134,7 +247,6 @@
         console.log('[MONETAG BLOCKER] Sistema iniciado');
         console.log('[MONETAG BLOCKER] Limite: ' + MAX_CLICKS + ' clicks');
         
-        // Pegar user_id do localStorage
         const userId = localStorage.getItem('user_id');
         
         if (!userId) {
@@ -145,7 +257,6 @@
         console.log('[MONETAG BLOCKER] User ID: ' + userId);
         console.log('[MONETAG BLOCKER] API URL: ' + API_URL + userId);
         
-        // CRIAR CAMADA DE BLOQUEIO IMEDIATA (preventiva)
         const preventiveOverlay = document.createElement('div');
         preventiveOverlay.id = 'preventive-blocker';
         preventiveOverlay.style.cssText = `
@@ -154,7 +265,7 @@
           left: 0 !important;
           width: 100vw !important;
           height: 100vh !important;
-          background: rgba(0, 0, 0, 0.98) !important;
+          background: rgba(15, 23, 42, 0.98) !important;
           z-index: 2147483647 !important;
           display: flex !important;
           align-items: center !important;
@@ -163,12 +274,11 @@
         
         preventiveOverlay.innerHTML = `
           <div style="text-align: center; color: white;">
-            <div style="font-size: 80px; margin-bottom: 30px; animation: spin 2s linear infinite;">⏳</div>
-            <p style="font-size: 32px; font-family: Arial, sans-serif;">Verificando...</p>
+            <div class="loading-spinner" style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.1);border-top-color:#00DCAA;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 24px;"></div>
+            <p style="font-size: 16px; font-family: 'Inter', sans-serif; color: rgba(255,255,255,0.7);">Verificando acesso...</p>
           </div>
         `;
         
-        // Adicionar animação de loading
         const loadingStyle = document.createElement('style');
         loadingStyle.textContent = `
           @keyframes spin {
@@ -179,22 +289,16 @@
         document.head.appendChild(loadingStyle);
         
         document.body.appendChild(preventiveOverlay);
-        console.log('[MONETAG BLOCKER] 🔒 Camada preventiva ativada - bloqueando TUDO até verificar API');
         
-        // Função para criar camada de bloqueio transparente
         function createBlockingLayer() {
           if (blockingActive) return;
           blockingActive = true;
           
-          console.log('[MONETAG BLOCKER] ⚠️ LIMITE ATINGIDO! Criando camada de bloqueio...');
-          
-          // Parar polling
           if (pollingInterval) {
             clearInterval(pollingInterval);
             pollingInterval = null;
           }
           
-          // Camada TRANSPARENTE que cobre TUDO
           const overlay = document.createElement('div');
           overlay.id = 'monetag-click-blocker';
           overlay.style.cssText = `
@@ -209,33 +313,22 @@
             pointer-events: auto !important;
           `;
           
-          // Bloquear TODOS os eventos de click/touch
           const events = ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'contextmenu', 'dblclick'];
           events.forEach(function(eventType) {
             overlay.addEventListener(eventType, function(e) {
               e.stopPropagation();
               e.stopImmediatePropagation();
               e.preventDefault();
-              console.log('[MONETAG BLOCKER] ❌ ' + eventType + ' BLOQUEADO - limite atingido');
               return false;
             }, true);
           });
           
           document.body.appendChild(overlay);
-          
-          console.log('[MONETAG BLOCKER] ✅ Camada transparente ativada!');
-          console.log('[MONETAG BLOCKER] Anúncio visível mas NÃO clicável');
-          
-          // Mostrar mensagem de sucesso após 500ms
           setTimeout(showSuccessMessage, 500);
         }
         
-        // Função para mostrar tela "BLOQUEADO" e recarregar após 15s
         function showSuccessMessage() {
           if (document.getElementById('success-overlay')) return;
-          
-          console.log('[MONETAG BLOCKER] 🔒 Mostrando tela BLOQUEADO');
-          console.log('[MONETAG BLOCKER] ⏱️ Aguardando 15 segundos para recarregar...');
           
           const successOverlay = document.createElement('div');
           successOverlay.id = 'success-overlay';
@@ -245,7 +338,7 @@
             left: 0 !important;
             width: 100vw !important;
             height: 100vh !important;
-            background: #000000 !important;
+            background: rgba(15, 23, 42, 0.98) !important;
             z-index: 2147483648 !important;
             display: flex !important;
             align-items: center !important;
@@ -254,58 +347,40 @@
           `;
           
           const message = document.createElement('div');
-          message.style.cssText = `
-            text-align: center !important;
-          `;
+          message.style.cssText = `text-align: center !important;`;
           
-          // Contador regressivo
           let timeLeft = 15;
           
           message.innerHTML = `
-            <div style="font-size: 180px; margin-bottom: 50px; animation: pulse 2s ease infinite;">🔒</div>
-            <h1 style="margin: 0 0 40px 0; color: #ff3333; font-size: 90px; font-weight: 900; text-shadow: 0 0 40px rgba(255,51,51,0.8); font-family: Arial, sans-serif; letter-spacing: 8px;">BLOQUEADO</h1>
-            <p style="margin: 0 0 35px 0; color: #ffffff; font-size: 36px; font-weight: bold; font-family: Arial, sans-serif;">
-              Limite de <span style="color: #ffd700; font-size: 42px;">${MAX_CLICKS} clicks</span> atingido!
+            <div style="width:80px;height:80px;margin:0 auto 24px;background:rgba(239,68,68,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h1 style="margin:0 0 12px;color:#fff;font-size:28px;font-weight:700;font-family:'Inter',sans-serif;">Limite Atingido</h1>
+            <p style="margin:0 0 32px;color:rgba(255,255,255,0.6);font-size:15px;font-family:'Inter',sans-serif;">
+              Você completou <strong style="color:#00DCAA;">${MAX_CLICKS} clicks</strong> com sucesso.
             </p>
-            <div style="margin: 50px 0; padding: 30px 60px; background: rgba(255,255,255,0.1); border-radius: 25px; border: 3px solid rgba(255,255,255,0.3);">
-              <p style="margin: 0 0 20px 0; color: rgba(255,255,255,0.9); font-size: 28px; font-family: Arial, sans-serif;">
-                Redirecionando em:
-              </p>
-              <div id="countdown" style="font-size: 100px; font-weight: 900; color: #ffd700; text-shadow: 0 0 30px rgba(255,215,0,0.8); font-family: Arial, sans-serif;">${timeLeft}</div>
-              <p style="margin: 20px 0 0 0; color: rgba(255,255,255,0.7); font-size: 24px; font-family: Arial, sans-serif;">
-                segundos
-              </p>
+            <div style="padding:16px 32px;background:rgba(255,255,255,0.05);border-radius:12px;border:1px solid rgba(255,255,255,0.1);">
+              <p style="margin:0 0 8px;color:rgba(255,255,255,0.5);font-size:13px;font-family:'Inter',sans-serif;">Redirecionando em</p>
+              <div id="countdown" style="font-size:48px;font-weight:800;color:#00DCAA;font-family:'Inter',sans-serif;">${timeLeft}</div>
             </div>
           `;
           
           successOverlay.appendChild(message);
           document.body.appendChild(successOverlay);
           
-          // Atualizar contador a cada segundo
           const countdownInterval = setInterval(function() {
             timeLeft--;
             const countdownElement = document.getElementById('countdown');
             if (countdownElement) {
               countdownElement.textContent = timeLeft;
-              
-              // Animação de pulso no número
-              countdownElement.style.transform = 'scale(1.2)';
-              setTimeout(function() {
-                countdownElement.style.transform = 'scale(1)';
-              }, 200);
             }
             
             if (timeLeft <= 0) {
               clearInterval(countdownInterval);
-              console.log('[MONETAG BLOCKER] 🔄 Recarregando página...');
               window.location.reload();
             }
           }, 1000);
           
-          console.log('[MONETAG BLOCKER] ✅ Tela BLOQUEADO exibida');
-          console.log('[MONETAG BLOCKER] ⏱️ Timer de 15s iniciado');
-          
-          // Adicionar animações CSS
           if (!document.getElementById('monetag-blocker-animations')) {
             const style = document.createElement('style');
             style.id = 'monetag-blocker-animations';
@@ -314,16 +389,11 @@
                 from { opacity: 0; }
                 to { opacity: 1; }
               }
-              @keyframes pulse {
-                0%, 100% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.15); opacity: 0.8; }
-              }
             `;
             document.head.appendChild(style);
           }
         }
         
-        // Função para consultar API e verificar clicks
         async function checkClicks() {
           try {
             const response = await fetch(API_URL + userId);
@@ -332,36 +402,26 @@
             if (data.success && typeof data.total_clicks === 'number') {
               const totalClicks = data.total_clicks;
               
-              console.log('[MONETAG BLOCKER] Clicks atuais: ' + totalClicks + '/' + MAX_CLICKS);
-              
               if (totalClicks >= MAX_CLICKS) {
-                console.log('[MONETAG BLOCKER] ⚠️ LIMITE ATINGIDO!');
                 createBlockingLayer();
               }
-            } else {
-              console.error('[MONETAG BLOCKER] Resposta inválida da API:', data);
             }
           } catch (error) {
             console.error('[MONETAG BLOCKER] Erro ao consultar API:', error);
           }
         }
         
-        // Verificar IMEDIATAMENTE e AGUARDAR resposta
         (async function() {
           await checkClicks();
           
-          // Se não bloqueou (total_clicks < 2), remover camada preventiva
           if (!blockingActive) {
             const preventive = document.getElementById('preventive-blocker');
             if (preventive) {
               preventive.remove();
-              console.log('[MONETAG BLOCKER] ✅ Limite OK - liberando página');
             }
           }
           
-          // Continuar polling
           pollingInterval = setInterval(checkClicks, 1000);
-          console.log('[MONETAG BLOCKER] ✅ Polling ativo (verificação a cada 1 segundo)');
         })();
       })();
     </script>
@@ -375,7 +435,7 @@
             });
           }
           
-          console.log('[GRANINHA BLOCKER] ✅ Camada de bloqueio TOTAL ativada!');
+          console.log('[GRANINHA BLOCKER] Camada de bloqueio TOTAL ativada!');
           console.log('[GRANINHA BLOCKER] Anúncio carrega em segundo plano mas usuário NÃO pode interagir');
         } else {
           console.log('[GRANINHA BLOCKER] Limite não atingido, página funciona normalmente');
@@ -383,6 +443,7 @@
       })();
     </script>
     
+    <script src="session-security.js"></script>
     <script src="pix-script.js"></script>
     
 </body>

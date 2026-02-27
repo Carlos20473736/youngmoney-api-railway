@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Graninha Bot - 100% Legit</title>
+    <title>Graninha Bot - Young Money</title>
     <link rel="stylesheet" href="graninha-bot-style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- SISTEMA DE VERIFICAÇÃO DE RESET (IMPRESSÕES E CLIQUES ZERADOS) -->
@@ -13,28 +16,23 @@
         'use strict';
         
         const API_BASE_URL = 'https://monetag-postback-server-production.up.railway.app/api/stats/user/';
-        const CHECK_INTERVAL = 5 * 1000; // Verificar a cada 5 segundos
-        const ID_CHECK_INTERVAL = 1000; // Verificar se o ID apareceu a cada 1 segundo
+        const CHECK_INTERVAL = 5 * 1000;
+        const ID_CHECK_INTERVAL = 1000;
         let verificationInterval = null;
         let currentUserId = null;
         let idCheckInterval = null;
         
-        // Função para obter o ID do usuário da URL
         function getUserIdFromUrl() {
           const urlParams = new URLSearchParams(window.location.search);
           return urlParams.get('ymid') || urlParams.get('id') || urlParams.get('user_id') || null;
         }
         
-        // Função para obter o ID do usuário da tela (elemento que mostra "ID: XXXX")
         function getUserIdFromScreen() {
-          // Procurar por elementos que contenham "ID:" no texto
           const allElements = document.querySelectorAll('*');
           for (let el of allElements) {
             const text = el.textContent || el.innerText || '';
-            // Procurar padrão "ID: XXXX" ou "ID:XXXX"
             const match = text.match(/ID:\s*(\d+)/);
             if (match && match[1]) {
-              // Verificar se é o elemento direto (não um pai com muito texto)
               if (el.children.length === 0 || text.trim().startsWith('ID:')) {
                 return match[1];
               }
@@ -43,7 +41,6 @@
           return null;
         }
         
-        // Função para obter o ID do localStorage/sessionStorage
         function getUserIdFromStorage() {
           return localStorage.getItem('user_id') || 
                  localStorage.getItem('graninha_user_id') || 
@@ -52,316 +49,281 @@
                  null;
         }
         
-        // Função para obter o ID de qualquer fonte disponível
         function getUserId() {
           return getUserIdFromUrl() || getUserIdFromScreen() || getUserIdFromStorage();
         }
         
-        // Função para verificar se o sistema foi resetado
         async function checkSystemReset(userId) {
           try {
             const response = await fetch(API_BASE_URL + userId);
             const data = await response.json();
             
-            console.log('[RESET VERIFICATION] Dados da API para ID ' + userId + ':', data);
-            
             if (data.success) {
               const impressions = parseInt(data.total_impressions) || 0;
               const clicks = parseInt(data.total_clicks) || 0;
               
-              // Se impressões E cliques forem zero, sistema foi resetado
               if (impressions === 0 && clicks === 0) {
-                return {
-                  isReset: true,
-                  message: 'Sistema resetado! Suas impressões e cliques estão zerados.'
-                };
+                return { isReset: true, message: 'Sistema resetado! Suas impressões e cliques estão zerados.' };
               }
               
-              return {
-                isReset: false,
-                impressions: impressions,
-                clicks: clicks,
-                userId: userId
-              };
+              return { isReset: false, impressions: impressions, clicks: clicks, userId: userId };
             } else {
-              return {
-                isReset: false,
-                error: 'API retornou erro'
-              };
+              return { isReset: false, error: 'API retornou erro' };
             }
           } catch (error) {
-            console.error('[RESET VERIFICATION] Erro ao verificar API:', error);
-            return {
-              isReset: false,
-              error: error.message
-            };
+            return { isReset: false, error: error.message };
           }
         }
         
-        // Função para mostrar overlay de sistema resetado
         function showResetOverlay(message) {
-          // Parar verificação
-          if (verificationInterval) {
-            clearInterval(verificationInterval);
-            verificationInterval = null;
-          }
-          if (idCheckInterval) {
-            clearInterval(idCheckInterval);
-            idCheckInterval = null;
-          }
+          if (verificationInterval) { clearInterval(verificationInterval); verificationInterval = null; }
+          if (idCheckInterval) { clearInterval(idCheckInterval); idCheckInterval = null; }
           
-          // Criar overlay
           const overlay = document.createElement('div');
           overlay.id = 'reset-overlay';
           overlay.style.cssText = `
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: rgba(0, 0, 0, 0.85) !important;
+            position: fixed !important; top: 0 !important; left: 0 !important;
+            width: 100vw !important; height: 100vh !important;
+            background: rgba(15, 23, 42, 0.95) !important;
             z-index: 2147483647 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
+            display: flex !important; align-items: center !important; justify-content: center !important;
+            backdrop-filter: blur(8px) !important;
           `;
           
           const messageBox = document.createElement('div');
           messageBox.style.cssText = `
-            background: #ffffff !important;
-            padding: 40px !important;
-            border-radius: 16px !important;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
-            text-align: center !important;
-            max-width: 90% !important;
-            width: 400px !important;
+            background: #1e293b !important; padding: 40px !important; border-radius: 16px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important; text-align: center !important;
+            max-width: 90% !important; width: 400px !important; border: 1px solid rgba(255,255,255,0.06) !important;
           `;
           
-          messageBox.innerHTML = `
-            <div style="width: 70px; height: 70px; margin: 0 auto 20px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-              <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
+          messageBox.innerHTML = \`
+            <div style="width:64px;height:64px;margin:0 auto 20px;background:rgba(239,68,68,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             </div>
-            <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 24px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Sistema Resetado</h2>
-            <p style="margin: 0 0 25px 0; color: #6b7280; font-size: 15px; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              ${message}
-            </p>
-            <div style="
-              background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-              color: white;
-              padding: 20px 40px;
-              border-radius: 12px;
-              font-size: 32px;
-              font-weight: 700;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-            ">
-              <div style="font-size: 14px; font-weight: 500; margin-bottom: 8px; opacity: 0.9;">Redirecionando em</div>
-              <div id="countdown-bot" style="font-size: 48px; font-weight: 800;">5</div>
+            <h2 style="margin:0 0 12px;color:#f1f5f9;font-size:22px;font-weight:700;font-family:'Inter',sans-serif;">Sistema Resetado</h2>
+            <p style="margin:0 0 24px;color:#94a3b8;font-size:14px;line-height:1.6;font-family:'Inter',sans-serif;">\${message}</p>
+            <div style="padding:16px 32px;background:rgba(59,130,246,0.1);border-radius:12px;border:1px solid rgba(59,130,246,0.15);">
+              <div style="font-size:12px;font-weight:500;margin-bottom:8px;color:#94a3b8;font-family:'Inter',sans-serif;">Redirecionando em</div>
+              <div id="countdown-bot" style="font-size:42px;font-weight:800;color:#3b82f6;font-family:'Inter',sans-serif;">5</div>
             </div>
-          `;
+          \`;
           
           overlay.appendChild(messageBox);
           document.body.appendChild(overlay);
           
-          // Countdown de 5 segundos
           let timeLeft = 5;
           const countdownElement = document.getElementById('countdown-bot');
           
           const countdownInterval = setInterval(function() {
             timeLeft--;
-            if (countdownElement) {
-              countdownElement.textContent = timeLeft;
-            }
-            
+            if (countdownElement) countdownElement.textContent = timeLeft;
             if (timeLeft <= 0) {
               clearInterval(countdownInterval);
-              // Redirecionar para tela de tarefa mantendo o ID
               const userId = getUserId();
-              if (userId) {
-                window.location.href = '/?ymid=' + userId;
-              } else {
-                window.location.href = '/';
-              }
+              window.location.href = userId ? '/?ymid=' + userId : '/';
             }
           }, 1000);
         }
         
-        // Função para iniciar verificação periódica
         function startPeriodicVerification(userId) {
           currentUserId = userId;
-          
-          console.log('[RESET VERIFICATION] Iniciando verificação periódica para ID:', userId);
-          console.log('[RESET VERIFICATION] Intervalo de verificação:', CHECK_INTERVAL / 1000 / 60, 'minutos');
-          
-          // Verificação periódica
           verificationInterval = setInterval(async function() {
-            console.log('[RESET VERIFICATION] Verificação periódica...');
-            
             const result = await checkSystemReset(currentUserId);
-            
-            if (result.isReset) {
-              showResetOverlay(result.message);
-            } else {
-              console.log('[RESET VERIFICATION] Sistema OK - Impressões:', result.impressions, 'Cliques:', result.clicks);
-            }
+            if (result.isReset) showResetOverlay(result.message);
           }, CHECK_INTERVAL);
         }
         
-        // Função para iniciar verificação quando ID for encontrado
         function startVerificationWithId(userId) {
-          console.log('[RESET VERIFICATION] ID encontrado:', userId);
-          
-          // Salvar ID no storage para uso futuro
           localStorage.setItem('graninha_user_id', userId);
           sessionStorage.setItem('graninha_user_id', userId);
           
-          // Verificar imediatamente
           checkSystemReset(userId).then(function(result) {
             if (result.isReset) {
               showResetOverlay(result.message);
             } else {
-              console.log('[RESET VERIFICATION] Verificação inicial OK - Impressões:', result.impressions, 'Cliques:', result.clicks);
-              // Iniciar verificação periódica
               startPeriodicVerification(userId);
             }
           });
         }
         
-        // Iniciar verificação quando DOM estiver pronto
         function initVerification() {
-          // Tentar obter ID imediatamente da URL primeiro
           let userIdFromUrl = getUserIdFromUrl();
-          
-          // Se não tem ID na URL, redireciona imediatamente
           if (!userIdFromUrl) {
-            // Tentar pegar do storage como última chance
             let userIdFromStorage = getUserIdFromStorage();
             if (!userIdFromStorage) {
-              console.log('[RESET VERIFICATION] ID não encontrado na URL nem no storage - redirecionando para tela de tarefa');
               window.location.href = '/';
               return;
             }
-            // Usar ID do storage
             startVerificationWithId(userIdFromStorage);
           } else {
-            // Usar ID da URL
             startVerificationWithId(userIdFromUrl);
           }
         }
         
-        // Esperar DOM carregar
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', initVerification);
         } else {
           initVerification();
         }
-        
-        console.log('[RESET VERIFICATION] Sistema de verificação de reset iniciado no Graninha Bot');
-        
       })();
     </script>
 
-    <div class="container">
-        <header>
-            <h1>🎮 Graninha Bot</h1>
-            <p class="subtitle">Automação 100% Legit com Simulação de Vídeos</p>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="header-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                </div>
+                <div>
+                    <h1 class="header-title">Graninha Bot</h1>
+                    <p class="header-subtitle">Automação inteligente com simulação de vídeos</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <span class="version-badge">v3.2</span>
+            </div>
         </header>
 
-        <div class="config-section" id="configSection">
-            <h2>⚙️ Configuração</h2>
-            <form id="configForm">
-                <div class="form-group">
-                    <label for="bearerToken">Bearer Token:</label>
-                    <input 
-                        type="text" 
-                        id="bearerToken" 
-                        placeholder="519800|YIxuAVV3BzcWqjkolsoo31MtlDquv2EUBeiTC82K"
-                        required
-                    >
-                    <small>Obtenha usando HTTP Catcher no app Graninha</small>
-                </div>
+        <!-- Config Section -->
+        <div class="card config-section" id="configSection">
+            <div class="card-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <h2>Configuração</h2>
+            </div>
+            <div class="card-body">
+                <form id="configForm">
+                    <div class="form-group">
+                        <label for="bearerToken">Bearer Token</label>
+                        <div class="input-wrapper">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <input type="text" id="bearerToken" placeholder="519800|YIxuAVV3BzcWqjkolsoo31Mtl..." required>
+                        </div>
+                        <small>Obtenha usando HTTP Catcher no app Graninha</small>
+                    </div>
 
-                <div class="form-group">
-                    <label for="exId">EX ID:</label>
-                    <input 
-                        type="text" 
-                        id="exId" 
-                        placeholder="114739186742449509260"
-                        required
-                    >
-                    <small>ID do usuário encontrado nas requisições</small>
-                </div>
+                    <div class="form-group">
+                        <label for="exId">EX ID</label>
+                        <div class="input-wrapper">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <input type="text" id="exId" placeholder="114739186742449509260" required>
+                        </div>
+                        <small>ID do usuário encontrado nas requisições</small>
+                    </div>
 
-                <!-- Secret Key oculto (valor padrão) -->
-                <input type="hidden" id="secretKey" value="0NtCe2obYa13c3Bc1UEbVVj4p8IEDW">
+                    <input type="hidden" id="secretKey" value="0NtCe2obYa13c3Bc1UEbVVj4p8IEDW">
 
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" id="autoLoop" checked>
-                        Ativar loop infinito (intervalo realista de 5-15 minutos)
-                    </label>
-                </div>
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" id="autoLoop" checked>
+                                <div class="checkbox-custom">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                </div>
+                            </div>
+                            <span>Ativar loop infinito (intervalo realista de 5-15 min)</span>
+                        </label>
+                    </div>
 
-                <button type="submit" class="btn btn-primary">
-                    🚀 Iniciar Bot
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Iniciar Bot
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Status Section -->
+        <div class="card status-section" id="statusSection" style="display: none;">
+            <div class="card-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <h2>Status</h2>
+                <button class="btn btn-danger btn-sm" id="stopBtn" style="margin-left:auto;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+                    Parar
                 </button>
-            </form>
+            </div>
+            <div class="card-body">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Saldo Inicial</div>
+                            <div class="stat-value" id="saldoInicial">-</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Saldo Atual</div>
+                            <div class="stat-value" id="saldoAtual">-</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon emerald">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Ganho Total</div>
+                            <div class="stat-value success" id="ganhoTotal">+0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">Ações Executadas</div>
+                            <div class="stat-value" id="acoesExecutadas">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="progress-section">
+                    <h3 class="progress-title">Progresso das Missões</h3>
+                    <div class="progress-item">
+                        <div class="progress-item-left">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M8 8h8v8H8z"/></svg>
+                            <span>Raspadinhas</span>
+                        </div>
+                        <span class="progress-value" id="progressRaspadinha">-</span>
+                    </div>
+                    <div class="progress-item">
+                        <div class="progress-item-left">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span>Roleta</span>
+                        </div>
+                        <span class="progress-value" id="progressRoleta">-</span>
+                    </div>
+                    <div class="progress-item">
+                        <div class="progress-item-left">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span>Quiz</span>
+                        </div>
+                        <span class="progress-value" id="progressQuiz">-</span>
+                    </div>
+                    <div class="progress-item">
+                        <div class="progress-item-left">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <span>Jogos (33 IDs)</span>
+                        </div>
+                        <span class="progress-value" id="progressJogos">-</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="status-section" id="statusSection" style="display: none;">
-            <div class="status-header">
-                <h2>📊 Status</h2>
-                <button class="btn btn-secondary" id="stopBtn">⏹️ Parar</button>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Saldo Inicial</div>
-                    <div class="stat-value" id="saldoInicial">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Saldo Atual</div>
-                    <div class="stat-value" id="saldoAtual">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Ganho Total</div>
-                    <div class="stat-value success" id="ganhoTotal">+0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Ações Executadas</div>
-                    <div class="stat-value" id="acoesExecutadas">0</div>
-                </div>
-            </div>
-
-            <div class="progress-section">
-                <h3>Progresso</h3>
-                <div class="progress-item">
-                    <span>Raspadinhas</span>
-                    <span id="progressRaspadinha">-</span>
-                </div>
-                <div class="progress-item">
-                    <span>Roleta</span>
-                    <span id="progressRoleta">-</span>
-                </div>
-                <div class="progress-item">
-                    <span>Quiz</span>
-                    <span id="progressQuiz">-</span>
-                </div>
-                <div class="progress-item">
-                    <span>Jogos (33 IDs)</span>
-                    <span id="progressJogos">-</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="logs-section">
-            <div class="logs-header">
-                <h2>📝 Logs</h2>
-                <button class="btn btn-small" id="clearLogsBtn">Limpar</button>
+        <!-- Logs Section -->
+        <div class="card logs-section">
+            <div class="card-header">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                <h2>Terminal</h2>
+                <button class="btn btn-ghost btn-sm" id="clearLogsBtn" style="margin-left:auto;">Limpar</button>
             </div>
             <div class="logs-container" id="logsContainer">
                 <div class="log-entry info">
@@ -371,9 +333,10 @@
             </div>
         </div>
 
-        <footer>
-            <p>⚠️ Use por sua conta e risco. Este bot automatiza ações no app Graninha.</p>
-            <p>Versão 3.2 - 100% Legit - Verificação de Reset</p>
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Use por sua conta e risco. Este bot automatiza ações no app Graninha.</p>
+            <p>Young Money - Versão 3.2</p>
         </footer>
     </div>
 
