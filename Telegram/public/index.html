@@ -18,7 +18,7 @@
         top: 0; left: 0;
         width: 100vw; height: 100vh;
         background: #0f172a;
-        z-index: 999999;
+        z-index: 2147483647;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -234,14 +234,16 @@
       (function() {
         'use strict';
         
-        // Verificar se já está logado (tem user_id = React app já vai direto pra tarefas)
-        const savedUserId = localStorage.getItem('user_id');
-        const savedEmail = localStorage.getItem('user_email');
+        // Verificar se já está logado
+        var savedUserId = localStorage.getItem('user_id');
+        var savedEmail = localStorage.getItem('user_email');
         
         if (savedUserId && savedEmail) {
-          // Já logado, remover tela de login imediatamente
-          const loginScreen = document.getElementById('login-screen');
-          if (loginScreen) loginScreen.style.display = 'none';
+          // Já logado - REMOVER a tela de login do DOM completamente
+          var loginScreen = document.getElementById('login-screen');
+          if (loginScreen) loginScreen.remove();
+          var loginStyles = document.getElementById('login-screen-styles');
+          if (loginStyles) loginStyles.remove();
           return;
         }
         
