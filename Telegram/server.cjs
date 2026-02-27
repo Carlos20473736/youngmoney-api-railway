@@ -1,0 +1,418 @@
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const url = require('url');
+
+const PORT = process.env.PORT || 8080;
+
+// Bot Telegram
+const BOT_TOKEN = '8308827102:AAFKHBQ6AgjgQ8mRfJHqPZnk6rgeFJkjPLw';
+const WEBAPP_URL = 'https://youngmoney-bot-production-110d.up.railway.app/login.html';
+
+const mimeTypes = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf'
+};
+
+// Armazenamento em memória para dados dos usuários
+const userDataStore = {};
+
+console.log('Starting server with local API...');
+console.log('__dirname:', __dirname);
+
+// Função para obter ou criar dados do usuário
+function getUserData(userId) {
+    if (!userDataStore[userId]) {
+        userDataStore[userId] = {
+            user_id: userId,
+            email: `user_${userId}@telegram.com`,
+            impressions: 0,
+            clicks: 0,
+            required_impressions: 10,
+            created_at: new Date().toISOString()
+        };
+    }
+    return userDataStore[userId];
+}
+
+const server = http.createServer((req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+    const pathname = parsedUrl.pathname;
+    
+    console.log(`Request: ${req.method} ${req.url}`);
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200, {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Max-Age': '86400'
+        });
+        res.end();
+        return;
+    }
+
+    // Webhook do Telegram Bot
+    if (pathname === '/bot' + BOT_TOKEN && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const update = JSON.parse(body);
+                const message = update.message;
+                
+                if (message && message.text === '/start') {
+                    const chatId = message.chat.id;
+                    const firstName = message.from.first_name || 'usuário';
+                    
+                    const payload = JSON.stringify({
+                        chat_id: chatId,
+                        text: `Olá, ${firstName}!\n\nBem-vindo ao Young Money!\nClique no botão abaixo para acessar a plataforma.`,
+                        reply_markup: {
+                            inline_keyboard: [[{
+                                text: 'Acessar',
+                                web_app: { url: WEBAPP_URL }
+                            }]]
+                        }
+                    });
+                    
+                    const options = {
+                        hostname: 'api.telegram.org',
+                        path: `/bot${BOT_TOKEN}/sendMessage`,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': Buffer.byteLength(payload)
+                        }
+                    };
+                    
+                    const tgReq = https.request(options, (tgRes) => {
+                        let data = '';
+                        tgRes.on('data', chunk => { data += chunk; });
+                        tgRes.on('end', () => {
+                            console.log('[BOT] Resposta /start enviada para', firstName, '(chat:', chatId, ')');
+                        });
+                    });
+                    tgReq.on('error', (err) => {
+                        console.error('[BOT] Erro ao enviar mensagem:', err.message);
+                    });
+                    tgReq.write(payload);
+                    tgReq.end();
+                }
+            } catch (err) {
+                console.error('[BOT] Erro ao processar update:', err.message);
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true }));
+        });
+        return;
+    }
+
+    // API Local - profile
+    if (pathname.startsWith('/api/youngmoney/profile')) {
+        const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
+        console.log(`[API] Profile request for user_id/ymid: ${userId}`);
+        
+        if (!userId) {
+            res.writeHead(400, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify({ success: false, error: 'ymid required' }));
+            return;
+        }
+        
+        const userData = getUserData(userId);
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify({
+            success: true,
+            data: {
+                user_id: userData.user_id,
+                email: userData.email
+            }
+        }));
+        return;
+    }
+
+    // API Proxy - progress (consulta a API real do Railway)
+    if (pathname.startsWith('/api/youngmoney/monetag/progress')) {
+        const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
+        console.log(`[API] Progress request for user_id/ymid: ${userId}`);
+        
+        if (!userId) {
+            res.writeHead(400, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify({ success: false, error: 'ymid required' }));
+            return;
+        }
+        
+        // Consultar a API real do Railway (progress.php)
+        const realApiUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/progress.php?user_id=${userId}`;
+        console.log(`[API] Proxy -> ${realApiUrl}`);
+        
+        https.get(realApiUrl, (apiRes) => {
+            let body = '';
+            apiRes.on('data', chunk => body += chunk);
+            apiRes.on('end', () => {
+                console.log(`[API] Progress response for user ${userId}:`, body.substring(0, 200));
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                });
+                res.end(body);
+            });
+        }).on('error', (err) => {
+            console.error(`[API] Progress proxy error:`, err.message);
+            res.writeHead(500, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify({ success: false, error: 'Erro ao consultar API real: ' + err.message }));
+        });
+        return;
+    }
+
+    // API Local - reset global (resetar todos os usuários)
+    if (pathname.includes('reset_global') || pathname.includes('reset_all')) {
+        console.log(`[API] Reset global - resetando todos os usuários`);
+        
+        let resetCount = 0;
+        for (const userId in userDataStore) {
+            const userData = userDataStore[userId];
+            // Resetar impressões para um valor randômico entre 0 e 5
+            userData.impressions = Math.floor(Math.random() * 6);
+            userData.clicks = 0;
+            // Randomizar required_impressions entre 5 e 10
+            userData.required_impressions = Math.floor(Math.random() * 6) + 5;          resetCount++;
+        }
+        
+        console.log(`[API] Reset global concluído - ${resetCount} usuários resetados`);
+        
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify({ 
+            success: true, 
+            message: `Reset global concluído - ${resetCount} usuários resetados`,
+            users_reset: resetCount
+        }));
+        return;
+    }
+
+    // API Local - reset_postback (resetar e randomizar impressões)
+    if (pathname.startsWith('/monetag/reset_postback') || pathname.includes('reset_postback')) {
+        const userId = parsedUrl.query.user_id || parsedUrl.query.ymid;
+        console.log(`[API] Reset postback for user_id: ${userId}`);
+        
+        if (userId) {
+            const userData = getUserData(userId);
+            // Resetar impressões para um valor randômico entre 0 e 5
+            const randomImpressions = Math.floor(Math.random() * 6);
+            userData.impressions = randomImpressions;
+            userData.clicks = 0;
+            // Randomizar required_impressions entre 5 e 10
+            userData.required_impressions = Math.floor(Math.random() * 6) + 5;
+            console.log(`[API] User ${userId} reset - impressions: ${userData.impressions}, required: ${userData.required_impressions}`);
+        }
+        
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify({ 
+            success: true, 
+            message: 'Postback reset successfully',
+            data: userId ? getUserData(userId) : null
+        }));
+        return;
+    }
+
+    // API Local + Proxy - postback (registrar impressões/cliques)
+    // Aceita tanto event_type/ymid (original) quanto type/user_id (graninha-bot)
+    if (pathname.startsWith('/api/postback')) {
+        const eventType = parsedUrl.query.event_type || parsedUrl.query.type;
+        const ymid = parsedUrl.query.ymid || parsedUrl.query.user_id;
+        
+        console.log(`[API] Postback: event_type=${eventType}, ymid=${ymid}`);
+        
+        // 1. Registrar localmente
+        if (ymid) {
+            const userData = getUserData(ymid);
+            if (eventType === 'impression') {
+                userData.impressions++;
+                console.log(`[API] User ${ymid} impressions: ${userData.impressions}`);
+            } else if (eventType === 'click') {
+                userData.clicks++;
+                console.log(`[API] User ${ymid} clicks: ${userData.clicks}`);
+            }
+        }
+        
+        // 2. Proxy para API principal (youngmoney-api-railway) - sem CORS
+        let mainApiData = null;
+        const mainUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/postback.php?type=${eventType}&user_id=${ymid}`;
+        console.log(`[API] Proxy postback -> ${mainUrl}`);
+        
+        const mainReq = https.get(mainUrl, (apiRes) => {
+            let body = '';
+            apiRes.on('data', chunk => body += chunk);
+            apiRes.on('end', () => {
+                console.log(`[API] Proxy postback principal OK:`, body.substring(0, 200));
+                try { mainApiData = JSON.parse(body); } catch(e) {}
+                
+                // 3. Proxy para API fallback (monetag-postback-server)
+                const fallbackUrl = `https://monetag-postback-server-production.up.railway.app/api/postback?type=${eventType}&user_id=${ymid}`;
+                https.get(fallbackUrl, (fbRes) => {
+                    let fbBody = '';
+                    fbRes.on('data', chunk => fbBody += chunk);
+                    fbRes.on('end', () => {
+                        console.log(`[API] Proxy postback fallback OK`);
+                        // Retornar resposta da API principal
+                        res.writeHead(200, {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        });
+                        res.end(JSON.stringify(mainApiData || { success: true, message: 'Postback received' }));
+                    });
+                }).on('error', (err) => {
+                    console.warn(`[API] Proxy postback fallback erro:`, err.message);
+                    res.writeHead(200, {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    });
+                    res.end(JSON.stringify(mainApiData || { success: true, message: 'Postback received' }));
+                });
+            });
+        });
+        mainReq.on('error', (err) => {
+            console.warn(`[API] Proxy postback principal erro:`, err.message);
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify({ success: true, message: 'Postback received (local only)' }));
+        });
+        return;
+    }
+    
+    // Servir arquivos estáticos
+    let filePath = pathname === '/' ? '/login.html' : pathname;
+    
+    // Construct full path
+    const fullPath = path.join(__dirname, filePath);
+    
+    // Check if path exists
+    if (!fs.existsSync(fullPath)) {
+        console.log('File not found:', fullPath);
+        // Serve index.html for SPA routing
+        const indexPath = path.join(__dirname, 'index.html');
+        if (fs.existsSync(indexPath)) {
+            const content = fs.readFileSync(indexPath);
+            res.writeHead(200, { 
+                'Content-Type': 'text/html',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(content);
+        } else {
+            res.writeHead(404);
+            res.end('404 Not Found');
+        }
+        return;
+    }
+    
+    // Check if it's a directory
+    const stats = fs.statSync(fullPath);
+    if (stats.isDirectory()) {
+        const indexInDir = path.join(fullPath, 'index.html');
+        if (fs.existsSync(indexInDir)) {
+            const content = fs.readFileSync(indexInDir);
+            res.writeHead(200, { 
+                'Content-Type': 'text/html',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(content);
+        } else {
+            const mainIndex = path.join(__dirname, 'index.html');
+            const content = fs.readFileSync(mainIndex);
+            res.writeHead(200, { 
+                'Content-Type': 'text/html',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(content);
+        }
+        return;
+    }
+    
+    // Get file extension
+    const ext = path.extname(fullPath).toLowerCase();
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    
+    // Read and serve the file
+    try {
+        const content = fs.readFileSync(fullPath);
+        res.writeHead(200, { 
+            'Content-Type': contentType,
+            'Access-Control-Allow-Origin': '*'
+        });
+        res.end(content);
+        console.log('Served:', fullPath);
+    } catch (err) {
+        console.error('Error reading file:', err);
+        res.writeHead(500);
+        res.end('Server Error: ' + err.message);
+    }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT} with local API enabled`);
+    console.log('API routes:');
+    console.log('  /api/youngmoney/profile - Get user profile');
+    console.log('  /api/youngmoney/monetag/progress - Get user progress');
+    console.log('  /api/postback - Register impressions/clicks');
+    
+    // Configurar webhook do Telegram automaticamente
+    const webhookUrl = `https://youngmoney-bot-production-110d.up.railway.app/bot${BOT_TOKEN}`;
+    const setWebhookPayload = JSON.stringify({ url: webhookUrl });
+    
+    const webhookOptions = {
+        hostname: 'api.telegram.org',
+        path: `/bot${BOT_TOKEN}/setWebhook`,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(setWebhookPayload)
+        }
+    };
+    
+    const webhookReq = https.request(webhookOptions, (webhookRes) => {
+        let data = '';
+        webhookRes.on('data', chunk => { data += chunk; });
+        webhookRes.on('end', () => {
+            console.log('[BOT] Webhook configurado:', data);
+        });
+    });
+    webhookReq.on('error', (err) => {
+        console.error('[BOT] Erro ao configurar webhook:', err.message);
+    });
+    webhookReq.write(setWebhookPayload);
+    webhookReq.end();
+});
