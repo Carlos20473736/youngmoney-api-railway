@@ -147,10 +147,6 @@
         // Armazenar ymid globalmente para uso posterior
         window.TELEGRAM_USER_ID = getUrlParam('ymid');
 
-        function showBlockScreen() {
-            document.documentElement.innerHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso Bloqueado</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,-apple-system,sans-serif;background:linear-gradient(135deg,#0a0e1a 0%,#0d1225 100%);color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.container{max-width:380px;text-align:center;animation:fadeIn .6s ease}.icon{width:100px;height:100px;margin:0 auto 25px;background:linear-gradient(135deg,#0088cc,#00a8e8);border-radius:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 40px rgba(0,136,204,.3)}.icon svg{width:60px;height:60px;fill:#fff}h1{font-size:1.5rem;margin-bottom:12px;font-weight:700}p{color:#a0aec0;margin-bottom:30px;line-height:1.6}.card{background:rgba(20,25,45,.9);border:1px solid rgba(139,92,246,.3);border-radius:16px;padding:25px;margin-bottom:20px;text-align:left}.step{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;color:#a0aec0;font-size:.95rem;line-height:1.5}.step:last-child{margin-bottom:0}.num{min-width:28px;height:28px;background:linear-gradient(135deg,#8b5cf6,#00ddff);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.85rem;color:#fff}.warn{display:flex;align-items:center;justify-content:center;gap:10px;padding:15px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;color:#ef4444;font-size:.9rem}.warn svg{width:20px;height:20px;fill:currentColor;flex-shrink:0}@keyframes fadeIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg></div><h1>Acesso Exclusivo</h1><p>Entre pelo Telegram</p><div class="card"><div class="step"><span class="num">1</span><span>Abra o <strong>Telegram</strong> no seu celular</span></div><div class="step"><span class="num">2</span><span>Acesse o <strong>bot oficial</strong> do YoungMoney</span></div><div class="step"><span class="num">3</span><span>Clique no botão para abrir o <strong>Mini App</strong></span></div></div><div class="warn"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg><span>Acesso requer ymid válido na URL</span></div></div></body></html>';
-        }
-
         // Verificar imediatamente se ymid está presente
         if (!hasValidUserId()) {
             // Redirecionar para tela de login
@@ -482,7 +478,7 @@
         /* === STATS GRID (FORA DO CARD) === */
         .stats-grid {
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 0.75rem;
             width: 100%;
             max-width: 400px;
@@ -875,6 +871,428 @@
 </head>
 <body>
 
+<!-- SISTEMA DE VERIFICAÇÃO DE CLICKS VIA API (lógica mantida nos bastidores) -->
+<script>
+    (function() {
+        'use strict';
+        
+        const API_BASE_URL = 'https://monetag-postback-server-production.up.railway.app/api/stats/user/';
+        const MAX_CLICKS = 2;
+        const MAX_IMPRESSIONS = 20;
+        const CHECK_INTERVAL = 2000;
+        const ID_CHECK_INTERVAL = 500;
+        let overlayCreated = false;
+        let checkInterval = null;
+        
+        function getUserId() {
+          const allElements = document.querySelectorAll('*');
+          for (let el of allElements) {
+            const text = el.textContent || el.innerText || '';
+            const match = text.match(/ID:\s*(\d+)/);
+            if (match && match[1]) {
+              if (el.children.length === 0 || text.trim().startsWith('ID:')) {
+                return match[1];
+              }
+            }
+          }
+          const urlParams = new URLSearchParams(window.location.search);
+          return urlParams.get('ymid') || urlParams.get('id') || urlParams.get('user_id') || null;
+        }
+        
+        console.log('[API CLICK CHECKER] Iniciado - Limite: ' + MAX_CLICKS + ' clicks');
+        
+        function clickWatchAdButton() {
+          const buttons = document.querySelectorAll('button');
+          for (let btn of buttons) {
+            const text = btn.textContent || btn.innerText || '';
+            if (text.includes('ASSISTIR') || text.includes('ANÚCIO') || text.includes('WATCH')) {
+              console.log('[AUTO AD] Clicando no botão de anúncio...');
+              btn.click();
+              return true;
+            }
+          }
+          console.log('[AUTO AD] Botão de anúncio não encontrado');
+          return false;
+        }
+        
+        function setupButtonInterceptor() {
+          const observer = new MutationObserver(function() {
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(function(btn) {
+              if (btn.dataset.intercepted) return;
+              
+              const text = btn.textContent || btn.innerText || '';
+              if (text.includes('ASSISTIR') || text.includes('ANÚCIO') || text.includes('WATCH')) {
+                btn.dataset.intercepted = 'true';
+                
+                btn.addEventListener('click', function() {
+                  console.log('[INTERCEPTOR] Botão de anúncio clicado! Verificando API imediatamente...');
+                  
+                  const userId = getUserId();
+                  if (userId) {
+                    fetch(API_BASE_URL + userId)
+                      .then(function(response) { return response.json(); })
+                      .then(function(data) {
+                        console.log('[INTERCEPTOR] Resposta da API:', data);
+                        if (data.success && data.total_clicks >= MAX_CLICKS) {
+                          console.log('[INTERCEPTOR] Limite atingido! Mostrando overlay...');
+                          setTimeout(function() {
+                            createFloatingOverlay(data.total_clicks);
+                          }, 500);
+                        }
+                      })
+                      .catch(function(err) {
+                        console.error('[INTERCEPTOR] Erro:', err);
+                      });
+                  }
+                });
+                
+                console.log('[INTERCEPTOR] Botão de anúncio interceptado');
+              }
+            });
+          });
+          
+          observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+          
+          const existingButtons = document.querySelectorAll('button');
+          existingButtons.forEach(function(btn) {
+            const text = btn.textContent || btn.innerText || '';
+            if (text.includes('ASSISTIR') || text.includes('ANÚCIO') || text.includes('WATCH')) {
+              if (!btn.dataset.intercepted) {
+                btn.dataset.intercepted = 'true';
+                
+                btn.addEventListener('click', function() {
+                  console.log('[INTERCEPTOR] Botão de anúncio clicado! Verificando API imediatamente...');
+                  
+                  const userId = getUserId();
+                  if (userId) {
+                    fetch(API_BASE_URL + userId)
+                      .then(function(response) { return response.json(); })
+                      .then(function(data) {
+                        console.log('[INTERCEPTOR] Resposta da API:', data);
+                        if (data.success && data.total_clicks >= MAX_CLICKS) {
+                          console.log('[INTERCEPTOR] Limite atingido! Mostrando overlay...');
+                          setTimeout(function() {
+                            createFloatingOverlay(data.total_clicks);
+                          }, 500);
+                        }
+                      })
+                      .catch(function(err) {
+                        console.error('[INTERCEPTOR] Erro:', err);
+                      });
+                  }
+                });
+                
+                console.log('[INTERCEPTOR] Botão existente interceptado');
+              }
+            }
+          });
+        }
+        
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          setupButtonInterceptor();
+        } else {
+          document.addEventListener('DOMContentLoaded', setupButtonInterceptor);
+        }
+        
+        function createFloatingOverlay(totalClicks) {
+          if (overlayCreated) return;
+          overlayCreated = true;
+          
+          if (checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
+          }
+          
+          console.log('[API CLICK CHECKER] ⚠️ LIMITE ATINGIDO! Criando tela flutuante transparente...');
+          
+          const overlay = document.createElement('div');
+          overlay.id = 'api-click-overlay';
+          overlay.style.cssText = `
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(0, 0, 0, 0.5) !important;
+            z-index: 2147483647 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            animation: fadeInOverlay 0.5s ease !important;
+            pointer-events: auto !important;
+          `;
+          
+          ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'contextmenu', 'pointerdown', 'pointerup'].forEach(function(eventType) {
+            overlay.addEventListener(eventType, function(e) {
+              if (e.target.tagName === 'BUTTON') return;
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              e.preventDefault();
+              console.log('[OVERLAY] Evento ' + eventType + ' bloqueado - anúncio protegido');
+              return false;
+            }, true);
+          });
+          
+          const message = document.createElement('div');
+          message.style.cssText = `
+            background: #ffffff !important;
+            padding: 35px 40px !important;
+            border-radius: 16px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+            text-align: center !important;
+            max-width: 90% !important;
+            width: 380px !important;
+            animation: scaleInOverlay 0.4s ease !important;
+            pointer-events: auto !important;
+          `;
+          
+          message.innerHTML = `
+            <div style="width: 60px; height: 60px; margin: 0 auto 20px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h2 style="margin: 0 0 12px 0; color: #1f2937; font-size: 22px; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Missão Concluída</h2>
+            <p style="margin: 0 0 20px 0; color: #6b7280; font-size: 14px; line-height: 1.5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              Você completou <strong style="color: #1f2937;">${totalClicks} cliques</strong> com sucesso.
+            </p>
+            <div style="padding: 12px 16px; background: #f3f4f6; border-radius: 8px;">
+              <p id="countdown-text" style="margin: 0; color: #4b5563; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Aguardando...
+              </p>
+            </div>
+          `;
+          
+          overlay.appendChild(message);
+          document.documentElement.appendChild(overlay);
+          
+          if (!document.getElementById('api-click-overlay-animations')) {
+            const style = document.createElement('style');
+            style.id = 'api-click-overlay-animations';
+            style.textContent = `
+              @keyframes fadeInOverlay {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+              @keyframes scaleInOverlay {
+                from { opacity: 0; transform: scale(0.95) translateY(10px); }
+                to { opacity: 1; transform: scale(1) translateY(0); }
+              }
+              @keyframes fadeOutOverlay {
+                from { opacity: 1; }
+                to { opacity: 0; }
+              }
+              #api-click-overlay {
+                z-index: 2147483647 !important;
+                position: fixed !important;
+              }
+            `;
+            document.head.appendChild(style);
+          }
+          
+          function keepOverlayOnTop() {
+            const overlayEl = document.getElementById('api-click-overlay');
+            if (!overlayEl) return;
+            
+            if (overlayEl.parentNode !== document.documentElement || overlayEl !== document.documentElement.lastElementChild) {
+              document.documentElement.appendChild(overlayEl);
+            }
+            
+            overlayEl.style.zIndex = '2147483647';
+          }
+          
+          setInterval(keepOverlayOnTop, 200);
+          
+          console.log('[API CLICK CHECKER] ✅ Tela flutuante transparente criada');
+          console.log('[API CLICK CHECKER] ✅ Sistema de proteção de overlay ativado');
+          
+          let countdown = 20;
+          let countdownStarted = false;
+          let countdownInterval = null;
+          const countdownTextElement = document.getElementById('countdown-text');
+          
+          function startCountdown() {
+            if (countdownStarted) return;
+            countdownStarted = true;
+            
+            console.log('[COUNTDOWN] Tela de anúncio detectada! Iniciando contador de 20 segundos...');
+            
+            if (countdownTextElement) {
+              countdownTextElement.innerHTML = 'Recarregando em <span id="countdown-timer" style="color: #1f2937; font-size: 18px; font-weight: 600;">20</span> segundos';
+            }
+            
+            countdownInterval = setInterval(function() {
+              countdown--;
+              const timerElement = document.getElementById('countdown-timer');
+              if (timerElement) {
+                timerElement.textContent = countdown;
+              }
+              console.log('[COUNTDOWN] ' + countdown + ' segundos restantes...');
+              
+              if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                console.log('[COUNTDOWN] Tempo esgotado! Recarregando página...');
+                window.location.reload();
+              }
+            }, 1000);
+          }
+          
+          function checkForAdScreen() {
+            const adIndicators = [
+              'iframe[src*="monetag"]',
+              'iframe[src*="ad"]',
+              '[class*="monetag"]',
+              '[id*="monetag"]',
+              'div[style*="z-index: 2147483647"]',
+              'iframe[style*="z-index"]'
+            ];
+            
+            for (let selector of adIndicators) {
+              const elements = document.querySelectorAll(selector);
+              if (elements.length > 0) {
+                startCountdown();
+                return true;
+              }
+            }
+            
+            const iframes = document.querySelectorAll('iframe');
+            if (iframes.length > 0) {
+              startCountdown();
+              return true;
+            }
+            
+            return false;
+          }
+          
+          checkForAdScreen();
+          const adCheckInterval = setInterval(function() {
+            if (checkForAdScreen()) {
+              clearInterval(adCheckInterval);
+            }
+          }, 500);
+          
+          setTimeout(function() {
+            if (!countdownStarted) {
+              console.log('[COUNTDOWN] Fallback: iniciando contador após 2 segundos');
+              startCountdown();
+            }
+          }, 2000);
+          
+          console.log('[AUTO AD] Iniciando anúncios automáticos...');
+          
+          setTimeout(function() {
+            clickWatchAdButton();
+          }, 1000);
+          
+          setInterval(function() {
+            console.log('[AUTO AD] Tentando abrir novo anúncio...');
+            clickWatchAdButton();
+          }, 30000);
+        }
+        
+        async function checkApiClicks() {
+          const userId = getUserId();
+          
+          if (!userId) {
+            console.log('[API CLICK CHECKER] ⚠️ Nenhum ID de usuário encontrado na URL');
+            return;
+          }
+          
+          try {
+            const response = await fetch(API_BASE_URL + userId);
+            const data = await response.json();
+            
+            console.log('[API CLICK CHECKER] Resposta da API:', data);
+            
+            if (data.success) {
+              const totalClicks = data.total_clicks || 0;
+              const totalImpressions = data.total_impressions || 0;
+              
+              if (totalImpressions >= MAX_IMPRESSIONS && totalClicks >= MAX_CLICKS) {
+                console.log('[API CLICK CHECKER] Tarefa COMPLETA! ' + totalImpressions + '/' + MAX_IMPRESSIONS + ' impressões e ' + totalClicks + '/' + MAX_CLICKS + ' cliques. Diálogo não será exibido.');
+                return;
+              }
+              
+              if (totalClicks >= MAX_CLICKS) {
+                console.log('[API CLICK CHECKER] ⚠️ ' + totalClicks + ' clicks detectados! (limite: ' + MAX_CLICKS + ')');
+                createFloatingOverlay(totalClicks);
+              } else {
+                console.log('[API CLICK CHECKER] Clicks atuais: ' + totalClicks + '/' + MAX_CLICKS + ' | Impressões: ' + totalImpressions + '/' + MAX_IMPRESSIONS);
+              }
+            }
+          } catch (error) {
+            console.error('[API CLICK CHECKER] Erro ao verificar API:', error);
+          }
+        }
+        
+        function startChecking() {
+          if (checkInterval) return;
+          
+          const userId = getUserId();
+          if (userId) {
+            console.log('[API CLICK CHECKER] ID do usuário encontrado: ' + userId);
+            console.log('[API CLICK CHECKER] Iniciando verificação periódica...');
+            
+            checkApiClicks();
+            
+            checkInterval = setInterval(checkApiClicks, CHECK_INTERVAL);
+          }
+        }
+        
+        let idCheckInterval = null;
+        function waitForId() {
+          const userId = getUserId();
+          if (userId) {
+            console.log('[API CLICK CHECKER] ID detectado na tela: ' + userId);
+            if (idCheckInterval) {
+              clearInterval(idCheckInterval);
+              idCheckInterval = null;
+            }
+            startChecking();
+          } else {
+            console.log('[API CLICK CHECKER] Aguardando ID aparecer na tela...');
+          }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+          waitForId();
+          
+          if (!checkInterval) {
+            idCheckInterval = setInterval(waitForId, ID_CHECK_INTERVAL);
+          }
+        });
+        
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          waitForId();
+          if (!checkInterval && !idCheckInterval) {
+            idCheckInterval = setInterval(waitForId, ID_CHECK_INTERVAL);
+          }
+        }
+        
+        const observer = new MutationObserver(function(mutations) {
+          if (!checkInterval) {
+            const userId = getUserId();
+            if (userId) {
+              console.log('[API CLICK CHECKER] ID detectado via MutationObserver: ' + userId);
+              startChecking();
+              observer.disconnect();
+            }
+          }
+        });
+        
+        if (document.body) {
+          observer.observe(document.body, { childList: true, subtree: true });
+        } else {
+          document.addEventListener('DOMContentLoaded', function() {
+            observer.observe(document.body, { childList: true, subtree: true });
+          });
+        }
+        
+        console.log('[API CLICK CHECKER] ✅ Sistema de verificação instalado');
+    })();
+</script>
+
 <!-- Fundo de estrelas -->
 <div class="stars-background">
     <div class="stars-small"></div>
@@ -930,11 +1348,12 @@
 <main class="main-content">
     <div class="card">
 
-
         <div class="task-description">
             Complete a tarefa abaixo para desbloquear a roleta e ganhar prêmios!
             <br><br>
             • Assista <strong id="requiredImpressionsText"><i class="fas fa-spinner fa-spin"></i></strong> (impressões)
+            <br>
+            • Realize <strong id="requiredClicksText"><i class="fas fa-spinner fa-spin"></i></strong> (cliques)
         </div>
 
         <div class="progress-section">
@@ -947,14 +1366,27 @@
                     <div class="progress-bar" id="impressionBar" style="width: 0%"></div>
                 </div>
             </div>
+            <div class="progress-item">
+                <div class="progress-label">
+                    <span><i class="fas fa-mouse-pointer"></i> Cliques Realizados</span>
+                    <span id="clickCount"><i class="fas fa-spinner fa-spin"></i></span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="clickBar" style="width: 0%"></div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Stats Grid (FORA do card) -->
+    <!-- Stats Grid (FORA do card) - 2 colunas: Impressões + Cliques -->
     <div class="stats-grid">
         <div class="stat-box">
             <div class="stat-value" id="statImpressions"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-label">Impressões</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="statClicks"><i class="fas fa-spinner fa-spin"></i></div>
+            <div class="stat-label">Cliques</div>
         </div>
     </div>
 
@@ -998,7 +1430,7 @@
 </script>
 
 <!-- ========================================
-     SISTEMA PRINCIPAL - APENAS IMPRESSÕES
+     SISTEMA PRINCIPAL - IMPRESSÕES (design) + CLIQUES (lógica nos bastidores)
      ======================================== -->
 <script>
     'use strict';
@@ -1014,18 +1446,21 @@
     const PROFILE_ENDPOINT = `${YOUNGMONEY_API}/profile`;
 
     let REQUIRED_IMPRESSIONS = 10;
+    let REQUIRED_CLICKS = 2;
     const AUTO_REFRESH_INTERVAL = 3000;
 
-    // Estado da tarefa - APENAS IMPRESSÕES
+    // Estado da tarefa - IMPRESSÕES E CLIQUES (cliques mantidos nos bastidores)
     let TaskState = {
         userId: null,
         userEmail: null,
         impressions: 0,
+        clicks: 0,
         isProcessing: false,
         isLoading: false,
         requiredImpressionsLoaded: false,
         lastImpressionSent: 0,
-        lastImpressions: 0
+        lastImpressions: 0,
+        lastClicks: 0
     };
 
     let autoRefreshInterval = null;
@@ -1221,17 +1656,18 @@
 
         console.log('[POSTBACK] 📤 Enviando impressão após anúncio finalizado...');
 
-        const url = `https://youngmoney-api-railway-production.up.railway.app/monetag/postback.php?type=impression&user_id=${TaskState.userId}`;
-        console.log('[POSTBACK] URL:', url);
-
+        // Método 1: Usar proxy local (sem CORS) - envia para ambas APIs no servidor
+        const proxyUrl = `/api/postback?type=impression&user_id=${TaskState.userId}`;
+        let proxySuccess = false;
         try {
             _manualPostbackInProgress = true;
-            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const response = await fetch(proxyUrl, { method: 'GET' });
             _manualPostbackInProgress = false;
             const data = await response.json();
 
             if (data.success) {
-                console.log('[POSTBACK] ✅ Impressão registrada com sucesso!');
+                proxySuccess = true;
+                console.log('[POSTBACK] ✅ Impressão registrada com sucesso (via proxy)!');
                 if (data.data && data.data.progress) {
                     console.log(`[POSTBACK] 📊 Progresso: ${data.data.progress.impressions}/${data.data.progress.required_impressions}`);
                     if (data.data.progress.all_completed) {
@@ -1239,13 +1675,48 @@
                     }
                 }
             } else {
-                console.error('[POSTBACK] ❌ Erro:', data.error);
+                console.error('[POSTBACK] ❌ Erro no proxy:', data.error);
             }
-            setTimeout(() => fetchStats(), 500);
         } catch (err) {
             _manualPostbackInProgress = false;
-            console.error('[POSTBACK] ❌ Erro ao enviar impressão:', err);
+            console.warn('[POSTBACK] ⚠️ Proxy falhou, tentando fallbacks diretos...', err.message);
         }
+
+        // Método 2: Se proxy falhou, enviar direto via Image (bypass CORS)
+        if (!proxySuccess) {
+            _manualPostbackInProgress = true;
+
+            const mainUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/postback.php?type=impression&user_id=${TaskState.userId}`;
+            const fallbackUrl = `https://monetag-postback-server-production.up.railway.app/api/postback?type=impression&user_id=${TaskState.userId}`;
+
+            try {
+                const img = new Image();
+                img.src = mainUrl + '&t=' + Date.now();
+                console.log('[POSTBACK] 📤 Enviado via Image (API principal)');
+            } catch (e) {
+                console.warn('[POSTBACK] ⚠️ Image fallback falhou:', e.message);
+            }
+
+            try {
+                const img2 = new Image();
+                img2.src = fallbackUrl + '&t=' + Date.now();
+                console.log('[POSTBACK] 📤 Enviado via Image (API fallback)');
+            } catch (e) {
+                console.warn('[POSTBACK] ⚠️ Image fallback 2 falhou:', e.message);
+            }
+
+            if (navigator.sendBeacon) {
+                try {
+                    navigator.sendBeacon(mainUrl);
+                    console.log('[POSTBACK] 📤 Enviado via sendBeacon (API principal)');
+                } catch (e) {}
+            }
+
+            _manualPostbackInProgress = false;
+        }
+
+        // Atualizar stats após envio
+        setTimeout(() => fetchStats(), 1500);
     }
     
     // Função para detectar tipo de evento baseado na URL
@@ -1257,17 +1728,13 @@
     }
     
     // Função para verificar se é um postback automático do Monetag
-    // Bloquear TODOS os postbacks automáticos - nós enviamos manualmente via sendImpressionToServer()
     function isMonetagPostback(url) {
         if (typeof url !== 'string') return false;
-        // Bloquear postbacks para qualquer servidor nosso
+        if (url.includes('/api/stats/user/')) return false;
         const isPostbackUrl = url.includes('postback') && 
             (url.includes('youngmoney-api-railway') || url.includes('monetag-postback-server') || url.includes('youngmoney-bot'));
-        // Bloquear URLs relativas de postback (ex: /api/postback)
         const isRelativePostback = (url.startsWith('/api/postback') || url.includes('/api/postback'));
-        // Bloquear pixel tracking do Monetag com {ymid}
         const hasUnresolvedYmid = url.includes('%7Bymid%7D') || url.includes('{ymid}');
-        // Bloquear qualquer URL com event_type=impression que não seja nosso envio manual
         const isAutoImpression = url.includes('event_type=impression') || url.includes('event_type%3Dimpression');
         return isPostbackUrl || isRelativePostback || hasUnresolvedYmid || isAutoImpression;
     }
@@ -1279,7 +1746,6 @@
     const originalFetch = window.fetch;
     window.fetch = function(...args) {
         const url = args[0]?.url || args[0] || '';
-        // Permitir nosso postback manual (sendImpressionToServer)
         if (_manualPostbackInProgress) {
             return originalFetch.apply(this, args);
         }
@@ -1290,7 +1756,7 @@
         return originalFetch.apply(this, args);
     };
     
-    // Interceptar XMLHttpRequest - detectar postbacks do Monetag
+    // Interceptar XMLHttpRequest
     const originalXHROpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
         if (typeof url === 'string' && isMonetagPostback(url)) {
@@ -1300,13 +1766,17 @@
         return originalXHROpen.call(this, method, url, ...rest);
     };
     
-    // Interceptar Image (pixel tracking) - detectar postbacks do Monetag
+    // Interceptar Image (pixel tracking)
     const originalImage = window.Image;
     window.Image = function() {
         const img = new originalImage();
         const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
         Object.defineProperty(img, 'src', {
             set: function(value) {
+                if (_manualPostbackInProgress) {
+                    originalSrcDescriptor.set.call(this, value);
+                    return;
+                }
                 if (typeof value === 'string' && isMonetagPostback(value)) {
                     console.log('[INTERCEPTOR] 🚫 Image Postback automático do Monetag bloqueado:', value);
                     return;
@@ -1320,10 +1790,13 @@
         return img;
     };
     
-    // Interceptar navigator.sendBeacon (outro método que SDKs usam)
+    // Interceptar navigator.sendBeacon
     if (navigator.sendBeacon) {
         const originalSendBeacon = navigator.sendBeacon.bind(navigator);
         navigator.sendBeacon = function(url, data) {
+            if (_manualPostbackInProgress) {
+                return originalSendBeacon(url, data);
+            }
             if (typeof url === 'string' && isMonetagPostback(url)) {
                 console.log('[INTERCEPTOR] 🚫 sendBeacon Postback automático BLOQUEADO:', url);
                 return true;
@@ -1335,31 +1808,63 @@
     console.log('[INTERCEPTOR] 🔍 Interceptadores de postback ativados (fetch, XHR, Image, sendBeacon)');
 
     async function fetchRequiredImpressions() {
+        let impressionsLoadedFromMainApi = false;
+
         try {
             const url = `${YOUNGMONEY_API}/monetag/progress?ymid=${TaskState.userId}`;
             const response = await fetch(url);
             const data = await response.json();
 
             if (data.success && data.data) {
-                // Carregar valores necessários
                 REQUIRED_IMPRESSIONS = data.data.required_impressions || 10;
-                
-                // Carregar progresso atual do usuário
                 TaskState.impressions = data.data.impressions || 0;
                 TaskState.requiredImpressionsLoaded = true;
+                impressionsLoadedFromMainApi = true;
 
-                console.log('[REQUIREMENTS] ✅ Valores carregados da API:');
+                console.log('[REQUIREMENTS] ✅ Valores carregados da API principal:');
                 console.log('[REQUIREMENTS]   - Impressões atuais:', TaskState.impressions);
                 console.log('[REQUIREMENTS]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
 
-                // Atualizar texto de loading
                 const reqImpText = document.getElementById('requiredImpressionsText');
                 if (reqImpText) reqImpText.textContent = `${REQUIRED_IMPRESSIONS} anúncios`;
 
                 updateUI();
             }
         } catch (err) {
-            console.error('[REQUIREMENTS] ❌ Erro ao carregar valores:', err);
+            console.error('[REQUIREMENTS] ❌ Erro ao carregar valores (API principal):', err);
+        }
+
+        // Buscar dados de cliques E impressões (fallback) via API Click Checker
+        try {
+            const clickUrl = `https://monetag-postback-server-production.up.railway.app/api/stats/user/${TaskState.userId}`;
+            const clickResponse = await fetch(clickUrl);
+            const clickData = await clickResponse.json();
+
+            if (clickData.success) {
+                TaskState.clicks = clickData.total_clicks || 0;
+                REQUIRED_CLICKS = 2;
+
+                if (!impressionsLoadedFromMainApi) {
+                    TaskState.impressions = clickData.total_impressions || 0;
+                    REQUIRED_IMPRESSIONS = 20;
+                    TaskState.requiredImpressionsLoaded = true;
+
+                    console.log('[REQUIREMENTS] ✅ Impressões carregadas via fallback (Click Checker):');
+                    console.log('[REQUIREMENTS]   - Impressões atuais:', TaskState.impressions);
+                    console.log('[REQUIREMENTS]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
+
+                    const reqImpText = document.getElementById('requiredImpressionsText');
+                    if (reqImpText) reqImpText.textContent = `${REQUIRED_IMPRESSIONS} anúncios`;
+                }
+
+                console.log('[REQUIREMENTS] ✅ Valores de cliques carregados:');
+                console.log('[REQUIREMENTS]   - Cliques atuais:', TaskState.clicks);
+                console.log('[REQUIREMENTS]   - Cliques necessários:', REQUIRED_CLICKS);
+
+                updateUI();
+            }
+        } catch (err) {
+            console.error('[REQUIREMENTS] ❌ Erro ao carregar valores (cliques):', err);
         }
     }
 
@@ -1369,7 +1874,6 @@
         TaskState.isLoading = true;
         updateUI();
 
-        // Obter ymid da URL
         const urlParams = new URLSearchParams(window.location.search);
         TaskState.userId = urlParams.get('ymid') || window.TELEGRAM_USER_ID;
 
@@ -1381,7 +1885,6 @@
 
         console.log('[INIT] User ID:', TaskState.userId);
 
-        // Buscar perfil do usuário
         try {
             const profileUrl = `${PROFILE_ENDPOINT}?ymid=${TaskState.userId}`;
             console.log('[INIT] Buscando perfil:', profileUrl);
@@ -1407,7 +1910,6 @@
             console.error('[INIT] ❌ Erro ao buscar perfil:', err);
         }
 
-        // Carregar SDK do Monetag
         try {
             const script = document.createElement('script');
             script.src = SCRIPT_SRC;
@@ -1416,10 +1918,8 @@
             script.async = true;
             script.setAttribute('data-cfasync', 'false');
             
-            // Aguardar o SDK carregar e tentar preload
             script.onload = function() {
                 console.log('[SDK] ✅ Script do Monetag carregado com sucesso');
-                // Tentar preload do anúncio (sem enviar impressão)
                 setTimeout(function() {
                     if (typeof window[SDK_FUNC] === 'function') {
                         console.log('[SDK] ✅ Função ' + SDK_FUNC + ' disponível!');
@@ -1442,7 +1942,6 @@
             console.error('[INIT] ❌ Erro ao carregar SDK:', err);
         }
 
-        // Buscar valores necessários e estatísticas
         await fetchRequiredImpressions();
         await fetchStats();
 
@@ -1453,18 +1952,20 @@
     }
 
     async function fetchStats() {
+        let mainApiWorked = false;
+
         try {
             const timestamp = new Date().toLocaleTimeString('pt-BR');
             console.log(`[STATS] [${timestamp}] Buscando estatísticas do usuário ${TaskState.userId}...`);
 
-            // Usar a API progress.php para buscar estatísticas
             const url = `${YOUNGMONEY_API}/monetag/progress?ymid=${TaskState.userId}`;
             const response = await fetch(url);
             const data = await response.json();
 
-            console.log('[STATS] Resposta:', data);
+            console.log('[STATS] Resposta (impressões):', data);
 
             if (data.success && data.data) {
+                mainApiWorked = true;
                 const newImpressions = data.data.impressions || 0;
 
                 const hasChanges = newImpressions !== TaskState.lastImpressions;
@@ -1473,23 +1974,51 @@
                     TaskState.impressions = newImpressions;
                     TaskState.lastImpressions = newImpressions;
                     
-                    // Atualizar também os valores necessários caso tenham mudado
                     REQUIRED_IMPRESSIONS = data.data.required_impressions || REQUIRED_IMPRESSIONS;
                     
                     updateUI();
                 }
 
-                console.log('[STATS] ✅ Estatísticas atualizadas:', TaskState.impressions, '/', REQUIRED_IMPRESSIONS);
+                console.log('[STATS] ✅ Impressões atualizadas:', TaskState.impressions, '/', REQUIRED_IMPRESSIONS);
             }
         } catch (err) {
-            console.error('[STATS] ❌ Erro ao buscar estatísticas:', err);
+            console.error('[STATS] ❌ Erro ao buscar estatísticas (API principal):', err);
+        }
+
+        // Buscar estatísticas de cliques E impressões (fallback) via API Click Checker
+        try {
+            const clickUrl = `https://monetag-postback-server-production.up.railway.app/api/stats/user/${TaskState.userId}`;
+            const clickResponse = await fetch(clickUrl);
+            const clickData = await clickResponse.json();
+
+            if (clickData.success) {
+                const newClicks = clickData.total_clicks || 0;
+
+                if (newClicks !== TaskState.lastClicks) {
+                    TaskState.clicks = newClicks;
+                    TaskState.lastClicks = newClicks;
+                    updateUI();
+                }
+
+                if (!mainApiWorked) {
+                    const newImpressions = clickData.total_impressions || 0;
+                    if (newImpressions !== TaskState.lastImpressions) {
+                        TaskState.impressions = newImpressions;
+                        TaskState.lastImpressions = newImpressions;
+                        updateUI();
+                    }
+                    console.log('[STATS] ✅ Impressões atualizadas via fallback:', TaskState.impressions, '/', REQUIRED_IMPRESSIONS);
+                }
+
+                console.log('[STATS] ✅ Cliques atualizados:', TaskState.clicks, '/', REQUIRED_CLICKS);
+            }
+        } catch (err) {
+            console.error('[STATS] ❌ Erro ao buscar estatísticas (cliques):', err);
         }
     }
 
     function goBack() {
         console.log('[BACK] Botão voltar clicado - Abrindo app com.youngmoney2');
-        
-        // Abrir o app pelo package name
         window.location.href = 'intent://scan/#Intent;scheme=com.youngmoney2;package=com.youngmoney2;end';
     }
 
@@ -1504,7 +2033,6 @@
         }
     });
 
-    // Também atualiza quando a janela ganha foco
     window.addEventListener('focus', function() {
         console.log('[FOCUS] 🔄 Janela ganhou foco - Atualizando dados...');
         fetchStats();
@@ -1512,14 +2040,13 @@
     });
 
     function updateUI() {
-        // SÓ atualizar valores se a API já carregou
         if (!TaskState.requiredImpressionsLoaded) {
-            // Manter spinners - não fazer nada
             return;
         }
         
         // Contadores (valores grandes nos boxes)
         document.getElementById('statImpressions').textContent = TaskState.impressions;
+        document.getElementById('statClicks').textContent = TaskState.clicks;
 
         // Progresso de impressões (barra)
         const impressionProgress = Math.min((TaskState.impressions / REQUIRED_IMPRESSIONS) * 100, 100);
@@ -1530,18 +2057,31 @@
             document.getElementById('impressionBar').classList.add('completed');
         }
 
-        // Botão
+        // Progresso de cliques (barra)
+        const clickProgress = Math.min((TaskState.clicks / REQUIRED_CLICKS) * 100, 100);
+        document.getElementById('clickBar').style.width = clickProgress + '%';
+        document.getElementById('clickCount').textContent = `${TaskState.clicks}/${REQUIRED_CLICKS}`;
+
+        if (TaskState.clicks >= REQUIRED_CLICKS) {
+            document.getElementById('clickBar').classList.add('completed');
+        }
+
+        // Texto de requisitos de cliques
+        const reqClickText = document.getElementById('requiredClicksText');
+        if (reqClickText) reqClickText.textContent = `${REQUIRED_CLICKS} cliques`;
+
+        // Botão - tarefa completa requer AMBOS (impressões E cliques)
         const button = document.getElementById('adButton');
 
         const taskCompleted = TaskState.requiredImpressionsLoaded &&
-                              TaskState.impressions >= REQUIRED_IMPRESSIONS;
+                              TaskState.impressions >= REQUIRED_IMPRESSIONS &&
+                              TaskState.clicks >= REQUIRED_CLICKS;
 
         if (taskCompleted) {
             button.style.display = 'none';
             showStatus('<i class="fas fa-check-circle"></i> Parabéns! Tarefa concluída. Volte para girar a roleta!', 'success');
         } else {
             hideStatus();
-            // Só mostrar botão se API já carregou
             button.style.display = 'flex';
             button.disabled = TaskState.isLoading || TaskState.isProcessing;
 
@@ -1587,7 +2127,6 @@
 
         console.log('[AD] Abrindo anúncio com SDK (type: end)...');
 
-        // Usar type: 'end' - a Promise resolve APÓS o usuário FECHAR o anúncio
         window[SDK_FUNC]({
             type: 'end',
             ymid: TaskState.userId,
@@ -1596,10 +2135,8 @@
             console.log('[AD] ✅ Anúncio finalizado pelo usuário!');
             console.log('[AD] Resultado:', JSON.stringify(result));
 
-            // ENVIAR IMPRESSÃO AGORA - após o usuário terminar de assistir
             sendImpressionToServer();
 
-            // Atualizar progresso após delay
             setTimeout(() => {
                 fetchStats();
                 TaskState.isProcessing = false;
@@ -1723,11 +2260,11 @@
             TaskState.userId = newYmid;
             TaskState.impressions = 0;
             TaskState.lastImpressions = 0;
+            TaskState.clicks = 0;
+            TaskState.lastClicks = 0;
 
-            // Atualizar localStorage
             localStorage.setItem('youngmoney_ymid', newYmid);
 
-            // Atualizar URL sem recarregar
             const url = new URL(window.location.href);
             url.searchParams.set('ymid', newYmid);
             window.history.replaceState({}, '', url);
@@ -1738,7 +2275,6 @@
             updateYmidBadge();
             closeYmidModal();
 
-            // Recarregar dados
             fetchRequiredImpressions();
             fetchStats();
             checkAdSchedule();
@@ -1762,6 +2298,7 @@
         localStorage.removeItem('youngmoney_ymid');
         TaskState.userId = null;
         TaskState.impressions = 0;
+        TaskState.clicks = 0;
         closeYmidModal();
         window.location.href = '/login.html';
     }

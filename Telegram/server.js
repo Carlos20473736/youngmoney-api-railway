@@ -247,13 +247,15 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // API Local - postback (registrar impressões/cliques)
+    // API Local + Proxy - postback (registrar impressões/cliques)
+    // Aceita tanto event_type/ymid (original) quanto type/user_id (graninha-bot)
     if (pathname.startsWith('/api/postback')) {
-        const eventType = parsedUrl.query.event_type;
-        const ymid = parsedUrl.query.ymid;
+        const eventType = parsedUrl.query.event_type || parsedUrl.query.type;
+        const ymid = parsedUrl.query.ymid || parsedUrl.query.user_id;
         
         console.log(`[API] Postback: event_type=${eventType}, ymid=${ymid}`);
         
+        // 1. Registrar localmente
         if (ymid) {
             const userData = getUserData(ymid);
             if (eventType === 'impression') {
@@ -265,11 +267,50 @@ const server = http.createServer((req, res) => {
             }
         }
         
-        res.writeHead(200, {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+        // 2. Proxy para API principal (youngmoney-api-railway) - sem CORS
+        let mainApiData = null;
+        const mainUrl = `https://youngmoney-api-railway-production.up.railway.app/monetag/postback.php?type=${eventType}&user_id=${ymid}`;
+        console.log(`[API] Proxy postback -> ${mainUrl}`);
+        
+        const mainReq = https.get(mainUrl, (apiRes) => {
+            let body = '';
+            apiRes.on('data', chunk => body += chunk);
+            apiRes.on('end', () => {
+                console.log(`[API] Proxy postback principal OK:`, body.substring(0, 200));
+                try { mainApiData = JSON.parse(body); } catch(e) {}
+                
+                // 3. Proxy para API fallback (monetag-postback-server)
+                const fallbackUrl = `https://monetag-postback-server-production.up.railway.app/api/postback?type=${eventType}&user_id=${ymid}`;
+                https.get(fallbackUrl, (fbRes) => {
+                    let fbBody = '';
+                    fbRes.on('data', chunk => fbBody += chunk);
+                    fbRes.on('end', () => {
+                        console.log(`[API] Proxy postback fallback OK`);
+                        // Retornar resposta da API principal
+                        res.writeHead(200, {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        });
+                        res.end(JSON.stringify(mainApiData || { success: true, message: 'Postback received' }));
+                    });
+                }).on('error', (err) => {
+                    console.warn(`[API] Proxy postback fallback erro:`, err.message);
+                    res.writeHead(200, {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    });
+                    res.end(JSON.stringify(mainApiData || { success: true, message: 'Postback received' }));
+                });
+            });
         });
-        res.end(JSON.stringify({ success: true, message: 'Postback received' }));
+        mainReq.on('error', (err) => {
+            console.warn(`[API] Proxy postback principal erro:`, err.message);
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify({ success: true, message: 'Postback received (local only)' }));
+        });
         return;
     }
     
