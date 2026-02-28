@@ -12,6 +12,161 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
     <script type="module" crossorigin src="/assets/index-Bt8lmjj0.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-C85mVqpZ.css">
+    <style id="dark-theme-override">
+      /* ===== YOUNG MONEY DARK THEME ===== */
+      
+      /* Fundo principal da tela de tarefas */
+      #root .min-h-screen.bg-gradient-to-br.from-emerald-50,
+      #root .min-h-screen.from-emerald-50,
+      #root > div > div.min-h-screen {
+        background: linear-gradient(180deg, #0a0a1a 0%, #0d1117 50%, #0a0a1a 100%) !important;
+      }
+      
+      /* Fundo do body e root */
+      body, #root {
+        background: #0a0a1a !important;
+      }
+      
+      /* Card principal */
+      #root .w-full.max-w-2xl > div {
+        background: #12121e !important;
+        border: 1px solid rgba(139, 92, 246, 0.2) !important;
+        border-radius: 24px !important;
+        box-shadow: 0 0 40px rgba(139, 92, 246, 0.1), 0 4px 30px rgba(0,0,0,0.5) !important;
+        overflow: hidden !important;
+      }
+      
+      /* Header gradient - estilo Young Money */
+      #root .bg-gradient-to-r.from-emerald-500.to-cyan-500 {
+        background: linear-gradient(135deg, #7C3AED 0%, #3B82F6 50%, #06B6D4 100%) !important;
+        border-bottom: 1px solid rgba(139, 92, 246, 0.3) !important;
+      }
+      
+      /* Area de conteudo */
+      #root .p-8 {
+        background: #12121e !important;
+      }
+      
+      /* Labels de texto */
+      #root .font-semibold.text-gray-700 {
+        color: #e2e8f0 !important;
+      }
+      
+      /* Valores emerald */
+      #root .text-emerald-600 {
+        color: #00DCAA !important;
+      }
+      
+      /* Valores cyan */
+      #root .text-cyan-600 {
+        color: #22d3ee !important;
+      }
+      
+      /* Barras de progresso fundo */
+      #root .bg-gray-100.rounded-full {
+        background: #1e1e2e !important;
+        border: 1px solid rgba(255,255,255,0.05) !important;
+      }
+      
+      /* Barra de progresso emerald */
+      #root .bg-gradient-to-r.from-emerald-400.to-emerald-500,
+      #root .bg-emerald-500,
+      #root [class*="from-emerald-400"] {
+        background: linear-gradient(90deg, #00DCAA, #10B981) !important;
+        box-shadow: 0 0 10px rgba(0, 220, 170, 0.4) !important;
+      }
+      
+      /* Barra de progresso cyan */
+      #root .bg-gradient-to-r.from-cyan-400.to-cyan-500,
+      #root .bg-cyan-500,
+      #root [class*="from-cyan-400"] {
+        background: linear-gradient(90deg, #22d3ee, #06b6d4) !important;
+        box-shadow: 0 0 10px rgba(34, 211, 238, 0.4) !important;
+      }
+      
+      /* Icones circulares */
+      #root .bg-emerald-100 {
+        background: rgba(0, 220, 170, 0.15) !important;
+        border: 1px solid rgba(0, 220, 170, 0.3) !important;
+      }
+      #root .bg-cyan-100 {
+        background: rgba(34, 211, 238, 0.15) !important;
+        border: 1px solid rgba(34, 211, 238, 0.3) !important;
+      }
+      
+      /* Cards de stats */
+      #root .bg-gradient-to-br.from-emerald-50,
+      #root [class*="from-emerald-50"][class*="to-emerald-100"] {
+        background: linear-gradient(135deg, rgba(0, 220, 170, 0.08), rgba(0, 220, 170, 0.03)) !important;
+        border-color: rgba(0, 220, 170, 0.2) !important;
+      }
+      #root .bg-gradient-to-br.from-cyan-50,
+      #root [class*="from-cyan-50"][class*="to-cyan-100"] {
+        background: linear-gradient(135deg, rgba(34, 211, 238, 0.08), rgba(34, 211, 238, 0.03)) !important;
+        border-color: rgba(34, 211, 238, 0.2) !important;
+      }
+      
+      /* Texto dos stats */
+      #root .text-emerald-700 {
+        color: #6ee7b7 !important;
+      }
+      #root .text-cyan-700 {
+        color: #67e8f9 !important;
+      }
+      
+      /* Botao ASSISTIR ANUNCIO */
+      #root .bg-gradient-to-r.from-blue-500.to-indigo-500 {
+        background: linear-gradient(135deg, #7C3AED 0%, #6366F1 50%, #3B82F6 100%) !important;
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.4) !important;
+        border: 1px solid rgba(139, 92, 246, 0.3) !important;
+      }
+      #root .bg-gradient-to-r.from-blue-500.to-indigo-500:hover {
+        box-shadow: 0 0 30px rgba(124, 58, 237, 0.6) !important;
+      }
+      
+      /* Texto de dica */
+      #root .text-gray-500,
+      #root .text-gray-400,
+      #root .text-gray-600 {
+        color: #94a3b8 !important;
+      }
+      
+      /* Subtitulo do header */
+      #root .text-emerald-50 {
+        color: rgba(255,255,255,0.8) !important;
+      }
+      
+      /* Rounded do card principal */
+      #root .rounded-3xl {
+        border-radius: 24px !important;
+      }
+      
+      /* Shadow override */
+      #root .shadow-2xl {
+        box-shadow: 0 0 40px rgba(0,0,0,0.5), 0 0 20px rgba(139, 92, 246, 0.1) !important;
+      }
+      
+      /* Loading text */
+      #root .bg-white {
+        background: #0a0a1a !important;
+      }
+      #root .text-gray-600 {
+        color: #94a3b8 !important;
+      }
+      
+      /* SVG icons color fix */
+      #root .text-emerald-500 {
+        color: #00DCAA !important;
+      }
+      #root .text-cyan-500 {
+        color: #22d3ee !important;
+      }
+      
+      /* Scrollbar dark */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #0a0a1a; }
+      ::-webkit-scrollbar-thumb { background: #2d2d44; border-radius: 3px; }
+    </style>
     <style id="login-screen-styles">
       #login-screen {
         position: fixed;
