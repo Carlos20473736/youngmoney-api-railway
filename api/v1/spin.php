@@ -1,9 +1,14 @@
 <?php
 /**
- * Spin Wheel API v2
+ * Spin Wheel API v2 - CORRIGIDO
  * Usa nova tabela user_spins para rastrear giros disponíveis
  * 
- * Endpoint: POST /api/v1/spin_v2.php
+ * CORREÇÕES APLICADAS:
+ * 1. Campos renomeados: available_spins -> spins_remaining, server_time -> server_timestamp
+ * 2. Campo adicionado: spins_today (contagem de giros usados hoje)
+ * 3. Tabela corrigida: monetag_impressions -> monetag_events
+ * 4. Leitura do body compatível com secure.php (usa _SECURE_REQUEST_BODY se disponível)
+ * 5. server_timestamp agora retorna milissegundos (timestamp Unix * 1000)
  */
 
 error_reporting(0);
@@ -36,10 +41,17 @@ require_once __DIR__ . '/includes/CooldownCheck.php';
 $conn = getDbConnection();
 
 // Verificação de manutenção e versão
+// CORREÇÃO: Ler body de _SECURE_REQUEST_BODY se disponível (chamada via secure.php)
 $method = $_SERVER['REQUEST_METHOD'];
-$requestData = ($method === 'POST') 
-    ? json_decode(file_get_contents('php://input'), true) ?? []
-    : $_GET;
+if ($method === 'POST') {
+    if (isset($GLOBALS['_SECURE_REQUEST_BODY']) && !empty($GLOBALS['_SECURE_REQUEST_BODY'])) {
+        $requestData = json_decode($GLOBALS['_SECURE_REQUEST_BODY'], true) ?? [];
+    } else {
+        $requestData = json_decode(file_get_contents('php://input'), true) ?? [];
+    }
+} else {
+    $requestData = $_GET;
+}
 $userEmail = $requestData['email'] ?? null;
 $appVersion = $requestData['app_version'] ?? $_SERVER['HTTP_X_APP_VERSION'] ?? null;
 checkMaintenanceAndVersion($conn, $userEmail, $appVersion);
@@ -98,6 +110,20 @@ try {
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
     $availableSpins = (int)$row['available_spins'];
+    $stmt->close();
+    
+    // CORREÇÃO: Contar giros usados HOJE para spins_today
+    $stmt = $conn->prepare("
+        SELECT COUNT(*) as spins_today 
+        FROM user_spins 
+        WHERE user_id = ? AND is_used = 1 AND DATE(used_at) = ?
+    ");
+    $stmt->bind_param("is", $userId, $currentDate);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $spinsToday = (int)$row['spins_today'];
+    $stmt->close();
     
     // Determinar saudação
     $hour = (int)date('H');
@@ -109,6 +135,9 @@ try {
         $greeting = 'BOA NOITE';
     }
     
+    // Gerar server_timestamp em milissegundos (compatível com o frontend)
+    $serverTimestamp = round(microtime(true) * 1000);
+    
     // GET: Retornar giros disponíveis
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $required_impressions = 10;
@@ -116,48 +145,95 @@ try {
         $task_completed = false;
         
         try {
-            $user_settings_stmt = $conn->prepare("
-                SELECT required_impressions FROM user_required_impressions 
-                WHERE user_id = ?
+            // Buscar required_impressions do roulette_settings (definido pelo cron diário)
+            $settings_stmt = $conn->prepare("
+                SELECT setting_value FROM roulette_settings 
+                WHERE setting_key = 'monetag_required_impressions'
             ");
-            $user_settings_stmt->bind_param("i", $userId);
-            $user_settings_stmt->execute();
-            $settings_result = $user_settings_stmt->get_result();
+            $settings_stmt->execute();
+            $settings_result = $settings_stmt->get_result();
             
             if ($settings_result->num_rows > 0) {
                 $settings_row = $settings_result->fetch_assoc();
-                $required_impressions = (int)$settings_row['required_impressions'];
+                $required_impressions = (int)$settings_row['setting_value'];
             }
-            $user_settings_stmt->close();
+            $settings_stmt->close();
             
-            $impressions_stmt = $conn->prepare("
-                SELECT COUNT(*) as total FROM monetag_impressions 
-                WHERE user_id = ?
-            ");
-            $impressions_stmt->bind_param("i", $userId);
-            $impressions_stmt->execute();
-            $impressions_result = $impressions_stmt->get_result();
-            $impressions_row = $impressions_result->fetch_assoc();
-            $current_impressions = (int)$impressions_row['total'];
+            // Tentar buscar de user_required_impressions (override por usuário)
+            try {
+                $user_settings_stmt = $conn->prepare("
+                    SELECT required_impressions FROM user_required_impressions 
+                    WHERE user_id = ?
+                ");
+                $user_settings_stmt->bind_param("i", $userId);
+                $user_settings_stmt->execute();
+                $user_settings_result = $user_settings_stmt->get_result();
+                
+                if ($user_settings_result->num_rows > 0) {
+                    $user_settings_row = $user_settings_result->fetch_assoc();
+                    $required_impressions = (int)$user_settings_row['required_impressions'];
+                }
+                $user_settings_stmt->close();
+            } catch (Exception $e) {
+                // Tabela pode não existir, usar valor do roulette_settings
+                error_log("[SPIN] user_required_impressions não disponível: " . $e->getMessage());
+            }
+            
+            // CORREÇÃO: Usar tabela monetag_events em vez de monetag_impressions (que não existe)
+            try {
+                $impressions_stmt = $conn->prepare("
+                    SELECT COUNT(*) as total FROM monetag_events 
+                    WHERE user_id = ?
+                ");
+                $impressions_stmt->bind_param("i", $userId);
+                $impressions_stmt->execute();
+                $impressions_result = $impressions_stmt->get_result();
+                $impressions_row = $impressions_result->fetch_assoc();
+                $current_impressions = (int)$impressions_row['total'];
+                $impressions_stmt->close();
+            } catch (Exception $e) {
+                // Se monetag_events também não existir, tentar coluna na tabela users
+                error_log("[SPIN] monetag_events não disponível: " . $e->getMessage());
+                try {
+                    $fallback_stmt = $conn->prepare("
+                        SELECT monetag_impressions FROM users WHERE id = ?
+                    ");
+                    $fallback_stmt->bind_param("i", $userId);
+                    $fallback_stmt->execute();
+                    $fallback_result = $fallback_stmt->get_result();
+                    if ($fallback_result->num_rows > 0) {
+                        $fallback_row = $fallback_result->fetch_assoc();
+                        $current_impressions = (int)($fallback_row['monetag_impressions'] ?? 0);
+                    }
+                    $fallback_stmt->close();
+                } catch (Exception $e2) {
+                    error_log("[SPIN] Fallback monetag_impressions também falhou: " . $e2->getMessage());
+                    $current_impressions = 0;
+                }
+            }
+            
             $task_completed = ($current_impressions >= $required_impressions);
-            $impressions_stmt->close();
         } catch (Exception $e) {
             error_log("[SPIN] Erro ao buscar progresso Monetag: " . $e->getMessage());
         }
         
+        // CORREÇÃO: Retornar campos com nomes compatíveis com o frontend Android
         echo json_encode([
             'status' => 'success',
             'data' => [
                 'greeting' => $greeting,
-                'available_spins' => $availableSpins,
+                'spins_remaining' => $availableSpins,       // CORRIGIDO: era 'available_spins'
+                'available_spins' => $availableSpins,        // Manter para retrocompatibilidade
+                'spins_today' => $spinsToday,                // ADICIONADO: campo que o frontend espera
                 'max_daily_spins' => $maxDailySpins,
                 'prize_values' => $prizeValues,
+                'server_timestamp' => $serverTimestamp,      // CORRIGIDO: era 'server_time', agora em ms
+                'server_time' => $currentDateTime,           // Manter para retrocompatibilidade
                 'monetag_task' => [
                     'required_impressions' => $required_impressions,
                     'current_impressions' => $current_impressions,
                     'completed' => $task_completed
-                ],
-                'server_time' => $currentDateTime
+                ]
             ]
         ]);
         exit;
@@ -171,9 +247,11 @@ try {
                 'status' => 'error',
                 'message' => 'Você não tem giros disponíveis. Volte amanhã!',
                 'data' => [
-                    'available_spins' => 0,
+                    'spins_remaining' => 0,                  // CORRIGIDO
+                    'available_spins' => 0,                   // Retrocompatibilidade
                     'max_daily_spins' => $maxDailySpins,
-                    'server_time' => $currentDateTime
+                    'server_timestamp' => $serverTimestamp,    // CORRIGIDO
+                    'server_time' => $currentDateTime          // Retrocompatibilidade
                 ]
             ]);
             exit;
@@ -273,6 +351,10 @@ try {
             $newBalance = $userData['points'];
             $stmt->close();
             
+            // Incrementar spinsToday para a resposta
+            $spinsToday++;
+            
+            // CORREÇÃO: Retornar campos com nomes compatíveis com o frontend Android
             echo json_encode([
                 'status' => 'success',
                 'message' => "Você ganhou {$prizeValue} pontos!",
@@ -280,10 +362,13 @@ try {
                     'greeting' => $greeting,
                     'prize_value' => $prizeValue,
                     'prize_index' => $prizeIndex,
-                    'available_spins' => $availableSpins - 1,
+                    'spins_remaining' => $availableSpins - 1,    // CORRIGIDO: era 'available_spins'
+                    'available_spins' => $availableSpins - 1,     // Retrocompatibilidade
+                    'spins_today' => $spinsToday,                 // ADICIONADO
                     'max_daily_spins' => $maxDailySpins,
                     'new_balance' => $newBalance,
-                    'server_time' => $currentDateTime
+                    'server_timestamp' => $serverTimestamp,       // CORRIGIDO: era 'server_time', agora em ms
+                    'server_time' => $currentDateTime              // Retrocompatibilidade
                 ]
             ]);
             

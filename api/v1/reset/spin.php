@@ -122,6 +122,33 @@ try {
         
         $stmt->close();
         
+        // CORRECAO: Resetar giros usados na tabela user_spins
+        $conn->query("DELETE FROM user_spins WHERE is_used = 1");
+        $spinsUsedReset = $conn->affected_rows;
+        
+        // CORRECAO: Recriar giros para todos os usuarios
+        $maxSpinsResult = $conn->query("SELECT setting_value FROM roulette_settings WHERE setting_key = 'max_daily_spins' LIMIT 1");
+        $maxSpinsRow = $maxSpinsResult ? $maxSpinsResult->fetch_assoc() : null;
+        $dailySpins = $maxSpinsRow ? (int)$maxSpinsRow['setting_value'] : 10;
+        
+        $activeUsersResult = $conn->query("SELECT id FROM users");
+        $spinsCreated = 0;
+        while ($activeUser = $activeUsersResult->fetch_assoc()) {
+            $uid = (int)$activeUser['id'];
+            $existingResult = $conn->query("SELECT COUNT(*) as cnt FROM user_spins WHERE user_id = $uid AND is_used = 0");
+            $existingRow = $existingResult->fetch_assoc();
+            $existing = (int)$existingRow['cnt'];
+            $toCreate = $dailySpins - $existing;
+            if ($toCreate > 0) {
+                $values = [];
+                for ($i = 0; $i < $toCreate; $i++) {
+                    $values[] = "($uid, 0, NOW(), NULL)";
+                }
+                $conn->query("INSERT INTO user_spins (user_id, is_used, created_at, used_at) VALUES " . implode(',', $values));
+                $spinsCreated += $toCreate;
+            }
+        }
+        
         // Registrar log do reset (opcional)
         $stmt = $conn->prepare("
             INSERT INTO spin_reset_logs 
@@ -144,8 +171,11 @@ try {
             'message' => 'Giros da roleta resetados com sucesso!',
             'data' => [
                 'reset_type' => 'spin',
-                'description' => 'Giros consumidos foram deletados',
-                'spins_deleted' => $spinsDeleted,
+                'description' => 'Giros consumidos foram deletados e novos giros criados',
+                'history_deleted' => $spinsDeleted,
+                'used_spins_reset' => $spinsUsedReset,
+                'new_spins_created' => $spinsCreated,
+                'daily_spins_per_user' => $dailySpins,
                 'reset_date' => $current_date,
                 'reset_datetime' => $current_datetime,
                 'timezone' => 'America/Sao_Paulo (GMT-3)',

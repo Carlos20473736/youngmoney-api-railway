@@ -366,6 +366,44 @@ try {
     $spinsDeleted = $mysqli->query("DELETE FROM spin_history WHERE DATE(created_at) = '$current_date'");
     $spinsDeletedCount = $mysqli->affected_rows;
     
+    // 2.1 SPIN - CORRECAO: Resetar giros na tabela user_spins
+    // Deletar TODOS os giros usados (is_used = 1) para liberar espaco
+    $spinsUsedDeleted = $mysqli->query("DELETE FROM user_spins WHERE is_used = 1");
+    $spinsUsedDeletedCount = $mysqli->affected_rows;
+    
+    // 2.2 SPIN - CORRECAO: Recriar giros diarios para TODOS os usuarios ativos
+    // Buscar max_daily_spins da configuracao
+    $maxSpinsResult = $mysqli->query("SELECT setting_value FROM roulette_settings WHERE setting_key = 'max_daily_spins' LIMIT 1");
+    $maxSpinsRow = $maxSpinsResult ? $maxSpinsResult->fetch_assoc() : null;
+    $dailySpinsToGive = $maxSpinsRow ? (int)$maxSpinsRow['setting_value'] : 10;
+    
+    // Para cada usuario ativo, verificar quantos giros nao usados ja tem e completar ate o maximo
+    $activeUsersResult = $mysqli->query("SELECT id FROM users WHERE 1");
+    $spinsCreatedCount = 0;
+    
+    while ($activeUser = $activeUsersResult->fetch_assoc()) {
+        $uid = (int)$activeUser['id'];
+        
+        // Contar giros nao usados que o usuario ja tem
+        $existingSpinsResult = $mysqli->query("SELECT COUNT(*) as cnt FROM user_spins WHERE user_id = $uid AND is_used = 0");
+        $existingRow = $existingSpinsResult->fetch_assoc();
+        $existingSpins = (int)$existingRow['cnt'];
+        
+        // Calcular quantos giros faltam para completar o maximo diario
+        $spinsToCreate = $dailySpinsToGive - $existingSpins;
+        
+        if ($spinsToCreate > 0) {
+            // Inserir os giros faltantes
+            $values = [];
+            for ($i = 0; $i < $spinsToCreate; $i++) {
+                $values[] = "($uid, 0, NOW(), NULL)";
+            }
+            $valuesStr = implode(',', $values);
+            $mysqli->query("INSERT INTO user_spins (user_id, is_used, created_at, used_at) VALUES $valuesStr");
+            $spinsCreatedCount += $spinsToCreate;
+        }
+    }
+    
     // 3. CHECK-IN - Atualizar last_reset_datetime (histórico preservado)
     $stmt = $mysqli->prepare("
         INSERT INTO system_settings (setting_key, setting_value, updated_at)
@@ -478,8 +516,11 @@ try {
                 'description' => 'APENAS Top 10 teve daily_points resetado para 0. Demais usuários mantêm seus pontos.'
             ],
             'spin' => [
-                'records_deleted' => $spinsDeletedCount,
-                'description' => 'Registros de giros de hoje deletados'
+                'history_deleted' => $spinsDeletedCount,
+                'used_spins_deleted' => $spinsUsedDeletedCount,
+                'new_spins_created' => $spinsCreatedCount,
+                'daily_spins_per_user' => $dailySpinsToGive,
+                'description' => 'Historico deletado, giros usados removidos e novos giros diarios criados para todos os usuarios'
             ],
             'checkin' => [
                 'records_deleted' => 0,

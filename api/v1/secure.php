@@ -94,7 +94,8 @@ if (!empty($missingHeaders)) {
 $timestamp = (int) $timestamp;
 
 // Obter dados criptografados do BODY
-$rawBody = file_get_contents('php://input');
+// CORRECAO: Reutilizar o $rawBody ja lido na linha 40 (php://input so pode ser lido uma vez)
+// $rawBody ja foi lido acima para verificacao de manutencao
 $requestData = json_decode($rawBody, true);
 
 // O body deve conter apenas encrypted_data
@@ -198,8 +199,12 @@ $endpointMap = [
     // Monetag
     '/monetag/reward.php' => __DIR__ . '/../../monetag/reward.php',
     '/monetag/callback.php' => __DIR__ . '/../../monetag/callback.php',
-    '/monetag/status.php' => __DIR__ . '/../../monetag/status.php',
+    '/monetag/status.php' => __DIR__ . '/../../monetag/progress.php',  // CORRECAO: status.php nao existe, usar progress.php
+    '/monetag/progress.php' => __DIR__ . '/../../monetag/progress.php', // ADICIONADO: endpoint correto
     '/api/v1/monetag/reward.php' => __DIR__ . '/../../monetag/reward.php',
+    '/api/v1/monetag/progress.php' => __DIR__ . '/../../monetag/progress.php', // ADICIONADO
+    '/monetag/track.php' => __DIR__ . '/../../monetag/track.php', // ADICIONADO
+    '/monetag/postback.php' => __DIR__ . '/../../monetag/postback.php', // ADICIONADO
     
     // Check-in
     '/api/v1/checkin.php' => __DIR__ . '/checkin.php',
@@ -207,6 +212,7 @@ $endpointMap = [
     
     // Spin (Roleta)
     '/api/v1/spin.php' => __DIR__ . '/spin.php',
+    '/spin.php' => __DIR__ . '/spin.php', // ADICIONADO: variante sem prefixo
     
     // Game (Candy)
     '/api/v1/game/abilities.php' => __DIR__ . '/game/abilities.php',
@@ -303,17 +309,19 @@ if ($body) {
     error_log("[SECURE] _SECURE_REQUEST_BODY set to: " . $GLOBALS['_SECURE_REQUEST_BODY']);
 }
 
-// Capturar output do endpoint
-ob_start();
-try {
-    include $targetFile;
-} catch (Exception $e) {
-    ob_end_clean();
-    http_response_code(500);
-    echo json_encode(['error' => 'Internal error: ' . $e->getMessage()]);
-    exit;
-}
-$response = ob_get_clean();
+// ============================================
+// CORREÇÃO CRÍTICA: Usar register_shutdown_function para capturar output
+// mesmo quando o script incluído chama exit()
+// 
+// PROBLEMA: Scripts como spin.php usam exit() após echo json_encode().
+// Quando incluídos via ob_start() + include, o exit() mata o secure.php
+// inteiro, impedindo que a resposta seja criptografada.
+// O output buffer é flushed automaticamente pelo exit(), enviando
+// a resposta SEM criptografia ao cliente, que não consegue parsear.
+//
+// SOLUÇÃO: register_shutdown_function() é executado ANTES do output
+// buffer ser flushed, permitindo capturar e criptografar a resposta.
+// ============================================
 
 // Verificar se é um endpoint de login (não encriptar resposta de login)
 $isLoginEndpoint = (
@@ -324,23 +332,88 @@ $isLoginEndpoint = (
     strpos($endpoint, 'login') !== false
 );
 
-if ($isLoginEndpoint) {
-    // Retornar resposta SEM criptografia para endpoints de login
-    // Isso evita erros de descriptografia no app durante o login
-    echo $response;
-} else {
-    // Criptografar resposta para outros endpoints
-    $encryptedResponse = $validator->encryptData($deviceKey, $response, $timestamp);
+// Guardar referências para uso no shutdown handler
+$GLOBALS['_SECURE_VALIDATOR'] = $validator;
+$GLOBALS['_SECURE_DEVICE_KEY'] = $deviceKey;
+$GLOBALS['_SECURE_TIMESTAMP'] = $timestamp;
+$GLOBALS['_SECURE_IS_LOGIN'] = $isLoginEndpoint;
+$GLOBALS['_SECURE_ENDPOINT'] = $endpoint;
 
-    if ($encryptedResponse === null) {
-        // Se falhar criptografia, retornar resposta sem criptografia (fallback)
-        echo $response;
-        exit;
+// Capturar output do endpoint usando ob_start + shutdown handler
+ob_start();
+
+// Registrar shutdown handler para criptografar a resposta
+// Isso é executado ANTES do output buffer ser flushed, mesmo com exit()
+register_shutdown_function(function() {
+    $response = ob_get_clean();
+    
+    if ($response === false || $response === null) {
+        $response = '';
     }
+    
+    $isLogin = $GLOBALS['_SECURE_IS_LOGIN'] ?? false;
+    $validator = $GLOBALS['_SECURE_VALIDATOR'] ?? null;
+    $deviceKey = $GLOBALS['_SECURE_DEVICE_KEY'] ?? null;
+    $timestamp = $GLOBALS['_SECURE_TIMESTAMP'] ?? 0;
+    $endpoint = $GLOBALS['_SECURE_ENDPOINT'] ?? '';
+    
+    error_log("[SECURE] Shutdown handler - Response length: " . strlen($response) . ", HTTP code: " . http_response_code());
+    
+    // CORREÇÃO: Resetar o HTTP code para 200 se o endpoint retornou dados válidos
+    // O secure.php SEMPRE retorna 200 com a resposta criptografada.
+    // O http_code original é preservado dentro da resposta criptografada.
+    $innerHttpCode = http_response_code();
+    http_response_code(200);
+    
+    if ($isLogin) {
+        // Retornar resposta SEM criptografia para endpoints de login
+        echo $response;
+    } else if ($validator && $deviceKey) {
+        // Criptografar resposta para outros endpoints
+        $encryptedResponse = $validator->encryptData($deviceKey, $response, $timestamp);
+        
+        if ($encryptedResponse === null) {
+            // Se falhar criptografia, retornar resposta sem criptografia (fallback)
+            error_log("[SECURE] WARNING: Encryption failed, returning raw response");
+            echo $response;
+        } else {
+            // Retornar resposta criptografada com HTTP 200
+            echo json_encode([
+                'encrypted_response' => $encryptedResponse,
+                'timestamp' => round(microtime(true) * 1000)
+            ]);
+        }
+    } else {
+        // Fallback: sem validator, retornar raw
+        error_log("[SECURE] WARNING: No validator available, returning raw response");
+        echo $response;
+    }
+});
 
-    // Retornar resposta criptografada
-    echo json_encode([
-        'encrypted_response' => $encryptedResponse,
-        'timestamp' => round(microtime(true) * 1000)
-    ]);
+// Incluir o endpoint - se ele chamar exit(), o shutdown handler cuidará da criptografia
+try {
+    include $targetFile;
+} catch (Exception $e) {
+    ob_end_clean();
+    http_response_code(200); // Sempre 200 para o cliente
+    
+    $errorResponse = json_encode(['status' => 'error', 'message' => 'Internal error: ' . $e->getMessage()]);
+    
+    if (!$isLoginEndpoint && $validator && $deviceKey) {
+        $encryptedResponse = $validator->encryptData($deviceKey, $errorResponse, $timestamp);
+        if ($encryptedResponse) {
+            echo json_encode([
+                'encrypted_response' => $encryptedResponse,
+                'timestamp' => round(microtime(true) * 1000)
+            ]);
+        } else {
+            echo $errorResponse;
+        }
+    } else {
+        echo $errorResponse;
+    }
+    exit;
 }
+
+// Se o script incluído NÃO chamou exit(), o shutdown handler ainda será executado
+// quando o script terminar normalmente
