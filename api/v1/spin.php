@@ -19,13 +19,26 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
+// Detectar se estamos sendo chamados via secure.php (tunnel criptografado)
+// Se sim, NÃO definir http_response_code(500) pois o secure.php precisa retornar 200
+$_IS_SECURE_CONTEXT = isset($GLOBALS['_SECURE_VALIDATOR']);
+
+// Função helper para definir HTTP error code apenas quando NÃO estamos no contexto seguro
+function setErrorHttpCode($code) {
+    global $_IS_SECURE_CONTEXT;
+    if (!$_IS_SECURE_CONTEXT) {
+        http_response_code($code);
+    }
+    // No contexto seguro, o secure.php sempre retorna 200 com resposta criptografada
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' && $_SERVER['REQUEST_METHOD'] !== 'GET') {
-    http_response_code(405);
+    setErrorHttpCode(405);
     echo json_encode(['status' => 'error', 'message' => 'Método não permitido']);
     exit;
 }
@@ -374,7 +387,7 @@ try {
             
         } catch (Exception $e) {
             $conn->rollback();
-            http_response_code(500);
+            setErrorHttpCode(500);
             echo json_encode([
                 'status' => 'error',
                 'message' => 'Erro ao processar giro: ' . $e->getMessage()
@@ -383,7 +396,7 @@ try {
     }
     
 } catch (Exception $e) {
-    http_response_code(500);
+    setErrorHttpCode(500);
     echo json_encode([
         'status' => 'error',
         'message' => 'Erro: ' . $e->getMessage()

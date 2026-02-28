@@ -100,7 +100,9 @@ function checkMaintenanceAndVersion($conn, $userEmail = null, $appVersion = null
             
             error_log("[MAINTENANCE_CHECK] Requisição BLOQUEADA - Modo de manutenção ativo. Email: " . ($userEmail ?? 'N/A'));
             
-            http_response_code(503);
+            if (!isset($GLOBALS['_SECURE_VALIDATOR'])) {
+                http_response_code(503);
+            }
             echo json_encode([
                 'success' => false,
                 'status' => 'error',
@@ -147,7 +149,9 @@ function checkMaintenanceAndVersion($conn, $userEmail = null, $appVersion = null
                 if (($appVersion === null || $appVersion === '' || empty(trim($appVersion))) && $requireVersion) {
                     error_log("[MAINTENANCE_CHECK] Requisição BLOQUEADA - APK não enviou versão. Versão obrigatória está ativa.");
                     
-                    http_response_code(426); // Upgrade Required
+                    if (!isset($GLOBALS['_SECURE_VALIDATOR'])) {
+                        http_response_code(426); // Upgrade Required
+                    }
                     echo json_encode([
                         'success' => false,
                         'status' => 'error',
@@ -169,7 +173,9 @@ function checkMaintenanceAndVersion($conn, $userEmail = null, $appVersion = null
                     if ($needsUpdate) {
                         error_log("[MAINTENANCE_CHECK] Requisição BLOQUEADA - Versão desatualizada. Versão: $appVersion, Mínima: $minVersion");
                         
-                        http_response_code(426); // Upgrade Required
+                        if (!isset($GLOBALS['_SECURE_VALIDATOR'])) {
+                            http_response_code(426); // Upgrade Required
+                        }
                         echo json_encode([
                             'success' => false,
                             'status' => 'error',

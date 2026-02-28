@@ -132,7 +132,11 @@ function getAuthenticatedUser($conn) {
  * Envia erro de não autenticado
  */
 function sendUnauthorizedError() {
-    http_response_code(401);
+    // No contexto seguro (via secure.php), não definir HTTP error code
+    // pois o secure.php precisa retornar 200 com resposta criptografada
+    if (!isset($GLOBALS['_SECURE_VALIDATOR'])) {
+        http_response_code(401);
+    }
     echo json_encode([
         'status' => 'error',
         'message' => 'Não autenticado. Token inválido ou expirado.'
@@ -156,7 +160,9 @@ function sendSuccess($data) {
  * Envia resposta de erro
  */
 function sendError($message, $code = 400) {
-    http_response_code($code);
+    if (!isset($GLOBALS['_SECURE_VALIDATOR'])) {
+        http_response_code($code);
+    }
     echo json_encode([
         'status' => 'error',
         'message' => $message

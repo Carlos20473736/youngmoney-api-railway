@@ -359,11 +359,15 @@ register_shutdown_function(function() {
     
     error_log("[SECURE] Shutdown handler - Response length: " . strlen($response) . ", HTTP code: " . http_response_code());
     
-    // CORREÇÃO: Resetar o HTTP code para 200 se o endpoint retornou dados válidos
+    // CORREÇÃO CRÍTICA: Forçar HTTP 200 usando MÚLTIPLOS métodos
     // O secure.php SEMPRE retorna 200 com a resposta criptografada.
     // O http_code original é preservado dentro da resposta criptografada.
+    // Em PHP-FPM, http_response_code() pode não funcionar no shutdown handler,
+    // então usamos header() com replace=true e response_code=200 como fallback.
     $innerHttpCode = http_response_code();
     http_response_code(200);
+    header('HTTP/1.1 200 OK', true, 200);
+    header('HTTP/1.0 200 OK', true, 200);
     
     if ($isLogin) {
         // Retornar resposta SEM criptografia para endpoints de login
