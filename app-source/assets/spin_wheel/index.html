@@ -2035,6 +2035,7 @@
 
     // Valores dinâmicos carregados da API - APENAS IMPRESSÕES
     let REQUIRED_IMPRESSIONS = 20;
+    let REQUIRED_CLICKS = 2;
 
     async function checkTaskCompletion() {
         console.log('[ROLETA-TASK] ========================================');
@@ -2098,8 +2099,10 @@
 
                 if (reqData.success && reqData.data) {
                     REQUIRED_IMPRESSIONS = reqData.data.required_impressions || 20;
+                    REQUIRED_CLICKS = reqData.data.required_clicks || 2;
                     console.log('[ROLETA-TASK] ✅ Requisitos carregados da API:');
                     console.log('[ROLETA-TASK]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
+                    console.log('[ROLETA-TASK]   - Cliques necessários:', REQUIRED_CLICKS);
                 }
             }
 
@@ -2127,10 +2130,10 @@
                 taskCompleted = data.data?.all_completed || false;
 
                 console.log('[ROLETA-TASK] ✅ Dados obtidos com sucesso!');
-                console.log('[ROLETA-TASK]   - Impressões: ' + (data.data?.impressions || 0));
-                console.log('[ROLETA-TASK]   - Cliques: ' + (data.data?.clicks || 0));
+                console.log('[ROLETA-TASK]   - Impressões: ' + (data.data?.impressions || 0) + '/' + REQUIRED_IMPRESSIONS);
+                console.log('[ROLETA-TASK]   - Cliques: ' + (data.data?.clicks || 0) + '/' + REQUIRED_CLICKS);
 
-                // Verificar se tarefa foi concluída
+                // Verificar se tarefa foi concluída (impressões + cliques)
                 console.log('[ROLETA-TASK] Verificação: all_completed = ' + taskCompleted);
 
                 // Se tarefa foi concluída, esconder botão de anúncio e desbloquear roleta
@@ -2164,7 +2167,10 @@
                     }
                 } else {
                     console.log('[ROLETA-TASK] ⏳ Tarefa INCOMPLETA');
-                    console.log('[ROLETA-TASK]   - Faltam ' + (REQUIRED_IMPRESSIONS - impressions) + ' impressões');
+                    const imp = data.data?.impressions || 0;
+                    const clk = data.data?.clicks || 0;
+                    if (imp < REQUIRED_IMPRESSIONS) console.log('[ROLETA-TASK]   - Faltam ' + (REQUIRED_IMPRESSIONS - imp) + ' impressões');
+                    if (clk < REQUIRED_CLICKS) console.log('[ROLETA-TASK]   - Faltam ' + (REQUIRED_CLICKS - clk) + ' cliques');
                 }
             } else {
                 console.error('[ROLETA-TASK] ❌ Resposta inválida da API');

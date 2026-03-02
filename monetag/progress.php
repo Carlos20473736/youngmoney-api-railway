@@ -1,10 +1,9 @@
 <?php
 /**
- * MoniTag Progress Endpoint (v3 - APENAS IMPRESSÕES)
+ * MoniTag Progress Endpoint (v4 - IMPRESSÕES + CLIQUES)
  * GET - Retorna progresso diário do usuário (SEM AUTENTICAÇÃO)
  * 
- * Cada usuário tem seu próprio número de impressões necessárias (fixo em 10)
- * Lógica de cliques removida completamente
+ * Requisitos fixos: 20 impressões + 2 cliques
  */
 
 // DEFINIR TIMEZONE NO INÍCIO DO ARQUIVO
@@ -46,15 +45,16 @@ error_log("MoniTag Progress - user_id=$user_id, time=" . date('Y-m-d H:i:s'));
 try {
     $conn = getDbConnection();
     
-    // Buscar número de impressões necessárias DO USUÁRIO
-    // Valor fixo de 20 impressões para todos os usuários (sem randomização)
+    // Valores fixos para todos os usuários (sem randomização)
     $required_impressions = 20;
+    $required_clicks = 2;
     
-    // Buscar progresso do dia - APENAS IMPRESSÕES
+    // Buscar progresso do dia - IMPRESSÕES E CLIQUES
     $today = date('Y-m-d');
     $stmt = $conn->prepare("
         SELECT 
-            COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions
+            COUNT(CASE WHEN event_type = 'impression' THEN 1 END) as impressions,
+            COUNT(CASE WHEN event_type = 'click' THEN 1 END) as clicks
         FROM monetag_events
         WHERE user_id = ? AND DATE(created_at) = ?
     ");
@@ -66,15 +66,19 @@ try {
     $conn->close();
     
     $impressions = (int)$progress['impressions'];
+    $clicks = (int)$progress['clicks'];
+    
+    $impressions_completed = $impressions >= $required_impressions;
+    $clicks_completed = $clicks >= $required_clicks;
     
     $response = [
         'impressions' => $impressions,
-        'clicks' => 0,
+        'clicks' => $clicks,
         'required_impressions' => $required_impressions,
-        'required_clicks' => 0,
-        'impressions_completed' => $impressions >= $required_impressions,
-        'clicks_completed' => true,
-        'all_completed' => $impressions >= $required_impressions,
+        'required_clicks' => $required_clicks,
+        'impressions_completed' => $impressions_completed,
+        'clicks_completed' => $clicks_completed,
+        'all_completed' => $impressions_completed && $clicks_completed,
         'server_time' => date('Y-m-d H:i:s'),
         'timezone' => 'America/Sao_Paulo'
     ];

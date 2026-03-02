@@ -66,7 +66,7 @@ try {
     // ========================================
     // Valor fixo de 20 impressões para todos os usuários (sem randomização)
     $required_impressions = 20;
-    $required_clicks = 0;
+    $required_clicks = 2;
     
     // ========================================
     // VERIFICAR LIMITE DIÁRIO ANTES DE INSERIR

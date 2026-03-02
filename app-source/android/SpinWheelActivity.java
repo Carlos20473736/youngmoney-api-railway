@@ -226,8 +226,10 @@ public class SpinWheelActivity extends AppCompatActivity {
 
         new Thread(() -> {
             try {
-                // 1. Buscar requisitos da API (impressões necessárias randomizadas)
-                int requiredImpressions = 5; // valor padrão
+                // 1. Buscar progresso da API progress.php (impressões + cliques)
+                int requiredImpressions = 20; // valor padrão fixo
+                int requiredClicks = 2; // valor padrão fixo
+                boolean taskCompleted = false;
 
                 try {
                     java.net.URL progressUrl = new java.net.URL(progressApiUrl);
@@ -256,72 +258,81 @@ public class SpinWheelActivity extends AppCompatActivity {
                         if (progressJson.optBoolean("success", false)) {
                             JSONObject progressData = progressJson.optJSONObject("data");
                             if (progressData != null) {
-                                requiredImpressions = progressData.optInt("required_impressions", 5);
-                                Log.d(TAG, "🎯 Requisitos da API: " + requiredImpressions + " impressões");
+                                requiredImpressions = progressData.optInt("required_impressions", 20);
+                                requiredClicks = progressData.optInt("required_clicks", 2);
+                                int impressions = progressData.optInt("impressions", 0);
+                                int clicks = progressData.optInt("clicks", 0);
+                                taskCompleted = progressData.optBoolean("all_completed", false);
+
+                                Log.d(TAG, "🎯 Requisitos: " + requiredImpressions + " impressões, " + requiredClicks + " cliques");
+                                Log.d(TAG, "📊 Progresso: " + impressions + "/" + requiredImpressions + " impressões, " + clicks + "/" + requiredClicks + " cliques");
+                                Log.d(TAG, (taskCompleted ? "✅" : "⏳") + " Tarefa concluída: " + taskCompleted);
                             }
                         }
                     }
                     progressConn.disconnect();
                 } catch (Exception e) {
-                    Log.e(TAG, "⚠️ Erro ao buscar requisitos, usando padrão: " + e.getMessage());
+                    Log.e(TAG, "⚠️ Erro ao buscar progresso, usando padrão: " + e.getMessage());
                 }
 
-                // 2. Buscar stats do usuário
-                java.net.URL url = new java.net.URL(statsApiUrl);
-                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(10000);
+                // 2. Fallback: buscar stats do monetag-postback-server se progress falhou
+                if (!taskCompleted) {
+                    try {
+                        java.net.URL url = new java.net.URL(statsApiUrl);
+                        java.net.HttpURLConnection connection = (java.net.HttpURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setConnectTimeout(10000);
+                        connection.setReadTimeout(10000);
 
-                int responseCode = connection.getResponseCode();
-                Log.d(TAG, "📊 Resposta da API Stats: " + responseCode);
+                        int responseCode = connection.getResponseCode();
+                        Log.d(TAG, "📊 Resposta da API Stats: " + responseCode);
 
-                if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
-                    java.io.BufferedReader reader = new java.io.BufferedReader(
-                            new java.io.InputStreamReader(connection.getInputStream())
-                    );
-                    StringBuilder response = new StringBuilder();
-                    String line;
-
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line);
-                    }
-                    reader.close();
-
-                    JSONObject jsonResponse = new JSONObject(response.toString());
-                    Log.d(TAG, "📋 Resposta JSON Stats: " + jsonResponse.toString());
-
-                    int totalImpressions = jsonResponse.optInt("total_impressions", 0);
-
-                    Log.d(TAG, "📊 Stats do usuário: " + totalImpressions + " impressões");
-                    Log.d(TAG, "🎯 Requisitos: " + requiredImpressions + " impressões");
-
-                    // Verificar se a tarefa foi concluída (APENAS IMPRESSÕES)
-                    final int finalRequiredImpressions = requiredImpressions;
-                    boolean taskCompleted = totalImpressions >= requiredImpressions;
-
-                    Log.d(TAG, (taskCompleted ? "✅" : "⏳") + " Tarefa concluída: " + taskCompleted +
-                            " (" + totalImpressions + "/" + requiredImpressions + " impressões)");
-
-                    // Enviar resultado para o HTML
-                    runOnUiThread(() -> {
-                        if (webViewLoaded) {
-                            String jsCommand = "if(typeof setTaskCompletionStatus === 'function') setTaskCompletionStatus(" + taskCompleted + ")";
-                            Log.d(TAG, "📤 Enviando para HTML: " + jsCommand);
-                            webView.evaluateJavascript(jsCommand, null);
-                        } else {
-                            Log.d(TAG, "⏳ WebView ainda não carregou, tentando novamente em 500ms");
-                            new Handler(Looper.getMainLooper()).postDelayed(
-                                    this::checkTaskCompletionStatus,
-                                    500
+                        if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                            java.io.BufferedReader reader = new java.io.BufferedReader(
+                                    new java.io.InputStreamReader(connection.getInputStream())
                             );
+                            StringBuilder response = new StringBuilder();
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                response.append(line);
+                            }
+                            reader.close();
+
+                            JSONObject jsonResponse = new JSONObject(response.toString());
+                            Log.d(TAG, "📋 Resposta JSON Stats: " + jsonResponse.toString());
+
+                            int totalImpressions = jsonResponse.optInt("total_impressions", 0);
+                            int totalClicks = jsonResponse.optInt("total_clicks", 0);
+
+                            Log.d(TAG, "📊 Stats: " + totalImpressions + " impressões, " + totalClicks + " cliques");
+
+                            boolean impressionsOk = totalImpressions >= requiredImpressions;
+                            boolean clicksOk = totalClicks >= requiredClicks;
+                            taskCompleted = impressionsOk && clicksOk;
+
+                            Log.d(TAG, (taskCompleted ? "✅" : "⏳") + " Tarefa (stats): " + taskCompleted);
                         }
-                    });
-                } else {
-                    Log.e(TAG, "❌ Erro na API Stats: " + responseCode);
+                        connection.disconnect();
+                    } catch (Exception e) {
+                        Log.e(TAG, "⚠️ Erro ao buscar stats: " + e.getMessage());
+                    }
                 }
 
-                connection.disconnect();
+                // Enviar resultado para o HTML
+                final boolean finalTaskCompleted = taskCompleted;
+                runOnUiThread(() -> {
+                    if (webViewLoaded) {
+                        String jsCommand = "if(typeof setTaskCompletionStatus === 'function') setTaskCompletionStatus(" + finalTaskCompleted + ")";
+                        Log.d(TAG, "📤 Enviando para HTML: " + jsCommand);
+                        webView.evaluateJavascript(jsCommand, null);
+                    } else {
+                        Log.d(TAG, "⏳ WebView ainda não carregou, tentando novamente em 500ms");
+                        new Handler(Looper.getMainLooper()).postDelayed(
+                                this::checkTaskCompletionStatus,
+                                500
+                        );
+                    }
+                });
 
             } catch (Exception e) {
                 Log.e(TAG, "❌ Erro ao verificar tarefa: " + e.getMessage());
