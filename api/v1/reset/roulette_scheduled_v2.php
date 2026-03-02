@@ -1,15 +1,15 @@
 <?php
 /**
- * API de Reset da Rouleta v2
+ * API de Reset da Rouleta v2 - CORRIGIDO
  * 
  * Endpoint: GET/POST /api/v1/reset/roulette_scheduled_v2.php
  * 
- * Função: Reseta os giros da rouleta MANTENDO giros não usados
+ * Função: Reseta os giros da rouleta MANTENDO giros não usados e CRIANDO novos giros até o limite diário
  * 
  * Lógica:
  * - Deleta APENAS giros usados (is_used = 1) de user_spins
  * - Mantém giros não usados (is_used = 0)
- * - Permite que usuários façam novos giros
+ * - Completa os giros de cada usuário até o limite max_daily_spins
  */
 
 error_reporting(0);
@@ -72,36 +72,53 @@ try {
     
     try {
         // 1. Contar giros usados que serão deletados
-        $result = $conn->query("
-            SELECT COUNT(*) as total FROM user_spins 
-            WHERE is_used = 1
-        ");
+        $result = $conn->query("SELECT COUNT(*) as total FROM user_spins WHERE is_used = 1");
         $row = $result->fetch_assoc();
         $usedSpinsDeleted = $row['total'] ?? 0;
         
-        // 2. Contar giros não usados que serão mantidos
-        $result = $conn->query("
-            SELECT COUNT(*) as total FROM user_spins 
-            WHERE is_used = 0
-        ");
-        $row = $result->fetch_assoc();
-        $unusedSpinsKept = $row['total'] ?? 0;
+        // 2. Deletar APENAS giros usados (is_used = 1)
+        $conn->query("DELETE FROM user_spins WHERE is_used = 1");
         
-        // 3. Deletar APENAS giros usados (is_used = 1)
-        $deleteResult = $conn->query("
-            DELETE FROM user_spins 
-            WHERE is_used = 1
-        ");
+        // 3. Buscar limite diário de giros
+        $maxSpinsResult = $conn->query("SELECT setting_value FROM roulette_settings WHERE setting_key = 'max_daily_spins' LIMIT 1");
+        $maxSpinsRow = $maxSpinsResult ? $maxSpinsResult->fetch_assoc() : null;
+        $dailySpinsLimit = $maxSpinsRow ? (int)$maxSpinsRow['setting_value'] : 10;
         
-        if (!$deleteResult) {
-            throw new Exception("Delete failed: " . $conn->error);
+        // 4. Recriar giros para todos os usuários ativos
+        $activeUsersResult = $conn->query("SELECT id FROM users");
+        $spinsCreatedCount = 0;
+        
+        while ($activeUser = $activeUsersResult->fetch_assoc()) {
+            $uid = (int)$activeUser['id'];
+            
+            // Contar quantos giros NÃO usados o usuário já tem (os que foram mantidos)
+            $existingResult = $conn->query("SELECT COUNT(*) as cnt FROM user_spins WHERE user_id = $uid AND is_used = 0");
+            $existingRow = $existingResult->fetch_assoc();
+            $existingSpins = (int)$existingRow['cnt'];
+            
+            // Calcular quantos giros faltam para completar o limite diário
+            $toCreate = $dailySpinsLimit - $existingSpins;
+            
+            if ($toCreate > 0) {
+                $values = [];
+                for ($i = 0; $i < $toCreate; $i++) {
+                    $values[] = "($uid, 0, 0, NOW(), NULL)";
+                }
+                $conn->query("INSERT INTO user_spins (user_id, prize_value, is_used, created_at, used_at) VALUES " . implode(',', $values));
+                $spinsCreatedCount += $toCreate;
+            }
         }
         
-        // 4. Registrar log do reset
+        // 5. Contar giros não usados totais após a criação
+        $result = $conn->query("SELECT COUNT(*) as total FROM user_spins WHERE is_used = 0");
+        $row = $result->fetch_assoc();
+        $totalUnusedSpins = $row['total'] ?? 0;
+        
+        // 6. Registrar log do reset
         $stmt = $conn->prepare("
             INSERT INTO spin_reset_logs 
             (spins_deleted, reset_datetime, triggered_by) 
-            VALUES (?, NOW(), 'api_roulette_scheduled_v2')
+            VALUES (?, NOW(), 'api_roulette_scheduled_v2_fixed')
         ");
         
         if ($stmt) {
@@ -116,12 +133,14 @@ try {
         // Retornar sucesso
         echo json_encode([
             'success' => true,
-            'message' => 'Reset da rouleta executado com sucesso!',
+            'message' => 'Reset da roleta executado com sucesso! Novos giros foram criados.',
             'data' => [
-                'reset_type' => 'roulette_v2',
-                'description' => 'Giros usados deletados, giros não usados mantidos',
+                'reset_type' => 'roulette_v2_fixed',
+                'description' => 'Giros usados deletados, novos giros criados mantendo os não usados',
                 'used_spins_deleted' => $usedSpinsDeleted,
-                'unused_spins_kept' => $unusedSpinsKept,
+                'new_spins_created' => $spinsCreatedCount,
+                'total_available_spins_in_db' => $totalUnusedSpins,
+                'daily_limit_per_user' => $dailySpinsLimit,
                 'reset_date' => $current_date,
                 'reset_datetime' => $current_datetime,
                 'timezone' => 'America/Sao_Paulo (GMT-3)',
@@ -140,7 +159,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao executar reset da rouleta',
+        'error' => 'Erro ao executar reset da roleta',
         'details' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
 }
