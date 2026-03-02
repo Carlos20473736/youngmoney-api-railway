@@ -177,6 +177,22 @@ public class SpinWheelActivity extends AppCompatActivity {
                 Log.d(TAG, "WebView onPageFinished");
                 webViewLoaded = true;
 
+                // Injetar userId no WebView para o YMID display
+                try {
+                    SessionManager sm = SessionManager.getInstance(SpinWheelActivity.this);
+                    String injectedId = sm.getUserId();
+                    if (injectedId != null && !injectedId.isEmpty()) {
+                        String jsInject = "window._injectedUserId = '" + injectedId.replace("'", "\\'" ) + "'; " +
+                                "if(typeof displayYmid === 'function') displayYmid();";
+                        Log.d(TAG, "Injetando userId no WebView: " + injectedId);
+                        webView.evaluateJavascript(jsInject, null);
+                    } else {
+                        Log.w(TAG, "userId vazio, não injetando no WebView");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Erro ao injetar userId: " + e.getMessage());
+                }
+
                 // Atualizar contador e valores se já foram carregados da API
                 if (pendingPrizeValues != null) {
                     Log.d(TAG, "Setting prize values in onPageFinished: " + pendingPrizeValues);
