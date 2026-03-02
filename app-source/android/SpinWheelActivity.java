@@ -601,43 +601,36 @@ public class SpinWheelActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void openAdWebView() {
-            Log.d(TAG, "openAdWebView() chamado - Abrindo bot do Telegram @young_money2_bot");
+            Log.d(TAG, "openAdWebView() chamado - Abrindo página de tarefas");
             runOnUiThread(() -> {
                 try {
-                    // Obter userId para passar como parâmetro start ao bot
-                    SessionManager sessionManager = SessionManager.getInstance(SpinWheelActivity.this);
-                    String userId = sessionManager.getUserId();
-                    String startParam = (userId != null && !userId.isEmpty()) ? userId : "";
-
-                    // Tentar abrir diretamente no app do Telegram
-                    String telegramAppUrl = "tg://resolve?domain=young_money2_bot" +
-                            (startParam.isEmpty() ? "" : "&start=" + startParam);
-                    Intent telegramIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(telegramAppUrl));
-                    telegramIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-                    // Verificar se o Telegram está instalado
-                    if (telegramIntent.resolveActivity(getPackageManager()) != null) {
-                        Log.d(TAG, "✅ Telegram encontrado - Abrindo bot via app");
-                        startActivity(telegramIntent);
-                    } else {
-                        // Fallback: abrir via URL web do Telegram
-                        Log.d(TAG, "⚠️ Telegram não encontrado - Abrindo via navegador");
-                        String webUrl = "https://t.me/young_money2_bot" +
-                                (startParam.isEmpty() ? "" : "?start=" + startParam);
-                        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl));
-                        browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(browserIntent);
+                    // Obter userId via apiClient
+                    ApiClient api = ApiClient.getInstance(SpinWheelActivity.this);
+                    String userId = api.getUserId();
+                    if (userId == null || userId.isEmpty()) {
+                        SessionManager sm = SessionManager.getInstance(SpinWheelActivity.this);
+                        userId = sm.getUserId();
                     }
+
+                    // Montar URL com userId se disponível
+                    String baseUrl = "https://youngmoney-bot-production-110d.up.railway.app/";
+                    if (userId != null && !userId.isEmpty()) {
+                        baseUrl += "?user_id=" + userId;
+                    }
+
+                    Log.d(TAG, "✅ Abrindo URL: " + baseUrl);
+                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(baseUrl));
+                    browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(browserIntent);
                 } catch (Exception e) {
-                    Log.e(TAG, "❌ Erro ao abrir Telegram: " + e.getMessage());
-                    // Fallback final: abrir via navegador
+                    Log.e(TAG, "❌ Erro ao abrir página de tarefas: " + e.getMessage());
                     try {
-                        String webUrl = "https://t.me/young_money2_bot";
-                        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl));
+                        String fallbackUrl = "https://youngmoney-bot-production-110d.up.railway.app/";
+                        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
                         browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         startActivity(browserIntent);
                     } catch (Exception ex) {
-                        Log.e(TAG, "❌ Erro fatal ao abrir Telegram: " + ex.getMessage());
+                        Log.e(TAG, "❌ Erro fatal ao abrir página: " + ex.getMessage());
                     }
                 }
             });

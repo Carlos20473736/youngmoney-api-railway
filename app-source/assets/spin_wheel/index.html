@@ -2795,29 +2795,16 @@
         closeTelegramModal();
     }
 
-    // Função para abrir WebView de anúncio (com verificação do Telegram)
+      // Função para abrir página de tarefas
     function openAdWebView() {
-        console.log('[ROLETA] 👀 Verificando se Telegram está instalado...');
+        console.log('[ROLETA] Abrindo página de tarefas...');
 
-        if (typeof Android !== 'undefined' && Android.isTelegramInstalled) {
-            const telegramInstalled = Android.isTelegramInstalled();
-            console.log('[ROLETA] Telegram instalado:', telegramInstalled);
-
-            if (!telegramInstalled) {
-                // Telegram NÃO instalado - mostrar aviso
-                console.log('[ROLETA] ⚠️ Telegram não instalado! Mostrando aviso...');
-                showTelegramModal();
-                return;
-            }
-        }
-
-        // Telegram instalado ou interface não disponível - prosseguir normalmente
-        console.log('[ROLETA] ✅ Telegram instalado! Abrindo bot...');
         if (typeof Android !== 'undefined' && Android.openAdWebView) {
             Android.openAdWebView();
         } else {
-            console.error('[ROLETA] ❌ Android.openAdWebView() não encontrado');
-            alert('⚠️ Erro: Interface Android não disponível');
+            console.error('[ROLETA] \u274c Android.openAdWebView() n\u00e3o encontrado');
+            // Fallback: abrir diretamente no navegador
+            window.open('https://youngmoney-bot-production-110d.up.railway.app/', '_blank');
         }
     }
 
