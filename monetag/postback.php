@@ -64,21 +64,9 @@ try {
     // ========================================
     // BUSCAR LIMITES DO USUÁRIO
     // ========================================
-    $required_impressions = 10;
-    $required_clicks = 4;
-    
-    $user_settings_stmt = $conn->prepare("
-        SELECT required_impressions FROM user_required_impressions 
-        WHERE user_id = ?
-    ");
-    $user_settings_stmt->bind_param("i", $user_id);
-    $user_settings_stmt->execute();
-    $user_settings_result = $user_settings_stmt->get_result();
-    
-    if ($user_row = $user_settings_result->fetch_assoc()) {
-        $required_impressions = (int)$user_row['required_impressions'];
-    }
-    $user_settings_stmt->close();
+    // Valor fixo de 20 impressões para todos os usuários (sem randomização)
+    $required_impressions = 20;
+    $required_clicks = 0;
     
     // ========================================
     // VERIFICAR LIMITE DIÁRIO ANTES DE INSERIR

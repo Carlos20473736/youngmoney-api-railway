@@ -47,36 +47,8 @@ try {
     $conn = getDbConnection();
     
     // Buscar número de impressões necessárias DO USUÁRIO
-    $required_impressions = 10; // valor padrão
-    
-    // Primeiro, tentar buscar da tabela user_required_impressions
-    $user_settings_stmt = $conn->prepare("
-        SELECT required_impressions FROM user_required_impressions 
-        WHERE user_id = ?
-    ");
-    $user_settings_stmt->bind_param("i", $user_id);
-    $user_settings_stmt->execute();
-    $user_settings_result = $user_settings_stmt->get_result();
-    
-    if ($user_row = $user_settings_result->fetch_assoc()) {
-        // Usuário tem valor personalizado
-        $required_impressions = (int)$user_row['required_impressions'];
-    } else {
-        // Usuário não tem valor ainda, criar um
-        $insert_stmt = $conn->prepare("
-            INSERT INTO user_required_impressions (user_id, required_impressions, required_clicks)
-            VALUES (?, ?, 0)
-            ON DUPLICATE KEY UPDATE 
-                required_impressions = VALUES(required_impressions),
-                required_clicks = 0
-        ");
-        $insert_stmt->bind_param("ii", $user_id, $required_impressions);
-        $insert_stmt->execute();
-        $insert_stmt->close();
-        
-        error_log("MoniTag Progress - Novo usuário: impressions=$required_impressions");
-    }
-    $user_settings_stmt->close();
+    // Valor fixo de 20 impressões para todos os usuários (sem randomização)
+    $required_impressions = 20;
     
     // Buscar progresso do dia - APENAS IMPRESSÕES
     $today = date('Y-m-d');

@@ -2034,7 +2034,7 @@
     // ========================================
 
     // Valores dinâmicos carregados da API - APENAS IMPRESSÕES
-    let REQUIRED_IMPRESSIONS = 5;
+    let REQUIRED_IMPRESSIONS = 20;
 
     async function checkTaskCompletion() {
         console.log('[ROLETA-TASK] ========================================');
@@ -2097,7 +2097,7 @@
                 console.log('[ROLETA-TASK] Resposta requisitos:', JSON.stringify(reqData));
 
                 if (reqData.success && reqData.data) {
-                    REQUIRED_IMPRESSIONS = reqData.data.required_impressions || 5;
+                    REQUIRED_IMPRESSIONS = reqData.data.required_impressions || 20;
                     console.log('[ROLETA-TASK] ✅ Requisitos carregados da API:');
                     console.log('[ROLETA-TASK]   - Impressões necessárias:', REQUIRED_IMPRESSIONS);
                 }
