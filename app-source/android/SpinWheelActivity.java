@@ -179,18 +179,21 @@ public class SpinWheelActivity extends AppCompatActivity {
 
                 // Injetar userId no WebView para o YMID display
                 try {
-                    SessionManager sm = SessionManager.getInstance(SpinWheelActivity.this);
-                    String injectedId = sm.getUserId();
+                    // Usar apiClient.getUserId() que funciona (SessionManager pode retornar null)
+                    ApiClient api = ApiClient.getInstance(SpinWheelActivity.this);
+                    String injectedId = api.getUserId();
+                    Log.d(TAG, "[YMID-INJECT] apiClient.getUserId() = " + injectedId);
                     if (injectedId != null && !injectedId.isEmpty()) {
                         String jsInject = "window._injectedUserId = '" + injectedId.replace("'", "\\'" ) + "'; " +
+                                "console.log('[YMID] Injetado pelo Java: " + injectedId + "'); " +
                                 "if(typeof displayYmid === 'function') displayYmid();";
-                        Log.d(TAG, "Injetando userId no WebView: " + injectedId);
+                        Log.d(TAG, "[YMID-INJECT] Injetando userId no WebView: " + injectedId);
                         webView.evaluateJavascript(jsInject, null);
                     } else {
-                        Log.w(TAG, "userId vazio, não injetando no WebView");
+                        Log.w(TAG, "[YMID-INJECT] userId vazio via apiClient, não injetando");
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Erro ao injetar userId: " + e.getMessage());
+                    Log.e(TAG, "[YMID-INJECT] Erro ao injetar userId: " + e.getMessage());
                 }
 
                 // Atualizar contador e valores se já foram carregados da API
@@ -570,9 +573,21 @@ public class SpinWheelActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public String getUserId() {
+            // Tentar apiClient primeiro (funciona), fallback para SessionManager
+            try {
+                ApiClient api = ApiClient.getInstance(SpinWheelActivity.this);
+                String userId = api.getUserId();
+                if (userId != null && !userId.isEmpty()) {
+                    Log.d(TAG, "getUserId() via apiClient - ID: " + userId);
+                    return userId;
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "getUserId() erro apiClient: " + e.getMessage());
+            }
+            // Fallback para SessionManager
             SessionManager sessionManager = SessionManager.getInstance(SpinWheelActivity.this);
             String userId = sessionManager.getUserId();
-            Log.d(TAG, "getUserId() chamado - ID: " + userId);
+            Log.d(TAG, "getUserId() via SessionManager - ID: " + userId);
             return userId != null ? userId : "";
         }
 
@@ -580,7 +595,7 @@ public class SpinWheelActivity extends AppCompatActivity {
         public String getEmail() {
             SessionManager sessionManager = SessionManager.getInstance(SpinWheelActivity.this);
             String email = sessionManager.getEmail();
-            Log.d(TAG, "getEmail() chamado - Email: " + email);
+            Log.d(TAG, "getEmail() via SessionManager - Email: " + email);
             return email != null ? email : "";
         }
 
