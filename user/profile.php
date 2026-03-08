@@ -50,14 +50,22 @@ try {
         $newXReq = generateNewXReq($conn, $user, $userAgent);
         header("X-New-Req: $newXReq");
         
+        // Taxa de conversão: 5.000.000 pontos = R$ 1,00
+        $pointsPerReal = 5000000;
+        $userPoints = (int)$user['points'];
+        $balanceBrl = round($userPoints / $pointsPerReal, 2);
+        
         // Retornar perfil completo do usuário
         $profileData = [
             'id' => (int)$user['id'],
             'email' => $user['email'],
             'name' => $user['name'],
             'profile_picture' => $user['profile_picture'] ?: '',
-            'balance' => (int)$user['points'], // balance = points
-            'points' => (int)$user['points'],
+            'balance' => $userPoints, // balance = points (raw)
+            'points' => $userPoints,
+            'balance_brl' => $balanceBrl,
+            'balance_brl_formatted' => 'R$ ' . number_format($balanceBrl, 2, ',', '.'),
+            'points_per_real' => $pointsPerReal,
             'invite_code' => $user['invite_code'],
             'greeting' => $greeting,
             'created_at' => $user['created_at'],

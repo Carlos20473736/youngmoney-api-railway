@@ -30,10 +30,19 @@ try {
     // VALIDAÇÃO DE HEADERS REMOVIDA - estava bloqueando requisições legítimas
     // validateSecurityHeaders($conn, $user);
     
-    // Retornar saldo (points)
+    // Taxa de conversão: 5.000.000 pontos = R$ 1,00
+    $pointsPerReal = 5000000;
+    $userPoints = (int)$user['points'];
+    $balanceBrl = round($userPoints / $pointsPerReal, 2);
+    
+    // Retornar saldo (points + BRL)
     sendSuccess([
-        'balance' => (int)$user['points'],
-        'points' => (int)$user['points']
+        'balance' => $userPoints,
+        'points' => $userPoints,
+        'points_formatted' => number_format($userPoints, 0, '', '.'),
+        'balance_brl' => $balanceBrl,
+        'balance_brl_formatted' => 'R$ ' . number_format($balanceBrl, 2, ',', '.'),
+        'points_per_real' => $pointsPerReal,
     ]);
     
     $conn->close();

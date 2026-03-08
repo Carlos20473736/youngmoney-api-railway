@@ -1,11 +1,11 @@
 <?php
 /**
-
-
- * Endpoint Público - Valores Rápidos de Saque
+ * Endpoint Público - Valores Rápidos de Saque + Configuração de Pontos
  * Permite que o app Android busque os valores configurados
  * 
  * GET /api/v1/withdrawal_values.php
+ * 
+ * TAXA: 5.000.000 pontos = R$ 1,00
  */
 
 header('Content-Type: application/json');
@@ -23,6 +23,9 @@ date_default_timezone_set('America/Sao_Paulo');
 require_once __DIR__ . '/../../includes/DecryptMiddleware.php';
 require_once __DIR__ . '/../../database.php';
 require_once __DIR__ . '/middleware/MaintenanceCheck.php';
+
+// Constantes
+define('POINTS_PER_REAL', 5000000);
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -70,20 +73,45 @@ try {
     ");
     
     $values = [];
+    $valuesWithPoints = [];
     while ($row = $result->fetch_assoc()) {
-        $values[] = (float)$row['value_amount'];
+        $brl = (float)$row['value_amount'];
+        $values[] = $brl;
+        $points = (int)($brl * POINTS_PER_REAL);
+        $valuesWithPoints[] = [
+            'brl' => $brl,
+            'brl_formatted' => 'R$ ' . number_format($brl, 2, ',', '.'),
+            'points' => $points,
+            'points_formatted' => number_format($points, 0, '', '.'),
+        ];
     }
     
     $conn->close();
     
     // Se não houver valores, retornar padrão
     if (empty($values)) {
-        $values = [1.0, 10.0, 20.0, 50.0];
+        $defaultValues = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0];
+        $values = $defaultValues;
+        foreach ($defaultValues as $brl) {
+            $points = (int)($brl * POINTS_PER_REAL);
+            $valuesWithPoints[] = [
+                'brl' => $brl,
+                'brl_formatted' => 'R$ ' . number_format($brl, 2, ',', '.'),
+                'points' => $points,
+                'points_formatted' => number_format($points, 0, '', '.'),
+            ];
+        }
     }
     
     // Enviar resposta criptografada
     DecryptMiddleware::sendSuccess([
-        'values' => $values
+        'values' => $values,
+        'values_with_points' => $valuesWithPoints,
+        'points_per_real' => POINTS_PER_REAL,
+        'points_per_real_formatted' => number_format(POINTS_PER_REAL, 0, '', '.'),
+        'min_withdrawal_brl' => 1.00,
+        'min_withdrawal_points' => POINTS_PER_REAL,
+        'available_methods' => ['pix', 'binance', 'faucetpay'],
     ], true);
     
 } catch (Exception $e) {

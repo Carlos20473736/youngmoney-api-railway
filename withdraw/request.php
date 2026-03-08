@@ -1,7 +1,12 @@
 <?php
 /**
- * Withdraw Request Endpoint
- * POST - Solicita um novo saque
+ * Withdraw Request Endpoint - V2
+ * POST - Solicita um novo saque (PIX, Binance ou FaucetPay)
+ * 
+ * TAXA DE CONVERSÃO: 5.000.000 pontos = R$ 1,00
+ * MÍNIMO: 5.000.000 pontos (R$ 1,00)
+ * 
+ * Para crypto (Binance/FaucetPay): converte R$ para LTC em tempo real
  */
 
 header('Content-Type: application/json');
@@ -16,6 +21,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../database.php';
 require_once __DIR__ . '/../includes/auth_helper.php';
+
+// ========================================
+// CONSTANTES DE CONVERSÃO
+// ========================================
+define('POINTS_PER_REAL', 5000000); // 5 milhões de pontos = R$ 1,00
+define('MIN_POINTS', 5000000);       // Mínimo para saque: 5M pontos
+define('MIN_BRL', 1.00);             // Mínimo em reais
+
+/**
+ * Busca cotação do Litecoin em BRL
+ */
+function getLtcBrlRate() {
+    $cacheFile = sys_get_temp_dir() . '/ltc_brl_cache.json';
+    $cacheTime = 300; // 5 minutos
+    
+    if (file_exists($cacheFile)) {
+        $cacheData = json_decode(file_get_contents($cacheFile), true);
+        if ($cacheData && (time() - $cacheData['timestamp']) < $cacheTime) {
+            return $cacheData['rate'];
+        }
+    }
+    
+    // CoinGecko API
+    $url = 'https://api.coingecko.com/api/v3/simple/price?ids=litecoin&vs_currencies=brl';
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200 && $response) {
+        $data = json_decode($response, true);
+        if (isset($data['litecoin']['brl'])) {
+            $rate = (float)$data['litecoin']['brl'];
+            file_put_contents($cacheFile, json_encode([
+                'rate' => $rate,
+                'timestamp' => time(),
+            ]));
+            return $rate;
+        }
+    }
+    
+    // Fallback: Binance API
+    $url = 'https://api.binance.com/api/v3/ticker/price?symbol=LTCBRL';
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200 && $response) {
+        $data = json_decode($response, true);
+        if (isset($data['price'])) {
+            $rate = (float)$data['price'];
+            file_put_contents($cacheFile, json_encode([
+                'rate' => $rate,
+                'timestamp' => time(),
+            ]));
+            return $rate;
+        }
+    }
+    
+    return 550.00; // Fallback
+}
 
 try {
     $conn = getDbConnection();
@@ -35,83 +114,88 @@ try {
         sendError('Dados inválidos', 400);
     }
     
-    // Validar campos obrigatórios
-    $amount = isset($data['amount']) ? (float)$data['amount'] : 0;
-    $pixType = $data['pix_type'] ?? null;
-    $pixKey = $data['pix_key'] ?? null;
+    // ========================================
+    // VALIDAR CAMPOS
+    // ========================================
+    $amountBrl = isset($data['amount']) ? (float)$data['amount'] : 0;
+    $paymentMethod = strtolower($data['method'] ?? 'pix');
     
-    if ($amount <= 0) {
-        sendError('Valor inválido', 400);
+    // Validar método de pagamento
+    $validMethods = ['pix', 'binance', 'faucetpay'];
+    if (!in_array($paymentMethod, $validMethods)) {
+        sendError('Método de pagamento inválido. Use: pix, binance ou faucetpay', 400);
     }
     
-    if (!$pixType || !$pixKey) {
-        sendError('Tipo e chave PIX são obrigatórios', 400);
+    // Validar valor mínimo em BRL
+    if ($amountBrl < MIN_BRL) {
+        sendError('Valor mínimo para saque é R$ ' . number_format(MIN_BRL, 2, ',', '.') . ' (5.000.000 pontos)', 400);
     }
     
-    // Buscar configurações de saque (limites e valores rápidos)
-    $stmt = $conn->prepare("
-        SELECT setting_key, setting_value 
-        FROM system_settings 
-        WHERE setting_key IN ('min_withdrawal', 'max_withdrawal')
-    ");
-    $stmt->execute();
-    $result = $stmt->get_result();
+    // Calcular pontos necessários
+    $pointsRequired = (int)($amountBrl * POINTS_PER_REAL);
     
-    $minWithdrawal = 10; // padrão
-    $maxWithdrawal = 1000; // padrão
+    // Verificar saldo do usuário
+    $currentPoints = (int)$user['points'];
+    if ($currentPoints < $pointsRequired) {
+        $pointsFormatted = number_format($pointsRequired, 0, '', '.');
+        $balanceFormatted = number_format($currentPoints, 0, '', '.');
+        sendError("Saldo insuficiente. Necessário: {$pointsFormatted} pontos. Seu saldo: {$balanceFormatted} pontos", 400);
+    }
     
-    while ($row = $result->fetch_assoc()) {
-        if ($row['setting_key'] === 'min_withdrawal') {
-            $minWithdrawal = (float)$row['setting_value'];
-        } elseif ($row['setting_key'] === 'max_withdrawal') {
-            $maxWithdrawal = (float)$row['setting_value'];
+    // ========================================
+    // VALIDAR DADOS ESPECÍFICOS DO MÉTODO
+    // ========================================
+    $pixType = null;
+    $pixKey = null;
+    $cryptoAddress = null;
+    $cryptoAmount = null;
+    $cryptoCurrency = 'LTC';
+    $exchangeRate = null;
+    
+    if ($paymentMethod === 'pix') {
+        // Validar PIX
+        $pixType = $data['pix_type'] ?? null;
+        $pixKey = $data['pix_key'] ?? null;
+        
+        if (!$pixType || !$pixKey) {
+            sendError('Tipo e chave PIX são obrigatórios', 400);
+        }
+        
+    } else {
+        // Validar Crypto (Binance ou FaucetPay)
+        $cryptoAddress = $data['crypto_address'] ?? $data['address'] ?? null;
+        
+        if (!$cryptoAddress || strlen(trim($cryptoAddress)) < 10) {
+            sendError('Endereço da carteira é obrigatório', 400);
+        }
+        
+        $cryptoAddress = trim($cryptoAddress);
+        
+        // Buscar cotação LTC/BRL em tempo real
+        $ltcRate = getLtcBrlRate();
+        $exchangeRate = $ltcRate;
+        
+        // Calcular valor em LTC
+        $cryptoAmount = round($amountBrl / $ltcRate, 8);
+        
+        if ($cryptoAmount <= 0) {
+            sendError('Erro ao calcular valor em Litecoin. Tente novamente.', 500);
         }
     }
-    $stmt->close();
     
-    // Buscar valores rápidos configurados
-    $stmt = $conn->prepare("
-        SELECT value_amount 
-        FROM withdrawal_quick_values 
-        WHERE is_active = 1
-    ");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $quickValues = [];
-    while ($row = $result->fetch_assoc()) {
-        $quickValues[] = (float)$row['value_amount'];
-    }
-    $stmt->close();
-    
-    // Verificar se usuário tem saldo suficiente
-    if ($user['points'] < $amount) {
-        sendError('Saldo insuficiente', 400);
-    }
-    
-    // Validar valor: aceitar se for um valor rápido OU se estiver dentro dos limites
-    $isQuickValue = in_array($amount, $quickValues);
-    $isWithinLimits = ($amount >= $minWithdrawal && $amount <= $maxWithdrawal);
-    
-    if (!$isQuickValue && !$isWithinLimits) {
-        if ($amount < $minWithdrawal) {
-            sendError("Valor mínimo para saque é R$ " . number_format($minWithdrawal, 2, ',', '.'), 400);
-        } else {
-            sendError("Valor máximo para saque é R$ " . number_format($maxWithdrawal, 2, ',', '.'), 400);
-        }
-    }
-    
-    // Iniciar transação
+    // ========================================
+    // PROCESSAR SAQUE
+    // ========================================
     $conn->begin_transaction();
     
     try {
-        // Debitar pontos do usuário
+        // 1. Debitar pontos do usuário
         $stmt = $conn->prepare("
             UPDATE users 
             SET points = points - ?
             WHERE id = ? AND points >= ?
         ");
-        $stmt->bind_param("dii", $amount, $user['id'], $amount);
+        $stmt->bind_param("iii", $pointsRequired, $user['id'], $pointsRequired);
         $stmt->execute();
         
         if ($stmt->affected_rows === 0) {
@@ -119,36 +203,89 @@ try {
         }
         $stmt->close();
         
-        // Criar registro de saque
-        $stmt = $conn->prepare("
-            INSERT INTO withdrawals (user_id, amount, pix_type, pix_key, status)
-            VALUES (?, ?, ?, ?, 'pending')
-        ");
-        $stmt->bind_param("idss", $user['id'], $amount, $pixType, $pixKey);
+        // 2. Criar registro de saque
+        if ($paymentMethod === 'pix') {
+            $stmt = $conn->prepare("
+                INSERT INTO withdrawals 
+                (user_id, amount, pix_type, pix_key, payment_method, points_debited, status)
+                VALUES (?, ?, ?, ?, 'pix', ?, 'pending')
+            ");
+            $stmt->bind_param("idssi", $user['id'], $amountBrl, $pixType, $pixKey, $pointsRequired);
+        } else {
+            $stmt = $conn->prepare("
+                INSERT INTO withdrawals 
+                (user_id, amount, payment_method, crypto_address, crypto_amount, crypto_currency, points_debited, exchange_rate, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            ");
+            $stmt->bind_param("idssdsdi", 
+                $user['id'], $amountBrl, $paymentMethod, $cryptoAddress, 
+                $cryptoAmount, $cryptoCurrency, $pointsRequired, $exchangeRate
+            );
+        }
         $stmt->execute();
         $withdrawalId = $stmt->insert_id;
         $stmt->close();
         
-        // Registrar transação de pontos
-        $description = "Saque solicitado - ID: $withdrawalId";
+        // 3. Registrar transação de pontos
+        $methodLabel = strtoupper($paymentMethod);
+        if ($paymentMethod === 'pix') {
+            $description = "Saque de R$ " . number_format($amountBrl, 2, ',', '.') . " via PIX - ID: $withdrawalId";
+        } else {
+            $ltcFormatted = number_format($cryptoAmount, 8, '.', '');
+            $description = "Saque de R$ " . number_format($amountBrl, 2, ',', '.') . " ({$ltcFormatted} LTC) via {$methodLabel} - ID: $withdrawalId";
+        }
+        
+        $negativePoints = -$pointsRequired;
         $stmt = $conn->prepare("
             INSERT INTO point_transactions (user_id, points, type, description)
             VALUES (?, ?, 'debit', ?)
         ");
-        $negativeAmount = -$amount;
-        $stmt->bind_param("ids", $user['id'], $negativeAmount, $description);
+        $stmt->bind_param("iis", $user['id'], $negativePoints, $description);
         $stmt->execute();
         $stmt->close();
+        
+        // Também registrar em points_history se a tabela existir
+        try {
+            $stmt = $conn->prepare("
+                INSERT INTO points_history (user_id, points, description, type)
+                VALUES (?, ?, ?, 'debit')
+            ");
+            $stmt->bind_param("iis", $user['id'], $negativePoints, $description);
+            $stmt->execute();
+            $stmt->close();
+        } catch (Exception $e) {
+            // Tabela pode não existir, ignorar
+        }
         
         // Commit da transação
         $conn->commit();
         
-        sendSuccess([
+        // ========================================
+        // RESPOSTA DE SUCESSO
+        // ========================================
+        $responseData = [
             'withdrawal_id' => $withdrawalId,
-            'amount' => $amount,
+            'amount_brl' => $amountBrl,
+            'amount_brl_formatted' => 'R$ ' . number_format($amountBrl, 2, ',', '.'),
+            'points_debited' => $pointsRequired,
+            'points_debited_formatted' => number_format($pointsRequired, 0, '', '.'),
+            'remaining_points' => $currentPoints - $pointsRequired,
+            'payment_method' => $paymentMethod,
             'status' => 'pending',
-            'message' => 'Saque solicitado com sucesso! Aguarde a aprovação.'
-        ]);
+            'message' => 'Saque solicitado com sucesso! Aguarde a aprovação.',
+        ];
+        
+        // Adicionar dados crypto se aplicável
+        if ($paymentMethod !== 'pix') {
+            $responseData['crypto_amount'] = $cryptoAmount;
+            $responseData['crypto_amount_formatted'] = number_format($cryptoAmount, 8, '.', '') . ' LTC';
+            $responseData['crypto_currency'] = $cryptoCurrency;
+            $responseData['exchange_rate'] = $exchangeRate;
+            $responseData['exchange_rate_formatted'] = 'R$ ' . number_format($exchangeRate, 2, ',', '.') . '/LTC';
+            $responseData['crypto_address'] = $cryptoAddress;
+        }
+        
+        sendSuccess($responseData);
         
     } catch (Exception $e) {
         $conn->rollback();
