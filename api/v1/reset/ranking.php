@@ -153,7 +153,7 @@ try {
                 u.pix_key
             FROM users u
             LEFT JOIN ranking_cooldowns rc ON u.id = rc.user_id AND rc.cooldown_until > ?
-            WHERE u.daily_points > 0
+            WHERE u.daily_points >= 2000000
               AND u.pix_key IS NOT NULL 
               AND u.pix_key != ''
               AND rc.id IS NULL
