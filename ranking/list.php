@@ -4,6 +4,7 @@
  * GET - Retorna lista do ranking de usuários por pontos
  * IMPORTANTE: Só mostra usuários que têm chave PIX cadastrada
  * IMPORTANTE: Exclui usuários em período de cooldown
+ * IMPORTANTE: Mínimo de 2.000.000 pontos para entrar no ranking diário
  */
 
 header('Content-Type: application/json');
@@ -18,6 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../database.php';
 require_once __DIR__ . '/../includes/auth_helper.php';
+
+// Pontos mínimos para entrar no ranking diário
+define('MIN_RANKING_POINTS', 2000000);
 
 try {
     $conn = getDbConnection();
@@ -52,20 +56,24 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     
-    // Buscar ranking (pontos diários) - APENAS usuários com chave PIX cadastrada
-    // EXCLUI usuários em período de cooldown
+    // Buscar ranking (pontos diários)
+    // REQUISITOS para entrar no ranking:
+    // 1. Ter chave PIX cadastrada
+    // 2. Não estar em cooldown
+    // 3. Ter no MÍNIMO 2.000.000 pontos diários
+    $minPoints = MIN_RANKING_POINTS;
     $stmt = $conn->prepare("
         SELECT u.id, u.name, u.profile_picture, u.daily_points as points
         FROM users u
         LEFT JOIN ranking_cooldowns rc ON u.id = rc.user_id AND rc.cooldown_until > ?
-        WHERE u.daily_points > 0 
+        WHERE u.daily_points >= ?
           AND u.pix_key IS NOT NULL 
           AND u.pix_key != ''
           AND rc.id IS NULL
         ORDER BY u.daily_points DESC, u.created_at ASC
         LIMIT ?
     ");
-    $stmt->bind_param("si", $now, $limit);
+    $stmt->bind_param("sii", $now, $minPoints, $limit);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -99,7 +107,8 @@ try {
     sendSuccess([
         'greeting' => $greeting,
         'ranking' => $ranking,
-        'total' => count($ranking)
+        'total' => count($ranking),
+        'min_points' => MIN_RANKING_POINTS
     ]);
     
 } catch (Exception $e) {
